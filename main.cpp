@@ -1533,6 +1533,20 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 			}
 		}
 		
+		// Otherwise
+		else {
+		
+			// Check if sending keep alive request to the stratum server failed
+			if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
+			
+				// Display message
+				cout << "Sending get keep alive request to the stratum server failed" << endl;
+				
+				// Return failure
+				exit(EXIT_FAILURE);
+			}
+		}
+		
 		// Loop while a response from stratum server is available
 		int responseAvailable;
 		do {
