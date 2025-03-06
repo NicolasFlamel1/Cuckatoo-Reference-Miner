@@ -1607,7 +1607,7 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 					else {
 					
 						// Display message
-						cout << "Receiving response from the stratum server failed" << endl;
+						cout << "Receiving response from the stratum server failed. Error " << errno << endl;
 					}
 					
 					// Return failure
@@ -1621,7 +1621,7 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 					if(responseSize == sizeof(serverResponse) - sizeof('\0')) {
 					
 						// Display message
-						cout << "Receiving response from the stratum server failed" << endl;
+						cout << "Receiving response from the stratum server failed. Buffer full" << endl;
 						
 						// Return failure
 						exit(EXIT_FAILURE);
@@ -1646,7 +1646,7 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 					else {
 					
 						// Display message
-						cout << "Receiving response from the stratum server failed" << endl;
+						cout << "Receiving response from the stratum server failed. Error " << errno << endl;
 					}
 					
 					// Return failure
