@@ -37,10 +37,20 @@ make crossCompilingDependencies CC=x86_64-w64-mingw32-g++-posix
 make CC=x86_64-w64-mingw32-g++-posix EDGE_BITS=30
 ```
 
+### Usage
+A stratum server address, port, and username can be provided when running this program to set the stratum server that it will mine to. For example, the following command will connect to the stratum server with the address `127.0.0.1`, at port `3416`, and use the username `username`. Once the software connects to a stratum server, it will start mining and display the `Searching` and `Trimming` times for each graph that it processes. Those two pipeline stages run in parallel with the GPU being responsible for trimming and the CPU being responsible for searching, and you can determine your mining rate in graphs/second by dividing 1 by the greater of the two times.
+```
+"./Cuckatoo Reference Miner" --stratum_server_address 127.0.0.1 --stratum_server_port 3416 --stratum_server_username username
+```
+
 ### Tuning
 A `TRIMMING_ROUNDS` setting can be provided when building this program that can be adjusted to make the `Searching` time displayed when running this program as close to, but not greater than, the `Trimming` time displayed to maximize this program's performance (without regard for power usage). Increasing the `TRIMMING_ROUNDS` setting decreases the `Searching` time and increases the `Trimming` time, and decreasing the `TRIMMING_ROUNDS` setting increases the `Searching` time and decreases the `Trimming` time while also increasing CPU RAM usage.
 ```
 make EDGE_BITS=30 TRIMMING_ROUNDS=25
+```
+A `TUNING=1` setting can be provided when building this program which will make it skip connecting to a stratum server. This is only useful for tuning the software since it can't mine blocks without being connected to a stratum server.
+```
+make EDGE_BITS=30 TRIMMING_ROUNDS=25 TUNING=1
 ```
 
 Also be sure to set your operating system's power mode to best performance when running this program.
