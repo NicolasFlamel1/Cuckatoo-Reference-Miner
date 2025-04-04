@@ -70,8 +70,8 @@ static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_
 // Decimal number base
 #define DECIMAL_NUMBER_BASE 10
 
-// Edge mask
-#define EDGE_MASK (NUMBER_OF_EDGES - 1)
+// Node mask
+#define NODE_MASK (NUMBER_OF_EDGES - 1)
 
 // BLAKE2b hash size
 #define BLAKE2B_HASH_SIZE 32

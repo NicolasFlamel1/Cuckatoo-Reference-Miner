@@ -17,8 +17,8 @@ using namespace metal;
 // Number of edges
 #define NUMBER_OF_EDGES (static_cast<ulong>(1) << EDGE_BITS)
 
-// Edge mask
-#define EDGE_MASK (NUMBER_OF_EDGES - 1)
+// Node mask
+#define NODE_MASK (NUMBER_OF_EDGES - 1)
 
 // SipRound rotation
 #define SIP_ROUND_ROTATION 21
@@ -182,10 +182,20 @@ uint sipHash24(ulong4 keys, const ulong nonce) {
 	sipRound(keys);
 	sipRound(keys);
 	sipRound(keys);
-	
-	// Return node from keys
 	keys.lo ^= keys.hi;
-	return (keys.x ^ keys.y) & EDGE_MASK;
+	
+	// Check if edge bits is 32
+	#if EDGE_BITS == 32
+	
+		// Return node from keys
+		return keys.x ^ keys.y;
+		
+	// Otherwise
+	#else
+	
+		// Return node from keys
+		return (keys.x ^ keys.y) & NODE_MASK;
+	#endif
 }
 
 // SipRound

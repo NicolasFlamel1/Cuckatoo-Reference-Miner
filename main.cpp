@@ -749,10 +749,10 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 							
 							// Set edge's nodes
 							const uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) nonces = {static_cast<uint64_t>(edges[edgeIndex]) * 2, (static_cast<uint64_t>(edges[edgeIndex]) * 2) | 1};
-							uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) uvs;
-							sipHash24<2>(&uvs, *searchingThreadsSipHashKeys, &nonces);
-							edges[edgeIndex + 1] = uvs[0];
-							edges[edgeIndex + 2] = uvs[1];
+							uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) nodes;
+							sipHash24<2>(&nodes, *searchingThreadsSipHashKeys, &nonces);
+							edges[edgeIndex + 1] = nodes[0];
+							edges[edgeIndex + 2] = nodes[1];
 							
 							// Go to next edge
 							edgeIndex += EDGE_NUMBER_OF_COMPONENTS;
@@ -1226,10 +1226,10 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 										
 										// Set edge's nodes
 										const uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) nonces = {static_cast<uint64_t>(edges[edgeIndex]) * 2, (static_cast<uint64_t>(edges[edgeIndex]) * 2) | 1};
-										uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) uvs;
-										sipHash24<2>(&uvs, *searchingThreadsSipHashKeys, &nonces);
-										edges[edgeIndex + 1] = uvs[0];
-										edges[edgeIndex + 2] = uvs[1];
+										uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) nodes;
+										sipHash24<2>(&nodes, *searchingThreadsSipHashKeys, &nonces);
+										edges[edgeIndex + 1] = nodes[0];
+										edges[edgeIndex + 2] = nodes[1];
 										
 										// Go to next edge
 										edgeIndex += EDGE_NUMBER_OF_COMPONENTS;

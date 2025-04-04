@@ -19,7 +19,7 @@ using namespace std;
 // Function prototypes
 
 // SipHash-2-4
-template<const unsigned int numberOfStates> static inline void sipHash24(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *uvs, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &keys, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nonces) noexcept;
+template<const unsigned int numberOfStates> static inline void sipHash24(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nodes, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &keys, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nonces) noexcept;
 
 // SipRound
 template<const unsigned int numberOfStates> static inline void sipRound(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) states[SIPHASH_KEYS_SIZE]) noexcept;
@@ -28,7 +28,7 @@ template<const unsigned int numberOfStates> static inline void sipRound(uint64_t
 // Supporting function implementation
 
 // SipHash-2-4
-template<const unsigned int numberOfStates> void sipHash24(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *uvs, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &keys, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nonces) noexcept {
+template<const unsigned int numberOfStates> void sipHash24(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nodes, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &keys, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nonces) noexcept {
 
 	// Initialize states
 	uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) states[SIPHASH_KEYS_SIZE] = {};
@@ -49,8 +49,8 @@ template<const unsigned int numberOfStates> void sipHash24(uint64_t __attribute_
 	sipRound<numberOfStates>(states);
 	sipRound<numberOfStates>(states);
 	
-	// Get UVs from states
-	*uvs = (states[0] ^ states[1] ^ states[2] ^ states[3]) & EDGE_MASK;
+	// Get nodes from states
+	*nodes = (states[0] ^ states[1] ^ states[2] ^ states[3]) & NODE_MASK;
 }
 
 // SipRound
