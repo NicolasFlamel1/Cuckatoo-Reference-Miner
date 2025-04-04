@@ -49,8 +49,18 @@ template<const unsigned int numberOfStates> void sipHash24(uint64_t __attribute_
 	sipRound<numberOfStates>(states);
 	sipRound<numberOfStates>(states);
 	
-	// Get nodes from states
-	*nodes = (states[0] ^ states[1] ^ states[2] ^ states[3]) & NODE_MASK;
+	// Check if edge bits is 32
+	#if EDGE_BITS == 32
+	
+		// Get nodes from states
+		*nodes = states[0] ^ states[1] ^ states[2] ^ states[3];
+		
+	// Otherwise
+	#else
+	
+		// Get nodes from states
+		*nodes = (states[0] ^ states[1] ^ states[2] ^ states[3]) & NODE_MASK;
+	#endif
 }
 
 // SipRound
