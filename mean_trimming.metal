@@ -23,23 +23,11 @@ using namespace metal;
 // SipRound rotation
 #define SIP_ROUND_ROTATION 21
 
-// Number of buckets
-#define NUMBER_OF_BUCKETS (1 << NUMBER_OF_BITS_FOR_BUCKETS)
-
-// Number of most significant bits used for bucket sorting
-#define NUMBER_OF_MOST_SIGNIFICANT_BITS_USED_FOR_BUCKET_SORTING (static_cast<char>(sizeof(uint) * BITS_IN_A_BYTE) - EDGE_BITS + NUMBER_OF_BITS_FOR_BUCKETS)
-
-// Number of least significant bits ignored during bucket sorting
-#define NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING (static_cast<char>(sizeof(uint) * BITS_IN_A_BYTE) - NUMBER_OF_MOST_SIGNIFICANT_BITS_USED_FOR_BUCKET_SORTING)
-
 // Number of items per bucket
-#define NUMBER_OF_ITEMS_PER_BUCKET (1 << NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING)
+#define NUMBER_OF_ITEMS_PER_BUCKET (NUMBER_OF_EDGES / NUMBER_OF_BUCKETS)
 
 // Bucket item mask
 #define BUCKET_ITEM_MASK (NUMBER_OF_ITEMS_PER_BUCKET - 1)
-
-// Number of bitmap bytes
-#define NUMBER_OF_BITMAP_BYTES (NUMBER_OF_ITEMS_PER_BUCKET / BITS_IN_A_BYTE)
 
 // Global ID
 const uint globalId [[thread_position_in_grid]];
