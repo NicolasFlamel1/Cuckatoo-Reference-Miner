@@ -7,13 +7,16 @@
 using namespace std;
 
 
+// Configurable constants
+
+// Lean trimming number of edges per step one work item
+#define LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM 64
+
+
 // Constants
 
 // Lean trimming required RAM bytes
 #define LEAN_TRIMMING_REQUIRED_RAM_BYTES (NUMBER_OF_EDGES / BITS_IN_A_BYTE * 3)
-
-// Lean trimming number of edges per step one work item
-#define LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM 64
 
 
 // Function prototypes

@@ -9,9 +9,6 @@ using namespace std;
 
 // Configurable constants
 
-// Mean trimming target work group RAM bytes
-#define MEAN_TRIMMING_TARGET_WORK_GROUP_RAM_BYTES (32 * BYTES_IN_A_KILOBYTE)
-
 // Mean trimming number of edges per step one work item
 #define MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM 1024
 
@@ -22,7 +19,7 @@ using namespace std;
 // Constants
 
 // Mean trimming number of bitmap bytes (Divide by 4 sets minimum number of buckets to 4)
-#define MEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES min(static_cast<uint64_t>(MEAN_TRIMMING_TARGET_WORK_GROUP_RAM_BYTES), (NUMBER_OF_EDGES / BITS_IN_A_BYTE) / 4)
+#define MEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES min(static_cast<uint64_t>(LOCAL_RAM_KILOBYTES * BYTES_IN_A_KILOBYTE), (NUMBER_OF_EDGES / BITS_IN_A_BYTE) / 4)
 
 // Mean trimming number of buckets
 #define MEAN_TRIMMING_NUMBER_OF_BUCKETS ((NUMBER_OF_EDGES / BITS_IN_A_BYTE) / MEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES)

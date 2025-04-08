@@ -3,8 +3,9 @@ NAME = "Cuckatoo Reference Miner"
 VERSION = 0.0.2
 EDGE_BITS = 30
 TRIMMING_ROUNDS = 25
+LOCAL_RAM_KILOBYTES = 32
 CC = "g++"
-CFLAGS = -march=native -mtune=native -Ofast -Wall -Wextra -Wno-vla -Wno-type-limits -Wno-missing-field-initializers -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME=$(NAME) -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS)
+CFLAGS = -march=native -mtune=native -Ofast -Wall -Wextra -Wno-vla -Wno-type-limits -Wno-missing-field-initializers -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME=$(NAME) -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS) -DLOCAL_RAM_KILOBYTES=$(LOCAL_RAM_KILOBYTES)
 LIBS = -lm
 SRCS = "./main.cpp"
 

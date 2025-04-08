@@ -72,7 +72,7 @@
 using namespace std;
 
 
-// Constants
+// Configurable constants
 
 // Max number of searching threads
 #define MAX_NUMBER_OF_SEARCHING_THREADS 8
@@ -205,7 +205,7 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 #endif
 
 	// Display message
-	cout << TO_STRING(NAME) << " v" << TO_STRING(VERSION) << " (Cuckatoo" << TO_STRING(EDGE_BITS) << ", " << TRIMMING_ROUNDS << " trimming round(s))" << endl;
+	cout << TO_STRING(NAME) " v" TO_STRING(VERSION) " (Cuckatoo" TO_STRING(EDGE_BITS) ", " TO_STRING(TRIMMING_ROUNDS) " trimming round(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB GPU local memory)" << endl;
 	
 	// Check if not tuning
 	#ifndef TUNING
