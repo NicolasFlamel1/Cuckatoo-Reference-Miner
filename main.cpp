@@ -603,7 +603,7 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 		}
 		
 		// Check if logging into the stratum server failed
-		if(!strstr(serverResponse, "\"error\":null")) {
+		if(!strstr(serverResponse, "\"error\":null") && !strstr(serverResponse, "\"error\": null")) {
 		
 			// Display message
 			cout << "Logging into the stratum server failed" << endl;
@@ -1697,32 +1697,34 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 			if(method) {
 			
 				// Check if method is get job template or job
-				if(!strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"getjobtemplate\"", sizeof("\"getjobtemplate\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"job\"", sizeof("\"job\"") - sizeof('\0'))) {
+				if(!strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"getjobtemplate\"", sizeof("\"getjobtemplate\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], " \"getjobtemplate\"", sizeof(" \"getjobtemplate\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"job\"", sizeof("\"job\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], " \"job\"", sizeof(" \"job\"") - sizeof('\0'))) {
 				
 					// Set new job found to false
 					newJobFound = false;
 					
 					// Check if getting job was successful
-					if(strstr(partStart, "\"error\":null") || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"job\"", sizeof("\"job\"") - sizeof('\0'))) {
+					if(strstr(partStart, "\"error\":null") || strstr(partStart, "\"error\": null") || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"job\"", sizeof("\"job\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], " \"job\"", sizeof(" \"job\"") - sizeof('\0'))) {
 					
 						// Check if getting job's height was successful
 						const char *height = strstr(partStart, "\"height\":");
 						if(height) {
 						
 							// Check if getting job's height was successful
+							const size_t heightValueOffset = height[sizeof("\"height\":") - sizeof('\0')] == ' ';
 							char *end;
 							errno = 0;
-							newJobHeight = strtoull(&height[sizeof("\"height\":") - sizeof('\0')], &end, DECIMAL_NUMBER_BASE);
-							if(end != &height[sizeof("\"height\":") - sizeof('\0')] && isdigit(height[sizeof("\"height\":") - sizeof('\0')]) && (height[sizeof("\"height\":") - sizeof('\0')] != '0' || !isdigit(height[sizeof("\"height\":") - sizeof('\0') + sizeof('0')])) && !errno && newJobHeight && newJobHeight <= UINT64_MAX) {
+							newJobHeight = strtoull(&height[sizeof("\"height\":") - sizeof('\0') + heightValueOffset], &end, DECIMAL_NUMBER_BASE);
+							if(end != &height[sizeof("\"height\":") - sizeof('\0') + heightValueOffset] && isdigit(height[sizeof("\"height\":") - sizeof('\0') + heightValueOffset]) && (height[sizeof("\"height\":") - sizeof('\0') + heightValueOffset] != '0' || !isdigit(height[sizeof("\"height\":") - sizeof('\0') + heightValueOffset + sizeof('0')])) && !errno && newJobHeight && newJobHeight <= UINT64_MAX) {
 							
 								// Check if getting job's ID was successful
 								const char *id = strstr(partStart, "\"job_id\":");
 								if(id) {
 								
 									// Check if getting job's ID was successful
+									const size_t idValueOffset = id[sizeof("\"job_id\":") - sizeof('\0')] == ' ';
 									errno = 0;
-									newJobId = strtoull(&id[sizeof("\"job_id\":") - sizeof('\0')], &end, DECIMAL_NUMBER_BASE);
-									if(end != &id[sizeof("\"job_id\":") - sizeof('\0')] && isdigit(id[sizeof("\"job_id\":") - sizeof('\0')]) && (id[sizeof("\"job_id\":") - sizeof('\0')] != '0' || !isdigit(id[sizeof("\"job_id\":") - sizeof('\0') + sizeof('0')])) && !errno && newJobId <= UINT64_MAX) {
+									newJobId = strtoull(&id[sizeof("\"job_id\":") - sizeof('\0') + idValueOffset], &end, DECIMAL_NUMBER_BASE);
+									if(end != &id[sizeof("\"job_id\":") - sizeof('\0') + idValueOffset] && isdigit(id[sizeof("\"job_id\":") - sizeof('\0') + idValueOffset]) && (id[sizeof("\"job_id\":") - sizeof('\0') + idValueOffset] != '0' || !isdigit(id[sizeof("\"job_id\":") - sizeof('\0') + idValueOffset + sizeof('0')])) && !errno && newJobId <= UINT64_MAX) {
 									
 										// Check if getting job's pre-proof of work was successful
 										const char *preProofOfWork = strstr(partStart, "\"pre_pow\":\"");
@@ -1732,20 +1734,21 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 											memset(newJobHeader, 0, sizeof(newJobHeader));
 											
 											// Go through all hex characters in the job's pre-proof of work
-											for(const char *i = &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0')]; isxdigit(*i) && !isupper(*i); ++i) {
+											const size_t preProofOfWorkValueOffset = preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0')] == ' ';
+											for(const char *i = &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset]; isxdigit(*i) && !isupper(*i); ++i) {
 											
 												// Check if job's pre-proof of work is too long
-												if((i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0')]) / 2 == static_cast<ssize_t>(sizeof(newJobHeader))) {
+												if((i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset]) / 2 == static_cast<ssize_t>(sizeof(newJobHeader))) {
 												
 													// Break
 													break;
 												}
 												
 												// Set character in new job's header
-												newJobHeader[(i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0')]) / 2] |= ((i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0')]) % 2) ? ((*i - ((*i > '9') ? '0' + 'a' - '9' - 1 : '0')) & 0xF) : ((*i - ((*i > '9') ? '0' + 'a' - '9' - 1 : '0')) << 4);
+												newJobHeader[(i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset]) / 2] |= ((i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset]) % 2) ? ((*i - ((*i > '9') ? '0' + 'a' - '9' - 1 : '0')) & 0xF) : ((*i - ((*i > '9') ? '0' + 'a' - '9' - 1 : '0')) << 4);
 												
 												// Check if next character terminates the job's pre-proof of work and the job's pre-proof of work is the correct size
-												if(i[1] == '"' && i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0')] == sizeof(newJobHeader) * 2 - 1) {
+												if(i[1] == '"' && i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset] == sizeof(newJobHeader) * 2 - 1) {
 												
 													// Set new job found to true
 													newJobFound = true;
