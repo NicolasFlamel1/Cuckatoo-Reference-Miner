@@ -1900,22 +1900,12 @@ using namespace std;
 		// Check if allocating memory on the device failed
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * bucketsOneNumberOfBuckets * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsOneSecondPart(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * (MEAN_TRIMMING_NUMBER_OF_BUCKETS - bucketsOneNumberOfBuckets) * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
-		if(!bucketsOne || (bucketsOneNumberOfBuckets != MEAN_TRIMMING_NUMBER_OF_BUCKETS && !bucketsOneSecondPart) || !numberOfEdgesPerBucketOne) {
-		
-			// Display message
-			cout << "Allocating memory on the GPU failed" << endl;
-			
-			// Return false
-			return false;
-		}
-		
-		// Check if allocating memory on the device failed
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) * MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
+		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> remainingEdgesOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> remainingEdgesTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
-		if(!bucketsTwo || !numberOfEdgesPerBucketTwo || !remainingEdgesOne || !remainingEdgesTwo) {
+		if(!bucketsOne || (bucketsOneNumberOfBuckets != MEAN_TRIMMING_NUMBER_OF_BUCKETS && !bucketsOneSecondPart) || !bucketsTwo || !numberOfEdgesPerBucketOne || !numberOfEdgesPerBucketTwo || !remainingEdgesOne || !remainingEdgesTwo) {
 		
 			// Display message
 			cout << "Allocating memory on the GPU failed" << endl;
