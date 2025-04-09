@@ -18,6 +18,9 @@ using namespace std;
 // Edges bitmap size
 #define EDGES_BITMAP_SIZE (NUMBER_OF_EDGES / BITMAP_UNIT_WIDTH)
 
+// Min local RAM kilobytes
+#define MIN_LOCAL_RAM_KILOBYTES 32
+
 
 // Checks
 
@@ -28,7 +31,10 @@ static_assert(endian::native == endian::little, "Host's byte order isn't little 
 static_assert(EDGE_BITS >= 10 && EDGE_BITS <= 32, "Edge bits is invalid");
 
 // Throw error if trimming rounds is invalid (Number of edges after a pair of trimming rounds ≈ NUMBER_OF_EDGES / (pow(roundNumber / 2 + 1, 2) + 2))
-static_assert(TRIMMING_ROUNDS >= 0 && TRIMMING_ROUNDS <= 20222 && static_cast<double>(NUMBER_OF_EDGES) / (((TRIMMING_ROUNDS + 1) / 2 + 1) * ((TRIMMING_ROUNDS + 1) / 2 + 1) + 2) >= SOLUTION_SIZE, "Trimming rounds are invalid");
+static_assert(TRIMMING_ROUNDS >= 0 && TRIMMING_ROUNDS <= 20222 && static_cast<double>(NUMBER_OF_EDGES) / (((TRIMMING_ROUNDS + 1) / 2 + 1) * ((TRIMMING_ROUNDS + 1) / 2 + 1) + 2) >= SOLUTION_SIZE, "Trimming rounds is invalid");
+
+// Throw error if local RAM kilobytes is invalid
+static_assert(LOCAL_RAM_KILOBYTES >= MIN_LOCAL_RAM_KILOBYTES && LOCAL_RAM_KILOBYTES <= 512 && has_single_bit(static_cast<unsigned int>(LOCAL_RAM_KILOBYTES)), "Local RAM kilobytes is invalid");
 
 // Throw error if the size of a vector of a type isn't the same as the size of an array of that type
 static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_t[1]), "Vector vs array size mismatch");

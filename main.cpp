@@ -1,7 +1,10 @@
 // Constants
 
-// OpenCL version
+// OpenCL target version (OpenCL v1.2)
 #define CL_TARGET_OPENCL_VERSION 120
+
+// Metal target version (Metal v3.0)
+#define METAL_TARGET_VERSION MTL::LanguageVersion3_0
 
 // Check if using Windows
 #ifdef _WIN32
@@ -205,7 +208,7 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 #endif
 
 	// Display message
-	cout << TO_STRING(NAME) " v" TO_STRING(VERSION) " (Cuckatoo" TO_STRING(EDGE_BITS) ", " TO_STRING(TRIMMING_ROUNDS) " trimming round(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB GPU local memory)" << endl;
+	cout << TO_STRING(NAME) " v" TO_STRING(VERSION) " (Cuckatoo" TO_STRING(EDGE_BITS) ", " TO_STRING(TRIMMING_ROUNDS) " trimming round(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory)" << endl;
 	
 	// Check if not tuning
 	#ifndef TUNING
@@ -1009,13 +1012,13 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 								#if TRIMMING_ROUNDS <= 10
 								
 									// Display message
-									cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds if this happens frequently" << endl;
+									cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
 									
 								// Otherwise
 								#else
 								
 									// Display message
-									cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds if this happens frequently" << endl;
+									cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
 								#endif
 							}
 							
@@ -1105,7 +1108,14 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 			}
 			
 			// Display message
-			cout << " of GPU RAM" << endl;
+			cout << " of RAM and " << (MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory" << endl;
+			
+			// Check if local RAM kilobytes is greater than its min value
+			if(LOCAL_RAM_KILOBYTES > MIN_LOCAL_RAM_KILOBYTES) {
+			
+				// Display message
+				cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce mean trimming's GPU local memory requirement by half" << endl;
+			}
 			
 			// Check if using macOS
 			#ifdef __APPLE__
@@ -1264,13 +1274,13 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 											#if TRIMMING_ROUNDS <= 10
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds if this happens frequently" << endl;
+												cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
 												
 											// Otherwise
 											#else
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds if this happens frequently" << endl;
+												cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
 											#endif
 										}
 										
@@ -1290,13 +1300,13 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 									#if TRIMMING_ROUNDS <= 10
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
 										
 									// Otherwise
 									#else
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
 									#endif
 								}
 								
@@ -1447,7 +1457,7 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 				}
 				
 				// Display message
-				cout << " of GPU RAM" << endl;
+				cout << " of RAM" << endl;
 				
 				// Return failure
 				exit(EXIT_FAILURE);

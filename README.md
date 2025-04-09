@@ -1,7 +1,7 @@
 # Cuckatoo Reference Miner
 
 ### Description
-Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements lean and mean edge trimming on the GPU using OpenCL and Metal.
+Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean and lean edge trimming on the GPU using OpenCL and Metal.
 
 ### Building
 It's recommended that you build this program on the same system that you'll be running it on since it uses the `-march=native` and `-mtune=native` compiler flags to optimize itself for the current system's available features. Because of this, I don't release prebuilt versions of this program.
@@ -48,9 +48,13 @@ A `TRIMMING_ROUNDS` setting can be provided when building this program that can 
 ```
 make EDGE_BITS=30 TRIMMING_ROUNDS=25
 ```
+You can provide a `LOCAL_RAM_KILOBYTES` setting when building this program to adjust the targeted GPU local RAM size in kilobytes used when mean trimming. This value must be a power of two, and it should match your GPU's local RAM size for potentially better performance.
+```
+make EDGE_BITS=30 LOCAL_RAM_KILOBYTES=64
+```
 A `TUNING=1` setting can be provided when building this program which will make it skip connecting to a stratum server. This is only useful for tuning the software since it can't mine blocks without being connected to a stratum server.
 ```
-make EDGE_BITS=30 TRIMMING_ROUNDS=25 TUNING=1
+make EDGE_BITS=30 TRIMMING_ROUNDS=25 LOCAL_RAM_KILOBYTES=64 TUNING=1
 ```
 
 Also be sure to set your operating system's power mode to best performance when running this program.

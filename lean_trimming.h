@@ -218,7 +218,7 @@ using namespace std;
 		
 		// Configure compiler options
 		compileOptions->setPreprocessorMacros(preprocessorMacros.get());
-		compileOptions->setLanguageVersion(MTL::LanguageVersion3_1);
+		compileOptions->setLanguageVersion(METAL_TARGET_VERSION);
 		
 		// Check if creating library for the device failed
 		const NS::String *source = (

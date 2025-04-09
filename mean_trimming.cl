@@ -267,7 +267,7 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 		__local uint localBuckets[NUMBER_OF_BUCKETS][LOCAL_BUCKETS_SIZE - 1];
 		
 		// Declare number of edges per local bucket
-		__local uint numberOfEdgesPerLocalBucket[(short)(NUMBER_OF_BUCKETS / sizeof(uint))];
+		__local uint numberOfEdgesPerLocalBucket[(short)((NUMBER_OF_BUCKETS + sizeof(uint) - 1) / sizeof(uint))];
 		
 		// Get global ID
 		const uint globalId = get_global_id(0);
@@ -279,7 +279,7 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 		const ushort localSize = get_local_size(0);
 		
 		// Go through all groups of local buckets as a work group
-		for(short i = localId; i < (short)(NUMBER_OF_BUCKETS / sizeof(uint)); i += localSize) {
+		for(short i = localId; i < (short)((NUMBER_OF_BUCKETS + sizeof(uint) - 1) / sizeof(uint)); i += localSize) {
 		
 			// Set group of local bucket's number of edges to zero
 			numberOfEdgesPerLocalBucket[i] = 0;
