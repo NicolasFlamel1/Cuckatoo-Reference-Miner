@@ -23,11 +23,8 @@ using namespace metal;
 // SipRound rotation
 #define SIP_ROUND_ROTATION 21
 
-// Number of items per bucket
-#define NUMBER_OF_ITEMS_PER_BUCKET (NUMBER_OF_EDGES / NUMBER_OF_BUCKETS)
-
-// Bucket item mask
-#define BUCKET_ITEM_MASK (NUMBER_OF_ITEMS_PER_BUCKET - 1)
+// Bitmap mask
+#define BITMAP_MASK (NUMBER_OF_BITMAP_BYTES * BITS_IN_A_BYTE - 1)
 
 
 // Function prototypes
@@ -477,7 +474,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 		const uint edgeIndex = indices[i];
 		
 		// Enable edge's node in the bitmap
-		setBitInBitmap(bitmap, sipHash24(sipHashKeys, static_cast<ulong>(edgeIndex) * 2) & BUCKET_ITEM_MASK);
+		setBitInBitmap(bitmap, sipHash24(sipHashKeys, static_cast<ulong>(edgeIndex) * 2) & BITMAP_MASK);
 	}
 	
 	// Synchronize work group
@@ -500,7 +497,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 			const uint node = sipHash24(sipHashKeys, static_cast<ulong>(edgeIndex) * 2);
 			
 			// Check if edge's node has a pair in the bitmap
-			if(isBitSetInBitmap(bitmap, (node & BUCKET_ITEM_MASK) ^ 1)) {
+			if(isBitSetInBitmap(bitmap, (node & BITMAP_MASK) ^ 1)) {
 			
 				// Get edge's other node
 				const uint otherNode = sipHash24(sipHashKeys, (static_cast<ulong>(edgeIndex) * 2) | 1);
@@ -555,7 +552,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 		const uint edgeIndex = indices[i];
 		
 		// Enable edge's node in the bitmap
-		setBitInBitmap(bitmap, sipHash24(sipHashKeys, (static_cast<ulong>(edgeIndex) * 2) | 1) & BUCKET_ITEM_MASK);
+		setBitInBitmap(bitmap, sipHash24(sipHashKeys, (static_cast<ulong>(edgeIndex) * 2) | 1) & BITMAP_MASK);
 	}
 	
 	// Synchronize work group
@@ -571,7 +568,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 		const uint node = sipHash24(sipHashKeys, (static_cast<ulong>(edgeIndex) * 2) | 1);
 		
 		// Check if edge's node has a pair in the bitmap
-		if(isBitSetInBitmap(bitmap, (node & BUCKET_ITEM_MASK) ^ 1)) {
+		if(isBitSetInBitmap(bitmap, (node & BITMAP_MASK) ^ 1)) {
 		
 			// Get edge's other node
 			const uint otherNode = sipHash24(sipHashKeys, static_cast<ulong>(edgeIndex) * 2);
@@ -617,7 +614,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 	for(uint i = localId; i < numberOfEdges; i += localSize) {
 	
 		// Enable edge's node in the bitmap
-		setBitInBitmap(bitmap, indices[i].y & BUCKET_ITEM_MASK);
+		setBitInBitmap(bitmap, indices[i].y & BITMAP_MASK);
 	}
 	
 	// Synchronize work group
@@ -630,7 +627,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 		const uint2 edgeIndexAndNode = indices[i];
 		
 		// Check if edge's node has a pair in the bitmap
-		if(isBitSetInBitmap(bitmap, (edgeIndexAndNode.y & BUCKET_ITEM_MASK) ^ 1)) {
+		if(isBitSetInBitmap(bitmap, (edgeIndexAndNode.y & BITMAP_MASK) ^ 1)) {
 		
 			// Get edge's other node
 			const uint otherNode = sipHash24(sipHashKeys, (static_cast<ulong>(edgeIndexAndNode.x) * 2) | 1);
@@ -645,7 +642,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 			device uint4 *bucketNextIndices = &destinationBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4 * bucketIndex + nextEdgeIndex];
 			
 			// Set destination bucket's next edge to the edge and its nodes
-			*bucketNextIndices = uint4(edgeIndexAndNode.x, otherNode, edgeIndexAndNode.y, otherNode & BUCKET_ITEM_MASK);
+			*bucketNextIndices = uint4(edgeIndexAndNode.x, otherNode, edgeIndexAndNode.y, otherNode & BITMAP_MASK);
 		}
 	}
 }
@@ -701,7 +698,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 			device uint4 *bucketNextIndices = &destinationBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4 * bucketIndex + nextEdgeIndex];
 			
 			// Set destination bucket's next edge to the edge and its nodes
-			*bucketNextIndices = uint4(edgeIndexAndNodes.xzy, edgeIndexAndNodes.z & BUCKET_ITEM_MASK);
+			*bucketNextIndices = uint4(edgeIndexAndNodes.xzy, edgeIndexAndNodes.z & BITMAP_MASK);
 		}
 	}
 }

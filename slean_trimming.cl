@@ -1,6 +1,6 @@
 R"(
 
-// Steps two through five are each one trimming round and the steps are called in this order: clear number of edges per bucket one, step one, clear number of edges per bucket two, step two, clear number of edges per bucket one, step three, clear number of edges per bucket two, step four, clear number of edges per bucket one, step five, clear number of edges per bucket two, step five, ..., clear number of edges per bucket one or two, step five, step six, get result from remaining edges
+// Steps one through six are one trimming round and the steps are called in this order: clear number of edges per bucket one, step one, step two, clear number of edges per bucket one, step one, step three, ..., clear number of edges per bucket one, step one, step three, clear number of edges per bucket one, step one, clear number of edges per bucket two, step four, step five, clear number of edges per bucket one, step one, clear number of edges per bucket two, step six, step five, ..., , clear number of edges per bucket one, step one, clear number of edges per bucket two, step six, step five, get result from edges bitmap
 
 
 // Constants
@@ -20,6 +20,9 @@ R"(
 // Bitmap mask
 #define BITMAP_MASK (NUMBER_OF_BITMAP_BYTES * BITS_IN_A_BYTE - 1)
 
+// Remaining edges bitmap mask
+#define REMAINING_EDGES_BITMAP_MASK (NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES * BITS_IN_A_BYTE - 1)
+
 
 // Function prototypes
 
@@ -37,13 +40,13 @@ R"(
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys);
+		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys);
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint *bucketsSecondPart);
+		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys, __global uint *bucketsSecondPart);
 	#endif
 
 // Otherwise check if local buckets size is two
@@ -53,13 +56,13 @@ R"(
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys);
+		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys);
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint2 *bucketsSecondPart);
+		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys, __global uint2 *bucketsSecondPart);
 	#endif
 
 // Otherwise
@@ -69,13 +72,13 @@ R"(
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys);
+		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys);
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint4 *bucketsSecondPart);
+		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys, __global uint4 *bucketsSecondPart);
 	#endif
 #endif
 
@@ -90,13 +93,13 @@ R"(
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step two
-	__kernel void trimEdgesStepTwo(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepTwo(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step two
-	__kernel void trimEdgesStepTwo(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart);
+	__kernel void trimEdgesStepTwo(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys, __global const uint *bucketsSecondPart);
 #endif
 
 // Check if work items per work group exists
@@ -106,8 +109,18 @@ R"(
 	__attribute__((reqd_work_group_size(TRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP, 1, 1)))
 #endif
 
-// Trim edges step three
-__kernel void trimEdgesStepThree(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint2 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
+// Check if initial buckets isn't disjointed
+#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
+
+	// Trim edges step three
+	__kernel void trimEdgesStepThree(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys);
+
+// Otherwise
+#else
+
+	// Trim edges step three
+	__kernel void trimEdgesStepThree(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys, __global const uint *bucketsSecondPart);
+#endif
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP
@@ -116,8 +129,18 @@ __kernel void trimEdgesStepThree(__global const uint *sourceBuckets, __global co
 	__attribute__((reqd_work_group_size(TRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP, 1, 1)))
 #endif
 
-// Trim edges step four
-__kernel void trimEdgesStepFour(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint4 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
+// Check if initial buckets isn't disjointed
+#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
+
+	// Trim edges step four
+	__kernel void trimEdgesStepFour(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
+
+// Otherwise
+#else
+
+	// Trim edges step four
+	__kernel void trimEdgesStepFour(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart);
+#endif
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_FIVE_WORK_ITEMS_PER_WORK_GROUP
@@ -127,7 +150,7 @@ __kernel void trimEdgesStepFour(__global const uint2 *sourceBuckets, __global co
 #endif
 
 // Trim edges step five
-__kernel void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint4 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket);
+__kernel void trimEdgesStepFive(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_SIX_WORK_ITEMS_PER_WORK_GROUP
@@ -136,23 +159,17 @@ __kernel void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global co
 	__attribute__((reqd_work_group_size(TRIM_EDGES_STEP_SIX_WORK_ITEMS_PER_WORK_GROUP, 1, 1)))
 #endif
 
-// Check if trimming rounds is one
-#if TRIMMING_ROUNDS == 1
+// Check if initial buckets isn't disjointed
+#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step six
-	__kernel void trimEdgesStepSix(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges, const ulong4 sipHashKeys);
-
-// Otherwise check if trimming rounds is two
-#elif TRIMMING_ROUNDS == 2
-
-	// Trim edges step six
-	__kernel void trimEdgesStepSix(__global const uint2 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepSix(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step six
-	__kernel void trimEdgesStepSix(__global const uint4 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges);
+	__kernel void trimEdgesStepSix(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart);
 #endif
 
 // SipHash-2-4
@@ -163,6 +180,9 @@ static inline void sipRound(ulong4 *keys);
 
 // Set bit in bitmap
 static inline void setBitInBitmap(__local uint *bitmap, const uint index);
+
+// Clear bit in bitmap
+static inline void clearBitInBitmap(__local uint *bitmap, const uint index);
 
 // Is bit set in bitmap
 static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index);
@@ -177,13 +197,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
+		void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys) {
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint *bucketsSecondPart) {
+		void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys, __global uint *bucketsSecondPart) {
 	#endif
 
 // Otherwise check if local buckets size is two
@@ -193,13 +213,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
+		void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys) {
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint2 *bucketsSecondPart) {
+		void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys, __global uint2 *bucketsSecondPart) {
 	#endif
 
 // Otherwise
@@ -209,13 +229,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
+		void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys) {
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint4 *bucketsSecondPart) {
+		void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const uchar part, const ulong4 sipHashKeys, __global uint4 *bucketsSecondPart) {
 	#endif
 #endif
 
@@ -225,8 +245,8 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 		// Get global ID
 		const uint globalId = get_global_id(0);
 		
-		// Get work item's edge indices
-		const uint indices = globalId * NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM;
+		// Get work item's edge indices in the part
+		const uint indices = globalId * NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM + part * (NUMBER_OF_EDGES / SLEAN_TRIMMING_PARTS);
 		
 		// Go through all of this work item's edges
 		for(short i = 0; i < NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM; ++i) {
@@ -282,8 +302,8 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 			numberOfEdgesPerLocalBucket[i] = 0;
 		}
 		
-		// Get work item's edge indices
-		const uint indices = globalId * NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM;
+		// Get work item's edge indices in the part
+		const uint indices = globalId * NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM + part * (NUMBER_OF_EDGES / SLEAN_TRIMMING_PARTS);
 		
 		// Go through all of this work item's edges
 		for(short i = 0; i < NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM; ++i) {
@@ -464,13 +484,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step two
-	void trimEdgesStepTwo(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
+	void trimEdgesStepTwo(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step two
-	void trimEdgesStepTwo(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart) {
+	void trimEdgesStepTwo(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys, __global const uint *bucketsSecondPart) {
 #endif
 
 	// Declare bitmap
@@ -490,6 +510,159 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	
 		// Set group of bytes in the bitmap to zero
 		bitmap[i] = 0;
+	}
+	
+	// Get number of edges in this work group's bucket
+	const uint numberOfEdges = min(numberOfEdgesPerBucket[groupId], (uint)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET);
+	
+	// Check if initial buckets isn't disjointed
+	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
+	
+		// Get work group's bucket's indices
+		__global const uint *indices = &buckets[(ulong)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET * groupId];
+	
+	// Otherwise
+	#else
+	
+		// Get work group's bucket's indices
+		__global const uint *indices = (groupId < INITIAL_BUCKETS_NUMBER_OF_BUCKETS) ? &buckets[(ulong)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET * groupId] : &bucketsSecondPart[(ulong)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET * (groupId - INITIAL_BUCKETS_NUMBER_OF_BUCKETS)];
+	#endif
+	
+	// Synchronize work group
+	barrier(CLK_LOCAL_MEM_FENCE);
+	
+	// Go through all edges in this work group's bucket as a work group
+	for(uint i = localId; i < numberOfEdges; i += localSize) {
+	
+		// Get edge's index
+		const uint edgeIndex = indices[i];
+		
+		// Enable edge's node in the bitmap
+		setBitInBitmap(bitmap, sipHash24(sipHashKeys, (ulong)edgeIndex * 2) & BITMAP_MASK);
+	}
+	
+	// Get work group's nodes bitmap's index
+	__global uint *nodesBitmapIndex = &nodesBitmap[groupId * (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
+	
+	// Synchronize work group
+	barrier(CLK_LOCAL_MEM_FENCE);
+	
+	// Go through all groups of bytes in the bitmap as a work group
+	for(short i = localId; i < (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
+	
+		// Set group of bytes in nodes bitmap to the bitmap's
+		nodesBitmapIndex[i] = bitmap[i];
+	}
+}
+
+// Check if initial buckets isn't disjointed
+#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
+
+	// Trim edges step three
+	void trimEdgesStepThree(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys) {
+
+// Otherwise
+#else
+
+	// Trim edges step three
+	void trimEdgesStepThree(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys, __global const uint *bucketsSecondPart) {
+#endif
+
+	// Declare bitmap
+	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
+	
+	// Get local ID
+	const ushort localId = get_local_id(0);
+	
+	// Get local size
+	const ushort localSize = get_local_size(0);
+	
+	// Get group ID
+	const uint groupId = get_group_id(0);
+	
+	// Get work group's nodes bitmap's index
+	__global uint *nodesBitmapIndex = &nodesBitmap[groupId * (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
+	
+	// Go through all groups of bytes in the bitmap as a work group
+	for(short i = localId; i < (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
+	
+		// Set group of bytes in the bitmap to the nodes bitmap's
+		bitmap[i] = nodesBitmapIndex[i];
+	}
+	
+	// Get number of edges in this work group's bucket
+	const uint numberOfEdges = min(numberOfEdgesPerBucket[groupId], (uint)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET);
+	
+	// Check if initial buckets isn't disjointed
+	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
+	
+		// Get work group's bucket's indices
+		__global const uint *indices = &buckets[(ulong)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET * groupId];
+	
+	// Otherwise
+	#else
+	
+		// Get work group's bucket's indices
+		__global const uint *indices = (groupId < INITIAL_BUCKETS_NUMBER_OF_BUCKETS) ? &buckets[(ulong)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET * groupId] : &bucketsSecondPart[(ulong)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET * (groupId - INITIAL_BUCKETS_NUMBER_OF_BUCKETS)];
+	#endif
+	
+	// Synchronize work group
+	barrier(CLK_LOCAL_MEM_FENCE);
+	
+	// Go through all edges in this work group's bucket as a work group
+	for(uint i = localId; i < numberOfEdges; i += localSize) {
+	
+		// Get edge's index
+		const uint edgeIndex = indices[i];
+		
+		// Enable edge's node in the bitmap
+		setBitInBitmap(bitmap, sipHash24(sipHashKeys, (ulong)edgeIndex * 2) & BITMAP_MASK);
+	}
+	
+	// Synchronize work group
+	barrier(CLK_LOCAL_MEM_FENCE);
+	
+	// Go through all groups of bytes in the bitmap as a work group
+	for(short i = localId; i < (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
+	
+		// Set group of bytes in nodes bitmap to the bitmap's
+		nodesBitmapIndex[i] = bitmap[i];
+	}
+}
+
+// Check if initial buckets isn't disjointed
+#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
+
+	// Trim edges step four
+	void trimEdgesStepFour(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
+
+// Otherwise
+#else
+
+	// Trim edges step four
+	void trimEdgesStepFour(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart) {
+#endif
+
+	// Declare bitmap
+	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
+	
+	// Get local ID
+	const ushort localId = get_local_id(0);
+	
+	// Get local size
+	const ushort localSize = get_local_size(0);
+	
+	// Get group ID
+	const uint groupId = get_group_id(0);
+	
+	// Get work group's nodes bitmap's index
+	__global uint *nodesBitmapIndex = &nodesBitmap[groupId * (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
+	
+	// Go through all groups of bytes in the bitmap as a work group
+	for(short i = localId; i < (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
+	
+		// Set group of bytes in the bitmap to the nodes bitmap's
+		bitmap[i] = nodesBitmapIndex[i];
 	}
 	
 	// Get number of edges in this work group's bucket
@@ -524,6 +697,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	// Synchronize work group
 	barrier(CLK_LOCAL_MEM_FENCE);
 	
+	// Go through all groups of bytes in the bitmap as a work group
+	for(short i = localId; i < (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
+	
+		// Set group of bytes in nodes bitmap to the bitmap's
+		nodesBitmapIndex[i] = bitmap[i];
+	}
+	
 	// Go through all edges in this work group's bucket as a work group
 	for(uint i = localId; i < numberOfEdges; i += localSize) {
 	
@@ -537,23 +717,17 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 			if(edgeIndex != indices[min(i - 1, numberOfEdges - 1)]) {
 		#endif
 		
-			// Get edge's node
-			const uint node = sipHash24(sipHashKeys, (ulong)edgeIndex * 2);
+			// Check if edge's node doesn't have a pair in the bitmap
+			if(!isBitSetInBitmap(bitmap, (sipHash24(sipHashKeys, (ulong)edgeIndex * 2) & BITMAP_MASK) ^ 1)) {
 			
-			// Check if edge's node has a pair in the bitmap
-			if(isBitSetInBitmap(bitmap, (node & BITMAP_MASK) ^ 1)) {
-			
-				// Get edge's other node
-				const uint otherNode = sipHash24(sipHashKeys, ((ulong)edgeIndex * 2) | 1);
-				
-				// Get edge's other node's bucket index
-				const uint bucketIndex = otherNode >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING;
+				// Get edge's index's bucket index
+				const uint bucketIndex = ((edgeIndex - (NUMBER_OF_EDGES / SLEAN_TRIMMING_PARTS) * (SLEAN_TRIMMING_PARTS - 1)) * SLEAN_TRIMMING_PARTS) >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING;
 				
 				// Get bucket's next edge index
-				const uint nextEdgeIndex = min(atomic_inc(&numberOfEdgesPerDestinationBucket[bucketIndex]), (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET - 1));
+				const uint nextEdgeIndex = min(atomic_inc(&numberOfEdgesPerDestinationBucket[bucketIndex]), (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET - 1));
 				
 				// Get destination bucket's next indices
-				__global uint *bucketNextIndices = &destinationBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET * bucketIndex + nextEdgeIndex];
+				__global uint *bucketNextIndices = &destinationBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET * bucketIndex + nextEdgeIndex];
 				
 				// Set destination bucket's next edge to the edge
 				*bucketNextIndices = edgeIndex;
@@ -567,153 +741,11 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	}
 }
 
-// Trim edges step three
-void trimEdgesStepThree(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint2 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
-
-	// Declare bitmap
-	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
-	
-	// Get local ID
-	const ushort localId = get_local_id(0);
-	
-	// Get local size
-	const ushort localSize = get_local_size(0);
-	
-	// Get group ID
-	const uint groupId = get_group_id(0);
-	
-	// Go through all groups of bytes in the bitmap as a work group
-	for(short i = localId; i < (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
-	
-		// Set group of bytes in the bitmap to zero
-		bitmap[i] = 0;
-	}
-	
-	// Get number of edges in this work group's bucket
-	const uint numberOfEdges = min(numberOfEdgesPerSourceBucket[groupId], (uint)AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET);
-	
-	// Get work group's bucket's indices
-	__global const uint *indices = &sourceBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET * groupId];
-	
-	// Synchronize work group
-	barrier(CLK_LOCAL_MEM_FENCE);
-	
-	// Go through all edges in this work group's bucket as a work group
-	for(uint i = localId; i < numberOfEdges; i += localSize) {
-	
-		// Get edge's index
-		const uint edgeIndex = indices[i];
-		
-		// Enable edge's node in the bitmap
-		setBitInBitmap(bitmap, sipHash24(sipHashKeys, ((ulong)edgeIndex * 2) | 1) & BITMAP_MASK);
-	}
-	
-	// Synchronize work group
-	barrier(CLK_LOCAL_MEM_FENCE);
-	
-	// Go through all edges in this work group's bucket as a work group
-	for(uint i = localId; i < numberOfEdges; i += localSize) {
-	
-		// Get edge's index
-		const uint edgeIndex = indices[i];
-		
-		// Get edge's node
-		const uint node = sipHash24(sipHashKeys, ((ulong)edgeIndex * 2) | 1);
-		
-		// Check if edge's node has a pair in the bitmap
-		if(isBitSetInBitmap(bitmap, (node & BITMAP_MASK) ^ 1)) {
-		
-			// Get edge's other node
-			const uint otherNode = sipHash24(sipHashKeys, (ulong)edgeIndex * 2);
-			
-			// Get edge's other node's bucket index
-			const uint bucketIndex = otherNode >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING;
-			
-			// Get bucket's next edge index
-			const uint nextEdgeIndex = min(atomic_inc(&numberOfEdgesPerDestinationBucket[bucketIndex]), (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 2 - 1));
-			
-			// Get destination bucket's next indices
-			__global uint2 *bucketNextIndices = &destinationBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 2 * bucketIndex + nextEdgeIndex];
-			
-			// Set destination bucket's next edge to the edge and its other node
-			*bucketNextIndices = (uint2)(edgeIndex, otherNode);
-		}
-	}
-}
-
-// Trim edges step four
-void trimEdgesStepFour(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint4 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
-
-	// Declare bitmap
-	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
-	
-	// Get local ID
-	const ushort localId = get_local_id(0);
-	
-	// Get local size
-	const ushort localSize = get_local_size(0);
-	
-	// Get group ID
-	const uint groupId = get_group_id(0);
-	
-	// Go through all groups of bytes in the bitmap as a work group
-	for(short i = localId; i < (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
-	
-		// Set group of bytes in the bitmap to zero
-		bitmap[i] = 0;
-	}
-	
-	// Get number of edges in this work group's bucket
-	const uint numberOfEdges = min(numberOfEdgesPerSourceBucket[groupId], (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 2));
-	
-	// Get work group's bucket's indices
-	__global const uint2 *indices = &sourceBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 2 * groupId];
-	
-	// Synchronize work group
-	barrier(CLK_LOCAL_MEM_FENCE);
-	
-	// Go through all edges in this work group's bucket as a work group
-	for(uint i = localId; i < numberOfEdges; i += localSize) {
-	
-		// Enable edge's node in the bitmap
-		setBitInBitmap(bitmap, indices[i].y & BITMAP_MASK);
-	}
-	
-	// Synchronize work group
-	barrier(CLK_LOCAL_MEM_FENCE);
-	
-	// Go through all edges in this work group's bucket as a work group
-	for(uint i = localId; i < numberOfEdges; i += localSize) {
-	
-		// Get edge's index and node
-		const uint2 edgeIndexAndNode = indices[i];
-		
-		// Check if edge's node has a pair in the bitmap
-		if(isBitSetInBitmap(bitmap, (edgeIndexAndNode.y & BITMAP_MASK) ^ 1)) {
-		
-			// Get edge's other node
-			const uint otherNode = sipHash24(sipHashKeys, ((ulong)edgeIndexAndNode.x * 2) | 1);
-			
-			// Get edge's other node's bucket index
-			const uint bucketIndex = otherNode >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING;
-			
-			// Get bucket's next edge index
-			const uint nextEdgeIndex = min(atomic_inc(&numberOfEdgesPerDestinationBucket[bucketIndex]), (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4 - 1));
-			
-			// Get destination bucket's next indices
-			__global uint4 *bucketNextIndices = &destinationBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4 * bucketIndex + nextEdgeIndex];
-			
-			// Set destination bucket's next edge to the edge and its nodes
-			*bucketNextIndices = (uint4)(edgeIndexAndNode.x, otherNode, edgeIndexAndNode.y, otherNode & BITMAP_MASK);
-		}
-	}
-}
-
 // Trim edges step five
-void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint4 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
+void trimEdgesStepFive(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part) {
 
 	// Declare bitmap
-	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
+	__local uint bitmap[(short)(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint))];
 	
 	// Get local ID
 	const ushort localId = get_local_id(0);
@@ -725,17 +757,17 @@ void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global const uint 
 	const uint groupId = get_group_id(0);
 	
 	// Go through all groups of bytes in the bitmap as a work group
-	for(short i = localId; i < (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
+	for(short i = localId; i < (short)(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	
-		// Set group of bytes in the bitmap to zero
-		bitmap[i] = 0;
+		// Set group of bytes in the bitmap to max
+		bitmap[i] = UINT_MAX;
 	}
 	
 	// Get number of edges in this work group's bucket
-	const uint numberOfEdges = min(numberOfEdgesPerSourceBucket[groupId], (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4));
+	const uint numberOfEdges = min(numberOfEdgesPerBucket[groupId], (uint)AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET);
 	
 	// Get work group's bucket's indices
-	__global const uint4 *indices = &sourceBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4 * groupId];
+	__global const uint *indices = &buckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET * groupId];
 	
 	// Synchronize work group
 	barrier(CLK_LOCAL_MEM_FENCE);
@@ -743,58 +775,39 @@ void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global const uint 
 	// Go through all edges in this work group's bucket as a work group
 	for(uint i = localId; i < numberOfEdges; i += localSize) {
 	
-		// Enable edge's node in the bitmap
-		setBitInBitmap(bitmap, indices[i].w);
+		// Disable edge's index in the bitmap
+		clearBitInBitmap(bitmap, indices[i] & REMAINING_EDGES_BITMAP_MASK);
 	}
 	
+	// Get work group's edges bitmap's index
+	__global uint *edgesBitmapIndex = &edgesBitmap[groupId * (short)(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint)) + part * (int)(((NUMBER_OF_EDGES / BITS_IN_A_BYTE) / SLEAN_TRIMMING_PARTS) / sizeof(uint))];
+	
 	// Synchronize work group
 	barrier(CLK_LOCAL_MEM_FENCE);
 	
-	// Go through all edges in this work group's bucket as a work group
-	for(uint i = localId; i < numberOfEdges; i += localSize) {
+	// Go through all groups of bytes in the bitmap as a work group
+	for(short i = localId; i < (short)(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	
-		// Get edge's index and nodes
-		const uint4 edgeIndexAndNodes = indices[i];
-		
-		// Check if edge's node has a pair in the bitmap
-		if(isBitSetInBitmap(bitmap, edgeIndexAndNodes.w ^ 1)) {
-		
-			// Get edge's other node's bucket index
-			const uint bucketIndex = edgeIndexAndNodes.z >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING;
-			
-			// Get bucket's next edge index
-			const uint nextEdgeIndex = min(atomic_inc(&numberOfEdgesPerDestinationBucket[bucketIndex]), (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4 - 1));
-			
-			// Get destination bucket's next indices
-			__global uint4 *bucketNextIndices = &destinationBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4 * bucketIndex + nextEdgeIndex];
-			
-			// Set destination bucket's next edge to the edge and its nodes
-			*bucketNextIndices = (uint4)(edgeIndexAndNodes.xzy, edgeIndexAndNodes.z & BITMAP_MASK);
-		}
+		// Set group of bytes in edges bitmap to the bitmap's
+		edgesBitmapIndex[i] = bitmap[i];
 	}
 }
 
-// Check if trimming rounds is one
-#if TRIMMING_ROUNDS == 1
+// Check if initial buckets isn't disjointed
+#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step six
-	void trimEdgesStepSix(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges, const ulong4 sipHashKeys) {
-
-// Otherwise check if trimming rounds is two
-#elif TRIMMING_ROUNDS == 2
-
-	// Trim edges step six
-	void trimEdgesStepSix(__global const uint2 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges, const ulong4 sipHashKeys) {
+	void trimEdgesStepSix(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step six
-	void trimEdgesStepSix(__global const uint4 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges) {
+	void trimEdgesStepSix(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart) {
 #endif
 
-	// Declare index
-	__local uint index;
+	// Declare bitmap
+	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
 	
 	// Get local ID
 	const ushort localId = get_local_id(0);
@@ -805,40 +818,31 @@ void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global const uint 
 	// Get group ID
 	const uint groupId = get_group_id(0);
 	
-	// Check if trimming rounds is one
-	#if TRIMMING_ROUNDS == 1
+	// Get work group's nodes bitmap's index
+	__global const uint *nodesBitmapIndex = &nodesBitmap[groupId * (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
 	
-		// Get number of edges in this work group's bucket
-		const uint numberOfEdges = min(numberOfEdgesPerBucket[groupId], (uint)AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET);
-		
-		// Get work group's bucket's indices
-		__global const uint *indices = &buckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET * groupId];
-		
-	// Otherwise check if trimming rounds is two
-	#elif TRIMMING_ROUNDS == 2
+	// Go through all groups of bytes in the bitmap as a work group
+	for(short i = localId; i < (short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	
-		// Get number of edges in this work group's bucket
-		const uint numberOfEdges = min(numberOfEdgesPerBucket[groupId], (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 2));
-		
+		// Set group of bytes in the bitmap to the nodes bitmap's
+		bitmap[i] = nodesBitmapIndex[i];
+	}
+	
+	// Get number of edges in this work group's bucket
+	const uint numberOfEdges = min(numberOfEdgesPerSourceBucket[groupId], (uint)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET);
+	
+	// Check if initial buckets isn't disjointed
+	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
+	
 		// Get work group's bucket's indices
-		__global const uint2 *indices = &buckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 2 * groupId];
-		
+		__global const uint *indices = &sourceBuckets[(ulong)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET * groupId];
+	
 	// Otherwise
 	#else
 	
-		// Get number of edges in this work group's bucket
-		const uint numberOfEdges = min(numberOfEdgesPerBucket[groupId], (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4));
-		
 		// Get work group's bucket's indices
-		__global const uint4 *indices = &buckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET / 4 * groupId];
+		__global const uint *indices = (groupId < INITIAL_BUCKETS_NUMBER_OF_BUCKETS) ? &sourceBuckets[(ulong)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET * groupId] : &sourceBucketsSecondPart[(ulong)INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET * (groupId - INITIAL_BUCKETS_NUMBER_OF_BUCKETS)];
 	#endif
-	
-	// Check if this work item is the first in the work group
-	if(localId == 0) {
-	
-		// Add number of edges to the number of remaining edges
-		index = atomic_add(remainingEdges, numberOfEdges);
-	}
 	
 	// Synchronize work group
 	barrier(CLK_LOCAL_MEM_FENCE);
@@ -846,56 +850,36 @@ void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global const uint 
 	// Go through all edges in this work group's bucket as a work group
 	for(uint i = localId; i < numberOfEdges; i += localSize) {
 	
-		// Get next remaining edge
-		__global uint *nextRemainingEdge = &remainingEdges[min(index + i, (uint)(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING - 1)) * EDGE_NUMBER_OF_COMPONENTS + 1];
+		// Get edge's index
+		const uint edgeIndex = indices[i];
 		
-		// Check if trimming rounds is one
-		#if TRIMMING_ROUNDS == 1
+		// Check if local buckets size isn't one
+		#if LOCAL_BUCKETS_SIZE != 1
 		
-			// Get edge's index
-			const uint edgeIndex = indices[i];
-			
-			// Get edge's node
-			const uint node = sipHash24(sipHashKeys, (ulong)edgeIndex * 2);
-			
-			// Get edge's other node
-			const uint otherNode = sipHash24(sipHashKeys, ((ulong)edgeIndex * 2) | 1);
-			
-			// Set next remaining edge to the edge and its nodes
-			nextRemainingEdge[0] = edgeIndex;
-			nextRemainingEdge[1] = node;
-			nextRemainingEdge[2] = otherNode;
-			
-		// Otherwise check if trimming rounds is two
-		#elif TRIMMING_ROUNDS == 2
+			// Check if edge isn't a duplicate
+			if(edgeIndex != indices[min(i - 1, numberOfEdges - 1)]) {
+		#endif
 		
-			// Get edge's other node
-			const uint otherNode = sipHash24(sipHashKeys, ((ulong)indices[i].x * 2) | 1);
+			// Check if edge's node doesn't have a pair in the bitmap
+			if(!isBitSetInBitmap(bitmap, (sipHash24(sipHashKeys, (ulong)edgeIndex * 2) & BITMAP_MASK) ^ 1)) {
 			
-			// Set next remaining edge to the edge and its nodes
-			nextRemainingEdge[0] = indices[i].x;
-			nextRemainingEdge[1] = indices[i].y;
-			nextRemainingEdge[2] = otherNode;
+				// Get edge's index's bucket index
+				const uint bucketIndex = ((edgeIndex - (NUMBER_OF_EDGES / SLEAN_TRIMMING_PARTS) * part) * SLEAN_TRIMMING_PARTS) >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING;
+				
+				// Get bucket's next edge index
+				const uint nextEdgeIndex = min(atomic_inc(&numberOfEdgesPerDestinationBucket[bucketIndex]), (uint)(AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET - 1));
+				
+				// Get destination bucket's next indices
+				__global uint *bucketNextIndices = &destinationBuckets[AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET * bucketIndex + nextEdgeIndex];
+				
+				// Set destination bucket's next edge to the edge
+				*bucketNextIndices = edgeIndex;
+			}
 			
-		// Otherwise
-		#else
+		// Check if local buckets size isn't one
+		#if LOCAL_BUCKETS_SIZE != 1
 		
-			// Check if trimming rounds is even
-			#if TRIMMING_ROUNDS % 2 == 0
-			
-				// Set next remaining edge to the edge and its nodes
-				nextRemainingEdge[0] = indices[i].x;
-				nextRemainingEdge[1] = indices[i].y;
-				nextRemainingEdge[2] = indices[i].z;
-			
-			// Otherwise
-			#else
-			
-				// Set next remaining edge to the edge and its nodes
-				nextRemainingEdge[0] = indices[i].x;
-				nextRemainingEdge[1] = indices[i].z;
-				nextRemainingEdge[2] = indices[i].y;
-			#endif
+			}
 		#endif
 	}
 }
@@ -947,6 +931,13 @@ void setBitInBitmap(__local uint *bitmap, const uint index) {
 
 	// Set bit in bitmap
 	atomic_or(&bitmap[index / (char)(sizeof(uint) * BITS_IN_A_BYTE)], 1 << (index % (char)(sizeof(uint) * BITS_IN_A_BYTE)));
+}
+
+// Clear bit in bitmap
+void clearBitInBitmap(__local uint *bitmap, const uint index) {
+
+	// Set bit in bitmap
+	atomic_xor(&bitmap[index / (char)(sizeof(uint) * BITS_IN_A_BYTE)], 1 << (index % (char)(sizeof(uint) * BITS_IN_A_BYTE)));
 }
 
 // Is bit set in bitmap

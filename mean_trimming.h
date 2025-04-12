@@ -10,10 +10,10 @@ using namespace std;
 // Configurable constants
 
 // Mean trimming number of edges per step one work item
-#define MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM 1024
+#define MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM min(static_cast<uint64_t>(1024), NUMBER_OF_EDGES)
 
 // Mean trimming work items per work group for step one
-#define MEAN_TRIMMING_WORK_ITEMS_PER_WORK_GROUP_STEP_ONE 256
+#define MEAN_TRIMMING_WORK_ITEMS_PER_WORK_GROUP_STEP_ONE 512
 
 
 // Constants
@@ -31,7 +31,7 @@ using namespace std;
 #define MEAN_TRIMMING_NUMBER_OF_ITEMS_PER_BUCKET (NUMBER_OF_EDGES / MEAN_TRIMMING_NUMBER_OF_BUCKETS)
 
 // Mean trimming initial max number of edges per bucket (Divide by 4 and multiply by 4 makes the result a product of 4)
-#define MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET ((static_cast<uint32_t>(MEAN_TRIMMING_NUMBER_OF_ITEMS_PER_BUCKET * 1.03) / 4) * 4)
+#define MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET ((static_cast<uint32_t>(MEAN_TRIMMING_NUMBER_OF_ITEMS_PER_BUCKET * 1.05) / 4) * 4)
 
 // Mean trimming after trimming round max number of edges per bucket (Divide by 4 and multiply by 4 makes the result a product of 4)
 #define MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET ((static_cast<uint32_t>(MEAN_TRIMMING_NUMBER_OF_ITEMS_PER_BUCKET * 0.73) / 4) * 4)
@@ -53,7 +53,7 @@ using namespace std;
 #define MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES MEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES
 
 // Mean trimming max local buckets size
-#define MEAN_TRIMMING_MAX_LOCAL_BUCKETS_SIZE 4
+#define MEAN_TRIMMING_MAX_LOCAL_BUCKETS_SIZE min(static_cast<uint64_t>(4), (MEAN_TRIMMING_NUMBER_OF_BUCKETS + 256 - 1) / 256)
 
 
 // Function prototypes
@@ -230,7 +230,7 @@ using namespace std;
 		const size_t bucketsOneNumberOfBuckets = (enforceMaxMemoryAllocationSize && static_cast<uint64_t>(MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) > device->maxBufferLength()) ? (MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET * MEAN_TRIMMING_NUMBER_OF_BUCKETS + MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET - 1) / MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET : MEAN_TRIMMING_NUMBER_OF_BUCKETS;
 		
 		// Set local buckets size based on the device's work group memory size
-		const unsigned int localBucketsSize = min(bit_floor((device->maxThreadgroupMemoryLength() - (MEAN_TRIMMING_NUMBER_OF_BUCKETS + sizeof(uint32_t) - 1)) / (sizeof(uint32_t) * MEAN_TRIMMING_NUMBER_OF_BUCKETS) + 1), static_cast<uint64_t>(MEAN_TRIMMING_MAX_LOCAL_BUCKETS_SIZE));
+		const unsigned int localBucketsSize = min(bit_floor((device->maxThreadgroupMemoryLength() - (MEAN_TRIMMING_NUMBER_OF_BUCKETS + sizeof(uint32_t) - 1)) / (sizeof(uint32_t) * MEAN_TRIMMING_NUMBER_OF_BUCKETS) + 1), MEAN_TRIMMING_MAX_LOCAL_BUCKETS_SIZE);
 		
 		// Check if creating preprocessor macros failed
 		static const unique_ptr<NS::Dictionary, void(*)(NS::Dictionary *)> preprocessorMacros(NS::Dictionary::alloc()->init((const NS::Object *[]){
@@ -241,11 +241,16 @@ using namespace std;
 			// Trimming rounds value
 			MTLSTR(TO_STRING(TRIMMING_ROUNDS)),
 			
-			// Number of edges per step one work item value
-			MTLSTR(TO_STRING(MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM)),
-			
 			// Edge number of components value
 			MTLSTR(TO_STRING(EDGE_NUMBER_OF_COMPONENTS)),
+			
+			// Number of edges per step one work item value
+			unique_ptr<NS::Number, void(*)(NS::Number *)>(NS::Number::alloc()->init(MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM), [](NS::Number *numberOfEdgesPerStepOneWorkItemValue) noexcept {
+			
+				// Free number of edges per step one work item value
+				numberOfEdgesPerStepOneWorkItemValue->release();
+				
+			}).get(),
 			
 			// Number of bitmap bytes value
 			unique_ptr<NS::Number, void(*)(NS::Number *)>(NS::Number::alloc()->init(MEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES), [](NS::Number *numberOfBitmapBytesValue) noexcept {
@@ -319,11 +324,11 @@ using namespace std;
 			// Trimming rounds key
 			MTLSTR("TRIMMING_ROUNDS"),
 			
-			// Number of edges per step one work item key
-			MTLSTR("NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM"),
-			
 			// Edge number of components key
 			MTLSTR("EDGE_NUMBER_OF_COMPONENTS"),
+			
+			// Number of edges per step one work item key
+			MTLSTR("NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM"),
 			
 			// Number of bitmap bytes key
 			MTLSTR("NUMBER_OF_BITMAP_BYTES"),
@@ -638,7 +643,7 @@ using namespace std;
 		const MTL::Size totalNumberOfWorkItems[] = {
 		
 			// Trim edges step one kernel
-			{(NUMBER_OF_EDGES + MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM - 1) / MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM, 1, 1},
+			{NUMBER_OF_EDGES / MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM, 1, 1},
 			
 			// Trim edges step two kernel
 			{MEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
@@ -1768,10 +1773,10 @@ using namespace std;
 		const size_t bucketsOneNumberOfBuckets = (enforceMaxMemoryAllocationSize && static_cast<uint64_t>(MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint) > maxMemoryAllocationSize) ? (MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET * MEAN_TRIMMING_NUMBER_OF_BUCKETS + MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET - 1) / MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET : MEAN_TRIMMING_NUMBER_OF_BUCKETS;
 		
 		// Set local buckets size based on the device's work group memory size
-		const unsigned int localBucketsSize = min(bit_floor((workGroupMemorySize - (MEAN_TRIMMING_NUMBER_OF_BUCKETS + sizeof(cl_uint) - 1)) / (sizeof(cl_uint) * MEAN_TRIMMING_NUMBER_OF_BUCKETS) + 1), static_cast<cl_ulong>(MEAN_TRIMMING_MAX_LOCAL_BUCKETS_SIZE));
+		const unsigned int localBucketsSize = min(bit_floor((workGroupMemorySize - (MEAN_TRIMMING_NUMBER_OF_BUCKETS + sizeof(cl_uint) - 1)) / (sizeof(cl_uint) * MEAN_TRIMMING_NUMBER_OF_BUCKETS) + 1), MEAN_TRIMMING_MAX_LOCAL_BUCKETS_SIZE);
 		
 		// Check if building program for the device failed
-		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DTRIMMING_ROUNDS=" TO_STRING(TRIMMING_ROUNDS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" TO_STRING(MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) " -DEDGE_NUMBER_OF_COMPONENTS=" TO_STRING(EDGE_NUMBER_OF_COMPONENTS) " -DNUMBER_OF_BITMAP_BYTES=" + to_string(MEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES) + " -DNUMBER_OF_BUCKETS=" + to_string(MEAN_TRIMMING_NUMBER_OF_BUCKETS) + " -DMAX_NUMBER_OF_EDGES_AFTER_TRIMMING=" + to_string(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING=" + to_string(MEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING) + " -DINITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DINITIAL_BUCKETS_NUMBER_OF_BUCKETS=" + to_string(bucketsOneNumberOfBuckets) + " -DLOCAL_BUCKETS_SIZE=" + to_string(localBucketsSize)).c_str(), nullptr, nullptr) != CL_SUCCESS) {
+		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DTRIMMING_ROUNDS=" TO_STRING(TRIMMING_ROUNDS) " -DEDGE_NUMBER_OF_COMPONENTS=" TO_STRING(EDGE_NUMBER_OF_COMPONENTS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) + " -DNUMBER_OF_BITMAP_BYTES=" + to_string(MEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES) + " -DNUMBER_OF_BUCKETS=" + to_string(MEAN_TRIMMING_NUMBER_OF_BUCKETS) + " -DMAX_NUMBER_OF_EDGES_AFTER_TRIMMING=" + to_string(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING=" + to_string(MEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING) + " -DINITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DINITIAL_BUCKETS_NUMBER_OF_BUCKETS=" + to_string(bucketsOneNumberOfBuckets) + " -DLOCAL_BUCKETS_SIZE=" + to_string(localBucketsSize)).c_str(), nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Building program for the GPU failed" << endl;
@@ -1813,7 +1818,7 @@ using namespace std;
 		const size_t totalNumberOfWorkItems[] = {
 		
 			// Trim edges step one kernel
-			(NUMBER_OF_EDGES + MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM - 1) / MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM,
+			NUMBER_OF_EDGES / MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM,
 			
 			// Trim edges step two kernel
 			MEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
@@ -1873,7 +1878,7 @@ using namespace std;
 		}
 		
 		// Check if rebuilding program for the device with hardcoded work items per work groups failed
-		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DTRIMMING_ROUNDS=" TO_STRING(TRIMMING_ROUNDS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" TO_STRING(MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) " -DEDGE_NUMBER_OF_COMPONENTS=" TO_STRING(EDGE_NUMBER_OF_COMPONENTS) " -DNUMBER_OF_BITMAP_BYTES=" + to_string(MEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES) + " -DNUMBER_OF_BUCKETS=" + to_string(MEAN_TRIMMING_NUMBER_OF_BUCKETS) + " -DMAX_NUMBER_OF_EDGES_AFTER_TRIMMING=" + to_string(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING=" + to_string(MEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING) + " -DINITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DINITIAL_BUCKETS_NUMBER_OF_BUCKETS=" + to_string(bucketsOneNumberOfBuckets) + " -DLOCAL_BUCKETS_SIZE=" + to_string(localBucketsSize) + " -DTRIM_EDGES_STEP_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[0]) + " -DTRIM_EDGES_STEP_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[1]) + " -DTRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[2]) + " -DTRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[3]) + " -DTRIM_EDGES_STEP_FIVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[4]) + " -DTRIM_EDGES_STEP_SIX_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[5])).c_str(), nullptr, nullptr) != CL_SUCCESS) {
+		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DTRIMMING_ROUNDS=" TO_STRING(TRIMMING_ROUNDS) " -DEDGE_NUMBER_OF_COMPONENTS=" TO_STRING(EDGE_NUMBER_OF_COMPONENTS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(MEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) + " -DNUMBER_OF_BITMAP_BYTES=" + to_string(MEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES) + " -DNUMBER_OF_BUCKETS=" + to_string(MEAN_TRIMMING_NUMBER_OF_BUCKETS) + " -DMAX_NUMBER_OF_EDGES_AFTER_TRIMMING=" + to_string(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING=" + to_string(MEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING) + " -DINITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DINITIAL_BUCKETS_NUMBER_OF_BUCKETS=" + to_string(bucketsOneNumberOfBuckets) + " -DLOCAL_BUCKETS_SIZE=" + to_string(localBucketsSize) + " -DTRIM_EDGES_STEP_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[0]) + " -DTRIM_EDGES_STEP_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[1]) + " -DTRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[2]) + " -DTRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[3]) + " -DTRIM_EDGES_STEP_FIVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[4]) + " -DTRIM_EDGES_STEP_SIX_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[5])).c_str(), nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Building program for the GPU failed" << endl;
@@ -1940,7 +1945,7 @@ using namespace std;
 		}
 		
 		// Check if setting program's unchanging arguments failed
-		if(clSetKernelArg(stepOneKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 2, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS) {
+		if(clSetKernelArg(stepOneKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 2, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 0, (TRIMMING_ROUNDS % 2) ? sizeof(bucketsTwo.get()) : sizeof(bucketsOne.get()), &unmove((TRIMMING_ROUNDS % 2) ? bucketsTwo.get() : bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 1, (TRIMMING_ROUNDS % 2) ? sizeof(numberOfEdgesPerBucketTwo.get()) : sizeof(numberOfEdgesPerBucketOne.get()), &unmove((TRIMMING_ROUNDS % 2) ? numberOfEdgesPerBucketTwo.get() : numberOfEdgesPerBucketOne.get())) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Setting program's arguments on the GPU failed" << endl;
@@ -1961,16 +1966,6 @@ using namespace std;
 				// Return false
 				return false;
 			}
-		}
-		
-		// Check if setting program's unchanging arguments failed
-		if(clSetKernelArg(stepTwoKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 0, (TRIMMING_ROUNDS % 2) ? sizeof(bucketsTwo.get()) : sizeof(bucketsOne.get()), &unmove((TRIMMING_ROUNDS % 2) ? bucketsTwo.get() : bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 1, (TRIMMING_ROUNDS % 2) ? sizeof(numberOfEdgesPerBucketTwo.get()) : sizeof(numberOfEdgesPerBucketOne.get()), &unmove((TRIMMING_ROUNDS % 2) ? numberOfEdgesPerBucketTwo.get() : numberOfEdgesPerBucketOne.get())) != CL_SUCCESS) {
-		
-			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
-			
-			// Return false
-			return false;
 		}
 		
 		// Check if queuing clearing number of edges per bucket one on the device failed

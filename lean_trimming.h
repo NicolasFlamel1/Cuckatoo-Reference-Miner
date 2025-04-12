@@ -10,7 +10,7 @@ using namespace std;
 // Configurable constants
 
 // Lean trimming number of edges per step one work item
-#define LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM 64
+#define LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM min(static_cast<uint64_t>(64), NUMBER_OF_EDGES)
 
 
 // Constants
@@ -177,7 +177,12 @@ using namespace std;
 			MTLSTR(TO_STRING(EDGE_BITS)),
 			
 			// Number of edges per step one work item value
-			MTLSTR(TO_STRING(LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM))
+			unique_ptr<NS::Number, void(*)(NS::Number *)>(NS::Number::alloc()->init(LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM), [](NS::Number *numberOfEdgesPerStepOneWorkItemValue) noexcept {
+			
+				// Free number of edges per step one work item value
+				numberOfEdgesPerStepOneWorkItemValue->release();
+				
+			}).get(),
 		
 		}, (const NS::Object *[]){
 		
@@ -420,7 +425,7 @@ using namespace std;
 		const MTL::Size totalNumberOfWorkItems[] = {
 		
 			// Trim edges step one kernel
-			{(NUMBER_OF_EDGES + LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM - 1) / LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM, 1, 1},
+			{NUMBER_OF_EDGES / LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM, 1, 1},
 			
 			// Trim edges step two kernel
 			{NUMBER_OF_EDGES / (sizeof(uint64_t) * BITS_IN_A_BYTE), 1, 1},
@@ -1184,7 +1189,7 @@ using namespace std;
 		}
 		
 		// Check if building program for the device failed
-		if(clBuildProgram(program.get(), 1, &device, "-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" TO_STRING(LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM), nullptr, nullptr) != CL_SUCCESS) {
+		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM)).c_str(), nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Building program for the GPU failed" << endl;
@@ -1224,7 +1229,7 @@ using namespace std;
 		const size_t totalNumberOfWorkItems[] = {
 		
 			// Trim edges step one kernel
-			(NUMBER_OF_EDGES + LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM - 1) / LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM,
+			NUMBER_OF_EDGES / LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM,
 			
 			// Trim edges step two kernel
 			NUMBER_OF_EDGES / (sizeof(cl_ulong) * BITS_IN_A_BYTE),
@@ -1270,7 +1275,7 @@ using namespace std;
 		}
 		
 		// Check if rebuilding program for the device with hardcoded work items per work groups failed
-		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" TO_STRING(LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) " -DTRIM_EDGES_STEP_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[0]) + " -DTRIM_EDGES_STEP_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[1]) + " -DTRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[2]) + " -DTRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[3])).c_str(), nullptr, nullptr) != CL_SUCCESS) {
+		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) + " -DTRIM_EDGES_STEP_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[0]) + " -DTRIM_EDGES_STEP_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[1]) + " -DTRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[2]) + " -DTRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[3])).c_str(), nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Building program for the GPU failed" << endl;
