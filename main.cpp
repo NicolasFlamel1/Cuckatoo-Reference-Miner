@@ -102,6 +102,25 @@ using namespace std;
 #define WRITE_TIMEOUT_SECONDS 60
 
 
+// Constants
+
+// Trimming type
+enum TrimmingType {
+
+	// All trimming types
+	ALL_TRIMMING_TYPES = 0,
+	
+	// Mean trimming type
+	MEAN_TRIMMING_TYPE = 1 << 0,
+	
+	// Slean trimming type
+	SLEAN_TRIMMING_TYPE = 1 << 1,
+	
+	// Lean trimming type
+	LEAN_TRIMMING_TYPE = 1 << 2
+};
+
+
 // Global variables
 
 // Closing
@@ -195,21 +214,28 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 #include "./slean_trimming.h"
 
 
-// Check if not tuning
-#ifndef TUNING
-
-	// Main function
-	int main(int argc, char *argv[]) noexcept {
-	
-// Otherwise
-#else
-
-	// Main function
-	int main() noexcept {
-#endif
+// Main function
+int main(int argc, char *argv[]) noexcept {
 
 	// Display message
-	cout << TO_STRING(NAME) " v" TO_STRING(VERSION) " (Cuckatoo" TO_STRING(EDGE_BITS) ", " TO_STRING(TRIMMING_ROUNDS) " trimming round(s), " TO_STRING(SLEAN_TRIMMING_PARTS) " slean trimming part(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory)" << endl;
+	cout << TO_STRING(NAME) " v" TO_STRING(VERSION) " (Cuckatoo" TO_STRING(EDGE_BITS) ", " TO_STRING(TRIMMING_ROUNDS) " trimming round(s)";
+	
+	// Check if there's trimming rounds
+	#if TRIMMING_ROUNDS != 0
+	
+		// Display message
+		cout << ", " TO_STRING(SLEAN_TRIMMING_PARTS) " slean trimming part(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory";
+	#endif
+	
+	// Check if tuning
+	#ifdef TUNING
+	
+		// Display message
+		cout << ", tuning mode";
+	#endif
+	
+	// Display message
+	cout << ")" << endl;
 	
 	// Check if not tuning
 	#ifndef TUNING
@@ -222,48 +248,68 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 		
 		// Set stratum server username to nothing
 		const char *stratumServerUsername = nullptr;
+	#endif
+	
+	// Check if there's trimming rounds
+	#if TRIMMING_ROUNDS != 0
+	
+		// Set trimming types to all trimming types
+		underlying_type_t<TrimmingType> trimmingTypes = ALL_TRIMMING_TYPES;
+	#endif
+	
+	// Set options
+	const option options[] = {
+	
+		// Version
+		{"version", no_argument, nullptr, 'v'},
 		
-		// Set options
-		const option options[] = {
+		// Stratum server address
+		{"stratum_server_address", required_argument, nullptr, 'a'},
+		
+		// Stratum server port
+		{"stratum_server_port", required_argument, nullptr, 'p'},
+		
+		// Stratum server username
+		{"stratum_server_username", required_argument, nullptr, 'u'},
+		
+		// Mean trimming
+		{"mean_trimming", no_argument, nullptr, 'm'},
+		
+		// Slean trimming
+		{"slean_trimming", no_argument, nullptr, 's'},
+		
+		// Lean trimming
+		{"lean_trimming", no_argument, nullptr, 'l'},
+		
+		// Help
+		{"help", no_argument, nullptr, 'h'},
+		
+		// End
+		{}
+	};
+	
+	// Set display help to false
+	bool displayHelp = false;
+	
+	// Go through all options
+	int option;
+	while((option = getopt_long(argc, argv, "va:p:u:mslh", options, nullptr)) != -1) {
+	
+		// Check option
+		switch(option) {
 		
 			// Version
-			{"version", no_argument, nullptr, 'v'},
+			case 'v':
 			
-			// Stratum server address
-			{"stratum_server_address", required_argument, nullptr, 'a'},
-			
-			// Stratum server port
-			{"stratum_server_port", required_argument, nullptr, 'p'},
-			
-			// Stratum server username
-			{"stratum_server_username", required_argument, nullptr, 'u'},
-			
-			// Help
-			{"help", no_argument, nullptr, 'h'},
-			
-			// End
-			{}
-		};
-		
-		// Set display help to false
-		bool displayHelp = false;
-		
-		// Go through all options
-		int option;
-		while((option = getopt_long(argc, argv, "va:p:u:h", options, nullptr)) != -1) {
-		
-			// Check option
-			switch(option) {
-			
-				// Version
-				case 'v':
+				// Return success
+				exit(EXIT_SUCCESS);
 				
-					// Return success
-					exit(EXIT_SUCCESS);
-					
-					// Break
-					break;
-				
+				// Break
+				break;
+			
+			// Check if not tuning
+			#ifndef TUNING
+			
 				// Stratum server address
 				case 'a':
 				
@@ -353,35 +399,83 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 					
 					// Break
 					break;
+			#endif
+			
+			// Check if there's trimming rounds
+			#if TRIMMING_ROUNDS != 0
+			
+				// Mean trimming
+				case 'm':
 				
-				// Help or default
-				case 'h':
-				default:
-				
-					// Set display help to true
-					displayHelp = true;
+					// Enable mean trimming type
+					trimmingTypes |= MEAN_TRIMMING_TYPE;
 					
 					// Break
 					break;
-			}
+				
+				// Slean trimming
+				case 's':
+				
+					// Enable slean trimming type
+					trimmingTypes |= SLEAN_TRIMMING_TYPE;
+					
+					// Break
+					break;
+				
+				// Lean trimming
+				case 'l':
+				
+					// Enable lean trimming type
+					trimmingTypes |= LEAN_TRIMMING_TYPE;
+					
+					// Break
+					break;
+			#endif
+			
+			// Help or default
+			case 'h':
+			default:
+			
+				// Set display help to true
+				displayHelp = true;
+				
+				// Break
+				break;
 		}
+	}
+	
+	// Check if displaying help
+	if(displayHelp) {
+	
+		// Display message
+		cout << endl << "Usage:" << endl << '\t' << argv[0] << " [options]" << endl << endl;
+		cout << "Options:" << endl;
+		cout << "\t-v, --version\t\t\tDisplay version information" << endl;
 		
-		// Check if displaying help
-		if(displayHelp) {
+		// Check if not tuning
+		#ifndef TUNING
 		
 			// Display message
-			cout << endl << "Usage:" << endl << '\t' << argv[0] << " [options]" << endl << endl;
-			cout << "Options:" << endl;
-			cout << "\t-v, --version\t\t\tDisplay version information" << endl;
 			cout << "\t-a, --stratum_server_address\tThe address of the stratum server to connect to (default: " << DEFAULT_STRATUM_SERVER_ADDRESS << ')' << endl;
 			cout << "\t-p, --stratum_server_port\tThe port of the stratum server to connect to (default: " << DEFAULT_STRATUM_SERVER_PORT << ')' << endl;
 			cout << "\t-u, --stratum_server_username\tThe username to use when logging into the stratum server" << endl;
-			cout << "\t-h, --help\t\t\tDisplay help information" << endl;
-			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-	#endif
+		#endif
+		
+		// Check if there's trimming rounds
+		#if TRIMMING_ROUNDS != 0
+		
+			// Display message
+			cout << "\t-m, --mean_trimming\t\tUse only mean trimming" << endl;
+			cout << "\t-s, --slean_trimming\t\tUse only slean trimming" << endl;
+			cout << "\t-l, --lean_trimming\t\tUse only lean trimming" << endl;
+		#endif
+		
+		// Display message
+		cout << "\t-h, --help\t\t\tDisplay help information" << endl;
+		
+		// Return failure
+		exit(EXIT_FAILURE);
+	}
 	
 	// Check if setting interrupt signal handler failed
 	if(signal(SIGINT, [](const int signal) noexcept {
@@ -880,19 +974,59 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 	// Otherwise
 	#else
 	
+		// Display message
+		cout << "Using trimming type(s):";
+		
+		// Set trimming type displayed to false
+		bool trimmingTypeDisplay = false;
+		
+		// Check if using all trimming types or mean trimming is enabled
+		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & MEAN_TRIMMING_TYPE) {
+		
+			// Display message
+			cout << (trimmingTypeDisplay ? "," : "") << " mean";
+			
+			// Set trimming type displayed to true
+			trimmingTypeDisplay = true;
+		}
+		
+		// Check if using all trimming types or slean trimming is enabled
+		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_TRIMMING_TYPE) {
+		
+			// Display message
+			cout << (trimmingTypeDisplay ? "," : "") << " slean";
+			
+			// Set trimming type displayed to true
+			trimmingTypeDisplay = true;
+		}
+		
+		// Check if using all trimming types or lean trimming is enabled
+		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & LEAN_TRIMMING_TYPE) {
+		
+			// Display message
+			cout << (trimmingTypeDisplay ? "," : "") << " lean";
+			
+			// Set trimming type displayed to true
+			trimmingTypeDisplay = true;
+		}
+		
+		// Display new line
+		cout << endl;
+		
 		// Check if using macOS
 		#ifdef __APPLE__
 		
-			// Create mean trimming context
-			static unique_ptr<MTL::Device, void(*)(MTL::Device *)> context(createMeanTrimmingContext(), [](MTL::Device *context) noexcept {
+			// Create context
+			static unique_ptr<MTL::Device, void(*)(MTL::Device *)> context(nullptr, [](MTL::Device *context) noexcept {
 			
-				// Free context
-				context->release();
 			});
 			
 		// Otherwise
 		#else
 		
+			// Create context
+			static unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)> context(nullptr, clReleaseContext);
+			
 			// Check if getting number of platforms failed or no platforms exist
 			cl_uint numberOfPlatforms;
 			if(clGetPlatformIDs(0, nullptr, &numberOfPlatforms) != CL_SUCCESS || !numberOfPlatforms) {
@@ -914,210 +1048,232 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 				// Return failure
 				exit(EXIT_FAILURE);
 			}
-			
-			// Create mean trimming context
-			static unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)> context(createMeanTrimmingContext(platforms, numberOfPlatforms), clReleaseContext);
 		#endif
 		
-		// Check if creating mean trimming context was successful
-		if(context) {
+		// Check if using all trimming types or mean trimming is enabled
+		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & MEAN_TRIMMING_TYPE) {
+		
+			// Check if using macOS
+			#ifdef __APPLE__
 			
-			// Get number of searching threads
-			const unsigned int numberOfSearchingThreads = min(min(max(thread::hardware_concurrency(), static_cast<unsigned int>(1)), static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
-			
-			// Go through all searching threads
-			unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreads];
-			unsigned int numberOfSearchingThreadsFinished = 0;
-			
-			for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
-			
-				// Create searching thread's node connections
-				nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
+				// Create mean trimming context
+				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createMeanTrimmingContext(), [](MTL::Device *context) noexcept {
 				
-				// Create searching thread
-				thread([numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					// Free context
+					context->release();
+				});
 				
-					// Check if setting searching thread's priority and affinity failed
-					if(!setThreadPriorityAndAffinity(searchingThreadIndex)) {
+			// Otherwise
+			#else
+				
+				// Create mean trimming context
+				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createMeanTrimmingContext(platforms, numberOfPlatforms), clReleaseContext);
+			#endif
+			
+			// Check if creating mean trimming context was successful
+			if(context) {
+				
+				// Get number of searching threads
+				const unsigned int numberOfSearchingThreads = min(min(max(thread::hardware_concurrency(), static_cast<unsigned int>(1)), static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
+				
+				// Go through all searching threads
+				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreads];
+				unsigned int numberOfSearchingThreadsFinished = 0;
+				
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Create searching thread's node connections
+					nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
 					
-						// Display message
-						cout << "Setting searching thread's priority and affinity failed" << endl;
-						
-						// Return failure
-						exit(EXIT_FAILURE);
-					}
+					// Create searching thread
+					thread([numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 					
-					// Initialize thread local global variables
-					initializeCuckatooThreadLocalGlobalVariables();
-					
-					// Loop forever
-					unique_lock lock(searchingThreadsMutex, defer_lock);
-					for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
-					
-						// Wait until starting searching threads
-						lock.lock();
-						startSearchingThreadsConditionalVariable->wait(lock, [startTriggerTrue]() noexcept -> bool {
+						// Check if setting searching thread's priority and affinity failed
+						if(!setThreadPriorityAndAffinity(searchingThreadIndex)) {
 						
-							// Return if starting searching threads
-							return startSearchingThreadsTriggerToggle == startTriggerTrue;
-						});
-						lock.unlock();
-						
-						// Get number of edges
-						const uint32_t &numberOfEdges = reinterpret_cast<const uint32_t *>(searchingThreadsData)[0];
-						
-						// Get total number of edges
-						const uint32_t totalNumberOfEdges = min(numberOfEdges, MAX_NUMBER_OF_EDGES_AFTER_TRIMMING);
-						
-						// Get edges
-						const uint32_t *edges = &reinterpret_cast<const uint32_t *>(searchingThreadsData)[1];
-						
-						// Check if not the first searching thread
-						if(searchingThreadIndex) {
-						
-							// Set first searching edges
-							const uint64_t firstSearchingEdge = (1 - 1 / pow(2, searchingThreadIndex - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT));
+							// Display message
+							cout << "Setting searching thread's priority and affinity failed" << endl;
 							
-							// Go through all previous edges
-							for(uint64_t nodeConnectionsIndex = 0, edgesIndex = 0; nodeConnectionsIndex < firstSearchingEdge * 2; nodeConnectionsIndex += 2, edgesIndex += EDGE_NUMBER_OF_COMPONENTS) {
-							
-								// Replace newest node connection for the node on the first partition and add node connection to list
-								nodeConnections[nodeConnectionsIndex] = {cuckatooUNewestNodeConnections.replace(edges[edgesIndex + 1], &nodeConnections[nodeConnectionsIndex]), edges[edgesIndex + 1], edges[edgesIndex]};
-								
-								// Replace newest node connection for the node on the second partition and add node connection to list
-								nodeConnections[nodeConnectionsIndex + 1] = {cuckatooVNewestNodeConnections.replace(edges[edgesIndex + 2], &nodeConnections[nodeConnectionsIndex + 1]), edges[edgesIndex + 2], edges[edgesIndex]};
-							}
-							
-							// Check if getting solution was successful
-							uint32_t solution[SOLUTION_SIZE];
-							if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
-							
-								// Lock
-								lock.lock();
-								
-								// Set searching threads solution to the solution
-								memcpy(searchingThreadsSolution, solution, sizeof(solution));
-								
-								// Unlock
-								lock.unlock();
-							}
+							// Return failure
+							exit(EXIT_FAILURE);
 						}
 						
-						// Otherwise
-						else {
+						// Initialize thread local global variables
+						initializeCuckatooThreadLocalGlobalVariables();
 						
-							// Check if too may edges exist
-							if(numberOfEdges > MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
+						// Loop forever
+						unique_lock lock(searchingThreadsMutex, defer_lock);
+						for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
+						
+							// Wait until starting searching threads
+							lock.lock();
+							startSearchingThreadsConditionalVariable->wait(lock, [startTriggerTrue]() noexcept -> bool {
 							
-								// Check if there's too few trimming rounds
-								#if TRIMMING_ROUNDS <= 10
+								// Return if starting searching threads
+								return startSearchingThreadsTriggerToggle == startTriggerTrue;
+							});
+							lock.unlock();
+							
+							// Get number of edges
+							const uint32_t &numberOfEdges = reinterpret_cast<const uint32_t *>(searchingThreadsData)[0];
+							
+							// Get total number of edges
+							const uint32_t totalNumberOfEdges = min(numberOfEdges, MAX_NUMBER_OF_EDGES_AFTER_TRIMMING);
+							
+							// Get edges
+							const uint32_t *edges = &reinterpret_cast<const uint32_t *>(searchingThreadsData)[1];
+							
+							// Check if not the first searching thread
+							if(searchingThreadIndex) {
+							
+								// Set first searching edges
+								const uint64_t firstSearchingEdge = (1 - 1 / pow(2, searchingThreadIndex - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT));
 								
-									// Display message
-									cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+								// Go through all previous edges
+								for(uint64_t nodeConnectionsIndex = 0, edgesIndex = 0; nodeConnectionsIndex < firstSearchingEdge * 2; nodeConnectionsIndex += 2, edgesIndex += EDGE_NUMBER_OF_COMPONENTS) {
+								
+									// Replace newest node connection for the node on the first partition and add node connection to list
+									nodeConnections[nodeConnectionsIndex] = {cuckatooUNewestNodeConnections.replace(edges[edgesIndex + 1], &nodeConnections[nodeConnectionsIndex]), edges[edgesIndex + 1], edges[edgesIndex]};
 									
-								// Otherwise
-								#else
+									// Replace newest node connection for the node on the second partition and add node connection to list
+									nodeConnections[nodeConnectionsIndex + 1] = {cuckatooVNewestNodeConnections.replace(edges[edgesIndex + 2], &nodeConnections[nodeConnectionsIndex + 1]), edges[edgesIndex + 2], edges[edgesIndex]};
+								}
 								
-									// Display message
-									cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
-								#endif
+								// Check if getting solution was successful
+								uint32_t solution[SOLUTION_SIZE];
+								if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
+								
+									// Lock
+									lock.lock();
+									
+									// Set searching threads solution to the solution
+									memcpy(searchingThreadsSolution, solution, sizeof(solution));
+									
+									// Unlock
+									lock.unlock();
+								}
 							}
 							
-							// Check if getting solution was successful
-							uint32_t solution[SOLUTION_SIZE];
-							if(getCuckatooSolution(solution, nodeConnections, edges, ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)))) {
+							// Otherwise
+							else {
 							
-								// Lock
-								lock.lock();
+								// Check if too may edges exist
+								if(numberOfEdges > MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
 								
-								// Set searching threads solution to the solution
-								memcpy(searchingThreadsSolution, solution, sizeof(solution));
+									// Check if there's too few trimming rounds
+									#if TRIMMING_ROUNDS <= 10
+									
+										// Display message
+										cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+										
+									// Otherwise
+									#else
+									
+										// Display message
+										cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+									#endif
+								}
 								
+								// Check if getting solution was successful
+								uint32_t solution[SOLUTION_SIZE];
+								if(getCuckatooSolution(solution, nodeConnections, edges, ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)))) {
+								
+									// Lock
+									lock.lock();
+									
+									// Set searching threads solution to the solution
+									memcpy(searchingThreadsSolution, solution, sizeof(solution));
+									
+									// Unlock
+									lock.unlock();
+								}
+							}
+							
+							// Reset node connections
+							cuckatooUNewestNodeConnections.clear();
+							cuckatooVNewestNodeConnections.clear();
+							
+							// Check if all searching threads have finished
+							lock.lock();
+							if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
+							
+								// Reset number of searching threads finished
+								numberOfSearchingThreadsFinished = 0;
+								
+								// Notify that searching threads have finished
+								searchingThreadsFinished = true;
+								lock.unlock();
+								searchingThreadsFinishedConditionalVariable->notify_one();
+							}
+							
+							// Otherwise
+							else {
+							
 								// Unlock
 								lock.unlock();
 							}
 						}
 						
-						// Reset node connections
-						cuckatooUNewestNodeConnections.clear();
-						cuckatooVNewestNodeConnections.clear();
-						
-						// Check if all searching threads have finished
-						lock.lock();
-						if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
-						
-							// Reset number of searching threads finished
-							numberOfSearchingThreadsFinished = 0;
-							
-							// Notify that searching threads have finished
-							searchingThreadsFinished = true;
-							lock.unlock();
-							searchingThreadsFinishedConditionalVariable->notify_one();
-						}
-						
-						// Otherwise
-						else {
-						
-							// Unlock
-							lock.unlock();
-						}
-					}
-					
-				}).detach();
-			}
-			
-			// Check if performing mean trimming loop failed
-			if(!performMeanTrimmingLoop(context.get())) {
-			
-				// Return failure
-				exit(EXIT_FAILURE);
-			}
-		}
-		
-		// Otherwise
-		else {
-		
-			// Display message
-			cout << "No applicable GPU found for mean trimming. Mean trimming requires ";
-			
-			// Check if RAM requirement can be expressed in bytes
-			if(MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE / 2) {
-			
-				// Display message
-				cout << MEAN_TRIMMING_REQUIRED_RAM_BYTES << " bytes";
-			}
-			
-			// Otherwise check if RAM requirement can be expressed in kilobytes
-			else if(MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE / 2) {
-			
-				// Display message
-				cout << (ceil(static_cast<double>(MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE * 100) / 100) << " KB";
-			}
-			
-			// Otherwise check if RAM requirement can be expressed in megabytes
-			else if(MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE * MEGABYTES_IN_A_GIGABYTE / 2) {
-			
-				// Display message
-				cout << (ceil(static_cast<double>(MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE * 100) / 100) << " MB";
+					}).detach();
+				}
+				
+				// Check if performing mean trimming loop failed
+				if(!performMeanTrimmingLoop(context.get())) {
+				
+					// Return failure
+					exit(EXIT_FAILURE);
+				}
 			}
 			
 			// Otherwise
 			else {
 			
 				// Display message
-				cout << (ceil(static_cast<double>(MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE * 100) / 100) << " GB";
-			}
-			
-			// Display message
-			cout << " of RAM and " << (MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory" << endl;
-			
-			// Check if local RAM kilobytes is greater than its min value
-			if(LOCAL_RAM_KILOBYTES > MIN_LOCAL_RAM_KILOBYTES) {
-			
+				cout << "No applicable GPU found for mean trimming. Mean trimming requires ";
+				
+				// Check if RAM requirement can be expressed in bytes
+				if(MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE / 2) {
+				
+					// Display message
+					cout << MEAN_TRIMMING_REQUIRED_RAM_BYTES << " bytes";
+				}
+				
+				// Otherwise check if RAM requirement can be expressed in kilobytes
+				else if(MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE / 2) {
+				
+					// Display message
+					cout << (ceil(static_cast<double>(MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE * 100) / 100) << " KB";
+				}
+				
+				// Otherwise check if RAM requirement can be expressed in megabytes
+				else if(MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE * MEGABYTES_IN_A_GIGABYTE / 2) {
+				
+					// Display message
+					cout << (ceil(static_cast<double>(MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE * 100) / 100) << " MB";
+				}
+				
+				// Otherwise
+				else {
+				
+					// Display message
+					cout << (ceil(static_cast<double>(MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE * 100) / 100) << " GB";
+				}
+				
 				// Display message
-				cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce mean trimming's GPU local memory requirement by half" << endl;
+				cout << " of RAM and " << (MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory" << endl;
+				
+				// Check if local RAM kilobytes is greater than its min value
+				if(LOCAL_RAM_KILOBYTES > MIN_LOCAL_RAM_KILOBYTES) {
+				
+					// Display message
+					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce mean trimming's GPU local memory requirement by half" << endl;
+				}
 			}
-			
+		}
+		
+		// Check if using all trimming types or slean trimming is enabled
+		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_TRIMMING_TYPE) {
+		
 			// Check if using macOS
 			#ifdef __APPLE__
 			
@@ -1473,213 +1629,141 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 					// Display message
 					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce slean trimming's GPU local memory requirement by half" << endl;
 				}
+			}
+		}
+		
+		// Check if using all trimming types or lean trimming is enabled
+		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & LEAN_TRIMMING_TYPE) {
+		
+			// Check if using macOS
+			#ifdef __APPLE__
+			
+				// Create lean trimming context
+				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createLeanTrimmingContext(), [](MTL::Device *context) noexcept {
 				
-				// Check if using macOS
-				#ifdef __APPLE__
+					// Free context
+					context->release();
+				});
 				
-					// Create lean trimming context
-					context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createLeanTrimmingContext(), [](MTL::Device *context) noexcept {
-					
-						// Free context
-						context->release();
-					});
-					
-				// Otherwise
-				#else
+			// Otherwise
+			#else
+			
+				// Create lean trimming context
+				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createLeanTrimmingContext(platforms, numberOfPlatforms), clReleaseContext);
+			#endif
+			
+			// Check if creating lean trimming context was successful
+			if(context) {
 				
-					// Create lean trimming context
-					context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createLeanTrimmingContext(platforms, numberOfPlatforms), clReleaseContext);
-				#endif
+				// Get number of searching threads
+				const unsigned int numberOfSearchingThreads = min(min(max(thread::hardware_concurrency(), static_cast<unsigned int>(1)), static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS)), static_cast<unsigned int>(EDGES_BITMAP_SIZE));
 				
-				// Check if creating lean trimming context was successful
-				if(context) {
+				// Get number of searching threads searching edges
+				const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
+				
+				// Go through all searching threads
+				uint64_t numberOfEdges[numberOfSearchingThreads];
+				barrier searchingThreadsBarrier(numberOfSearchingThreads);
+				const unique_ptr edges = make_unique<uint32_t[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS);
+				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreadsSearchingEdges];
+				unsigned int numberOfSearchingThreadsFinished = 0;
+				
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Check if searching thread is searching edges
+					if(i < numberOfSearchingThreadsSearchingEdges) {
 					
-					// Get number of searching threads
-					const unsigned int numberOfSearchingThreads = min(min(max(thread::hardware_concurrency(), static_cast<unsigned int>(1)), static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS)), static_cast<unsigned int>(EDGES_BITMAP_SIZE));
+						// Create searching thread's node connections
+						nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
+					}
 					
-					// Get number of searching threads searching edges
-					const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
+					// Create searching thread
+					thread([numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 					
-					// Go through all searching threads
-					uint64_t numberOfEdges[numberOfSearchingThreads];
-					barrier searchingThreadsBarrier(numberOfSearchingThreads);
-					const unique_ptr edges = make_unique<uint32_t[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS);
-					unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreadsSearchingEdges];
-					unsigned int numberOfSearchingThreadsFinished = 0;
-					
-					for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
-					
-						// Check if searching thread is searching edges
-						if(i < numberOfSearchingThreadsSearchingEdges) {
+						// Check if setting searching thread's priority and affinity failed
+						if(!setThreadPriorityAndAffinity(searchingThreadIndex)) {
 						
-							// Create searching thread's node connections
-							nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
+							// Display message
+							cout << "Setting searching thread's priority and affinity failed" << endl;
+							
+							// Return failure
+							exit(EXIT_FAILURE);
 						}
 						
-						// Create searching thread
-						thread([numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+						// Check if searching thread is searching edges
+						if(searchingThreadIndex < numberOfSearchingThreadsSearchingEdges) {
 						
-							// Check if setting searching thread's priority and affinity failed
-							if(!setThreadPriorityAndAffinity(searchingThreadIndex)) {
+							// Initialize thread local global variables
+							initializeCuckatooThreadLocalGlobalVariables();
+						}
+						
+						// Set searching thread's bitmap start and end
+						const uint_fast32_t bitmapStart = (EDGES_BITMAP_SIZE + numberOfSearchingThreads - 1) / numberOfSearchingThreads * searchingThreadIndex;
+						const uint_fast32_t bitmapEnd = min((EDGES_BITMAP_SIZE + numberOfSearchingThreads - 1) / numberOfSearchingThreads * (searchingThreadIndex + 1), EDGES_BITMAP_SIZE);
+						
+						// Loop forever
+						unique_lock lock(searchingThreadsMutex, defer_lock);
+						for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
+						
+							// Wait until starting searching threads
+							lock.lock();
+							startSearchingThreadsConditionalVariable->wait(lock, [startTriggerTrue]() noexcept -> bool {
 							
-								// Display message
-								cout << "Setting searching thread's priority and affinity failed" << endl;
-								
-								// Return failure
-								exit(EXIT_FAILURE);
+								// Return if starting searching threads
+								return startSearchingThreadsTriggerToggle == startTriggerTrue;
+							});
+							lock.unlock();
+							
+							// Go through all of the searching thread's units in the edges bitmap
+							numberOfEdges[searchingThreadIndex] = 0;
+							for(uint_fast32_t bitmapIndex = bitmapStart; bitmapIndex < bitmapEnd; ++bitmapIndex) {
+							
+								// Add number of set bits in the unit to the searching thread's number of edges
+								numberOfEdges[searchingThreadIndex] += __builtin_popcountll(reinterpret_cast<const uint64_t *>(searchingThreadsData)[bitmapIndex]);
 							}
 							
-							// Check if searching thread is searching edges
-							if(searchingThreadIndex < numberOfSearchingThreadsSearchingEdges) {
+							// Wait for all searching threads to finish counting the number of edges in their units
+							searchingThreadsBarrier.arrive_and_wait();
 							
-								// Initialize thread local global variables
-								initializeCuckatooThreadLocalGlobalVariables();
+							// Check if not the first searching thread
+							uint64_t firstEdge = 0;
+							if(searchingThreadIndex) {
+							
+								// Go through all previous searching threads
+								for(unsigned int previousSearchingThreadIndex = searchingThreadIndex; previousSearchingThreadIndex; --previousSearchingThreadIndex) {
+								
+									// Add previous searching thread's number of edges to first edge
+									firstEdge += numberOfEdges[previousSearchingThreadIndex - 1];
+								}
 							}
 							
-							// Set searching thread's bitmap start and end
-							const uint_fast32_t bitmapStart = (EDGES_BITMAP_SIZE + numberOfSearchingThreads - 1) / numberOfSearchingThreads * searchingThreadIndex;
-							const uint_fast32_t bitmapEnd = min((EDGES_BITMAP_SIZE + numberOfSearchingThreads - 1) / numberOfSearchingThreads * (searchingThreadIndex + 1), EDGES_BITMAP_SIZE);
+							// Check if not too many edges exist for the searching thread
+							uint64_t totalNumberOfEdges;
+							if(firstEdge + numberOfEdges[searchingThreadIndex] <= MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
 							
-							// Loop forever
-							unique_lock lock(searchingThreadsMutex, defer_lock);
-							for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
-							
-								// Wait until starting searching threads
-								lock.lock();
-								startSearchingThreadsConditionalVariable->wait(lock, [startTriggerTrue]() noexcept -> bool {
-								
-									// Return if starting searching threads
-									return startSearchingThreadsTriggerToggle == startTriggerTrue;
-								});
-								lock.unlock();
-								
 								// Go through all of the searching thread's units in the edges bitmap
-								numberOfEdges[searchingThreadIndex] = 0;
+								uint64_t edgeIndex = firstEdge * EDGE_NUMBER_OF_COMPONENTS;
 								for(uint_fast32_t bitmapIndex = bitmapStart; bitmapIndex < bitmapEnd; ++bitmapIndex) {
 								
-									// Add number of set bits in the unit to the searching thread's number of edges
-									numberOfEdges[searchingThreadIndex] += __builtin_popcountll(reinterpret_cast<const uint64_t *>(searchingThreadsData)[bitmapIndex]);
-								}
-								
-								// Wait for all searching threads to finish counting the number of edges in their units
-								searchingThreadsBarrier.arrive_and_wait();
-								
-								// Check if not the first searching thread
-								uint64_t firstEdge = 0;
-								if(searchingThreadIndex) {
-								
-									// Go through all previous searching threads
-									for(unsigned int previousSearchingThreadIndex = searchingThreadIndex; previousSearchingThreadIndex; --previousSearchingThreadIndex) {
+									// Go through all set bits in the unit
+									uint64_t unit = reinterpret_cast<const uint64_t *>(searchingThreadsData)[bitmapIndex];
+									for(uint_fast8_t unitCurrentBitIndex = __builtin_ffsll(unit), unitPreviousBitIndex = 0; unitCurrentBitIndex; unit >>= unitCurrentBitIndex, unitPreviousBitIndex += unitCurrentBitIndex, unitCurrentBitIndex = __builtin_ffsll(unit)) {
 									
-										// Add previous searching thread's number of edges to first edge
-										firstEdge += numberOfEdges[previousSearchingThreadIndex - 1];
-									}
-								}
-								
-								// Check if not too many edges exist for the searching thread
-								uint64_t totalNumberOfEdges;
-								if(firstEdge + numberOfEdges[searchingThreadIndex] <= MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
-								
-									// Go through all of the searching thread's units in the edges bitmap
-									uint64_t edgeIndex = firstEdge * EDGE_NUMBER_OF_COMPONENTS;
-									for(uint_fast32_t bitmapIndex = bitmapStart; bitmapIndex < bitmapEnd; ++bitmapIndex) {
-									
-										// Go through all set bits in the unit
-										uint64_t unit = reinterpret_cast<const uint64_t *>(searchingThreadsData)[bitmapIndex];
-										for(uint_fast8_t unitCurrentBitIndex = __builtin_ffsll(unit), unitPreviousBitIndex = 0; unitCurrentBitIndex; unit >>= unitCurrentBitIndex, unitPreviousBitIndex += unitCurrentBitIndex, unitCurrentBitIndex = __builtin_ffsll(unit)) {
+										// Set edge's index
+										edges[edgeIndex] = bitmapIndex * BITMAP_UNIT_WIDTH + (unitCurrentBitIndex - 1) + unitPreviousBitIndex;
 										
-											// Set edge's index
-											edges[edgeIndex] = bitmapIndex * BITMAP_UNIT_WIDTH + (unitCurrentBitIndex - 1) + unitPreviousBitIndex;
-											
-											// Set edge's nodes
-											const uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) nonces = {static_cast<uint64_t>(edges[edgeIndex]) * 2, (static_cast<uint64_t>(edges[edgeIndex]) * 2) | 1};
-											uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) nodes;
-											sipHash24<2>(&nodes, *searchingThreadsSipHashKeys, &nonces);
-											edges[edgeIndex + 1] = nodes[0];
-											edges[edgeIndex + 2] = nodes[1];
-											
-											// Go to next edge
-											edgeIndex += EDGE_NUMBER_OF_COMPONENTS;
-											
-											// Check if shifting by the entire unit
-											if(unitCurrentBitIndex == BITMAP_UNIT_WIDTH) {
-											
-												// Break
-												break;
-											}
-										}
-									}
-									
-									// Go through all next searching threads
-									totalNumberOfEdges = firstEdge + numberOfEdges[searchingThreadIndex];
-									for(unsigned int nextSearchingThreadIndex = searchingThreadIndex + 1; nextSearchingThreadIndex < numberOfSearchingThreads; ++nextSearchingThreadIndex) {
-									
-										// Check if not too many edges exist for the next searching thread
-										if(totalNumberOfEdges + numberOfEdges[nextSearchingThreadIndex] <= MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
+										// Set edge's nodes
+										const uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) nonces = {static_cast<uint64_t>(edges[edgeIndex]) * 2, (static_cast<uint64_t>(edges[edgeIndex]) * 2) | 1};
+										uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) nodes;
+										sipHash24<2>(&nodes, *searchingThreadsSipHashKeys, &nonces);
+										edges[edgeIndex + 1] = nodes[0];
+										edges[edgeIndex + 2] = nodes[1];
 										
-											// Add next searching thread's number of edges to total number of edges
-											totalNumberOfEdges += numberOfEdges[nextSearchingThreadIndex];
-										}
+										// Go to next edge
+										edgeIndex += EDGE_NUMBER_OF_COMPONENTS;
 										
-										// Otherwise
-										else {
-										
-											// Check if first searching thread
-											if(!searchingThreadIndex) {
-											
-												// Check if there's too few trimming rounds
-												#if TRIMMING_ROUNDS <= 10
-												
-													// Display message
-													cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
-													
-												// Otherwise
-												#else
-												
-													// Display message
-													cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
-												#endif
-											}
-											
-											// Break
-											break;
-										}
-									}
-								}
-								
-								// Otherwise
-								else {
-								
-									// Check if first searching thread
-									if(!searchingThreadIndex) {
-									
-										// Check if there's too few trimming rounds
-										#if TRIMMING_ROUNDS <= 10
-										
-											// Display message
-											cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
-											
-										// Otherwise
-										#else
-										
-											// Display message
-											cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
-										#endif
-									}
-									
-									// Go through all searching threads
-									totalNumberOfEdges = 0;
-									for(unsigned int nextSearchingThreadIndex = 0; nextSearchingThreadIndex < numberOfSearchingThreads; ++nextSearchingThreadIndex) {
-									
-										// Check if not too many edges exist for the next searching thread
-										if(totalNumberOfEdges + numberOfEdges[nextSearchingThreadIndex] <= MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
-										
-											// Add next searching thread's number of edges to total number of edges
-											totalNumberOfEdges += numberOfEdges[nextSearchingThreadIndex];
-										}
-										
-										// Otherwise
-										else {
+										// Check if shifting by the entire unit
+										if(unitCurrentBitIndex == BITMAP_UNIT_WIDTH) {
 										
 											// Break
 											break;
@@ -1687,138 +1771,214 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 									}
 								}
 								
-								// Wait for all searching threads to finish getting the edges in their units
-								searchingThreadsBarrier.arrive_and_wait();
+								// Go through all next searching threads
+								totalNumberOfEdges = firstEdge + numberOfEdges[searchingThreadIndex];
+								for(unsigned int nextSearchingThreadIndex = searchingThreadIndex + 1; nextSearchingThreadIndex < numberOfSearchingThreads; ++nextSearchingThreadIndex) {
 								
-								// Check if searching thread is searching edges
-								if(searchingThreadIndex < numberOfSearchingThreadsSearchingEdges) {
-								
-									// Check if not the first searching thread
-									if(searchingThreadIndex) {
+									// Check if not too many edges exist for the next searching thread
+									if(totalNumberOfEdges + numberOfEdges[nextSearchingThreadIndex] <= MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
 									
-										// Set first searching edges
-										const uint64_t firstSearchingEdge = (1 - 1 / pow(2, searchingThreadIndex - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT));
-										
-										// Go through all previous edges
-										for(uint64_t nodeConnectionsIndex = 0, edgesIndex = 0; nodeConnectionsIndex < firstSearchingEdge * 2; nodeConnectionsIndex += 2, edgesIndex += EDGE_NUMBER_OF_COMPONENTS) {
-										
-											// Replace newest node connection for the node on the first partition and add node connection to list
-											nodeConnections[nodeConnectionsIndex] = {cuckatooUNewestNodeConnections.replace(edges[edgesIndex + 1], &nodeConnections[nodeConnectionsIndex]), edges[edgesIndex + 1], edges[edgesIndex]};
-											
-											// Replace newest node connection for the node on the second partition and add node connection to list
-											nodeConnections[nodeConnectionsIndex + 1] = {cuckatooVNewestNodeConnections.replace(edges[edgesIndex + 2], &nodeConnections[nodeConnectionsIndex + 1]), edges[edgesIndex + 2], edges[edgesIndex]};
-										}
-										
-										// Check if getting solution was successful
-										uint32_t solution[SOLUTION_SIZE];
-										if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
-										
-											// Lock
-											lock.lock();
-											
-											// Set searching threads solution to the solution
-											memcpy(searchingThreadsSolution, solution, sizeof(solution));
-											
-											// Unlock
-											lock.unlock();
-										}
+										// Add next searching thread's number of edges to total number of edges
+										totalNumberOfEdges += numberOfEdges[nextSearchingThreadIndex];
 									}
 									
 									// Otherwise
 									else {
 									
-										// Check if getting solution was successful
-										uint32_t solution[SOLUTION_SIZE];
-										if(getCuckatooSolution(solution, nodeConnections, edges, ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)))) {
+										// Check if first searching thread
+										if(!searchingThreadIndex) {
 										
-											// Lock
-											lock.lock();
+											// Check if there's too few trimming rounds
+											#if TRIMMING_ROUNDS <= 10
 											
-											// Set searching threads solution to the solution
-											memcpy(searchingThreadsSolution, solution, sizeof(solution));
+												// Display message
+												cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+												
+											// Otherwise
+											#else
 											
-											// Unlock
-											lock.unlock();
+												// Display message
+												cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+											#endif
 										}
+										
+										// Break
+										break;
 									}
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Check if first searching thread
+								if(!searchingThreadIndex) {
+								
+									// Check if there's too few trimming rounds
+									#if TRIMMING_ROUNDS <= 10
 									
-									// Reset node connections
-									cuckatooUNewestNodeConnections.clear();
-									cuckatooVNewestNodeConnections.clear();
+										// Display message
+										cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+										
+									// Otherwise
+									#else
+									
+										// Display message
+										cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+									#endif
 								}
 								
-								// Check if all searching threads have finished
-								lock.lock();
-								if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
+								// Go through all searching threads
+								totalNumberOfEdges = 0;
+								for(unsigned int nextSearchingThreadIndex = 0; nextSearchingThreadIndex < numberOfSearchingThreads; ++nextSearchingThreadIndex) {
 								
-									// Reset number of searching threads finished
-									numberOfSearchingThreadsFinished = 0;
+									// Check if not too many edges exist for the next searching thread
+									if(totalNumberOfEdges + numberOfEdges[nextSearchingThreadIndex] <= MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
 									
-									// Notify that searching threads have finished
-									searchingThreadsFinished = true;
-									lock.unlock();
-									searchingThreadsFinishedConditionalVariable->notify_one();
+										// Add next searching thread's number of edges to total number of edges
+										totalNumberOfEdges += numberOfEdges[nextSearchingThreadIndex];
+									}
+									
+									// Otherwise
+									else {
+									
+										// Break
+										break;
+									}
+								}
+							}
+							
+							// Wait for all searching threads to finish getting the edges in their units
+							searchingThreadsBarrier.arrive_and_wait();
+							
+							// Check if searching thread is searching edges
+							if(searchingThreadIndex < numberOfSearchingThreadsSearchingEdges) {
+							
+								// Check if not the first searching thread
+								if(searchingThreadIndex) {
+								
+									// Set first searching edges
+									const uint64_t firstSearchingEdge = (1 - 1 / pow(2, searchingThreadIndex - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT));
+									
+									// Go through all previous edges
+									for(uint64_t nodeConnectionsIndex = 0, edgesIndex = 0; nodeConnectionsIndex < firstSearchingEdge * 2; nodeConnectionsIndex += 2, edgesIndex += EDGE_NUMBER_OF_COMPONENTS) {
+									
+										// Replace newest node connection for the node on the first partition and add node connection to list
+										nodeConnections[nodeConnectionsIndex] = {cuckatooUNewestNodeConnections.replace(edges[edgesIndex + 1], &nodeConnections[nodeConnectionsIndex]), edges[edgesIndex + 1], edges[edgesIndex]};
+										
+										// Replace newest node connection for the node on the second partition and add node connection to list
+										nodeConnections[nodeConnectionsIndex + 1] = {cuckatooVNewestNodeConnections.replace(edges[edgesIndex + 2], &nodeConnections[nodeConnectionsIndex + 1]), edges[edgesIndex + 2], edges[edgesIndex]};
+									}
+									
+									// Check if getting solution was successful
+									uint32_t solution[SOLUTION_SIZE];
+									if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
+									
+										// Lock
+										lock.lock();
+										
+										// Set searching threads solution to the solution
+										memcpy(searchingThreadsSolution, solution, sizeof(solution));
+										
+										// Unlock
+										lock.unlock();
+									}
 								}
 								
 								// Otherwise
 								else {
 								
-									// Unlock
-									lock.unlock();
+									// Check if getting solution was successful
+									uint32_t solution[SOLUTION_SIZE];
+									if(getCuckatooSolution(solution, nodeConnections, edges, ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)))) {
+									
+										// Lock
+										lock.lock();
+										
+										// Set searching threads solution to the solution
+										memcpy(searchingThreadsSolution, solution, sizeof(solution));
+										
+										// Unlock
+										lock.unlock();
+									}
 								}
+								
+								// Reset node connections
+								cuckatooUNewestNodeConnections.clear();
+								cuckatooVNewestNodeConnections.clear();
 							}
 							
-						}).detach();
-					}
-					
-					// Check if performing lean trimming loop failed
-					if(!performLeanTrimmingLoop(context.get())) {
-					
-						// Return failure
-						exit(EXIT_FAILURE);
-					}
+							// Check if all searching threads have finished
+							lock.lock();
+							if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
+							
+								// Reset number of searching threads finished
+								numberOfSearchingThreadsFinished = 0;
+								
+								// Notify that searching threads have finished
+								searchingThreadsFinished = true;
+								lock.unlock();
+								searchingThreadsFinishedConditionalVariable->notify_one();
+							}
+							
+							// Otherwise
+							else {
+							
+								// Unlock
+								lock.unlock();
+							}
+						}
+						
+					}).detach();
+				}
+				
+				// Check if performing lean trimming loop failed
+				if(!performLeanTrimmingLoop(context.get())) {
+				
+					// Return failure
+					exit(EXIT_FAILURE);
+				}
+			}
+			
+			// Otherwise
+			else {
+			
+				// Display message
+				cout << "No applicable GPU found for lean trimming. Lean trimming requires ";
+				
+				// Check if RAM requirement can be expressed in bytes
+				if(LEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE / 2) {
+				
+					// Display message
+					cout << LEAN_TRIMMING_REQUIRED_RAM_BYTES << " bytes";
+				}
+				
+				// Otherwise check if RAM requirement can be expressed in kilobytes
+				else if(LEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE / 2) {
+				
+					// Display message
+					cout << (ceil(static_cast<double>(LEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE * 100) / 100) << " KB";
+				}
+				
+				// Otherwise check if RAM requirement can be expressed in megabytes
+				else if(LEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE * MEGABYTES_IN_A_GIGABYTE / 2) {
+				
+					// Display message
+					cout << (ceil(static_cast<double>(LEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE * 100) / 100) << " MB";
 				}
 				
 				// Otherwise
 				else {
 				
 					// Display message
-					cout << "No applicable GPU found for lean trimming. Lean trimming requires ";
-					
-					// Check if RAM requirement can be expressed in bytes
-					if(LEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE / 2) {
-					
-						// Display message
-						cout << LEAN_TRIMMING_REQUIRED_RAM_BYTES << " bytes";
-					}
-					
-					// Otherwise check if RAM requirement can be expressed in kilobytes
-					else if(LEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE / 2) {
-					
-						// Display message
-						cout << (ceil(static_cast<double>(LEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE * 100) / 100) << " KB";
-					}
-					
-					// Otherwise check if RAM requirement can be expressed in megabytes
-					else if(LEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE * MEGABYTES_IN_A_GIGABYTE / 2) {
-					
-						// Display message
-						cout << (ceil(static_cast<double>(LEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE * 100) / 100) << " MB";
-					}
-					
-					// Otherwise
-					else {
-					
-						// Display message
-						cout << (ceil(static_cast<double>(LEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE * 100) / 100) << " GB";
-					}
-					
-					// Display message
-					cout << " of RAM" << endl;
-					
-					// Return failure
-					exit(EXIT_FAILURE);
+					cout << (ceil(static_cast<double>(LEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE * 100) / 100) << " GB";
 				}
+				
+				// Display message
+				cout << " of RAM" << endl;
+				
+				// Return failure
+				exit(EXIT_FAILURE);
 			}
 		}
 	#endif
