@@ -6,7 +6,7 @@ TRIMMING_ROUNDS = 25
 SLEAN_TRIMMING_PARTS = 2
 LOCAL_RAM_KILOBYTES = 32
 CC = "g++"
-CFLAGS = -march=native -mtune=native -Ofast -Wall -Wextra -Wno-vla -Wno-type-limits -Wno-missing-field-initializers -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME=$(NAME) -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS) -DSLEAN_TRIMMING_PARTS=$(SLEAN_TRIMMING_PARTS) -DLOCAL_RAM_KILOBYTES=$(LOCAL_RAM_KILOBYTES)
+CFLAGS = -march=native -mtune=native -Ofast -Wall -Wextra -Wno-vla -Wno-type-limits -Wno-missing-field-initializers -Wno-implicit-fallthrough -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME=$(NAME) -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS) -DSLEAN_TRIMMING_PARTS=$(SLEAN_TRIMMING_PARTS) -DLOCAL_RAM_KILOBYTES=$(LOCAL_RAM_KILOBYTES)
 LIBS = -lm
 SRCS = "./main.cpp"
 

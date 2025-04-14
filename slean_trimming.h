@@ -77,19 +77,19 @@ using namespace std;
 #ifdef __APPLE__
 
 	// Create slean trimming context
-	static inline MTL::Device *createSleanTrimmingContext() noexcept;
+	static inline MTL::Device *createSleanTrimmingContext(const unsigned int deviceIndex) noexcept;
 	
 	// Perform slean trimming loop
-	static inline bool performSleanTrimmingLoop(MTL::Device *device) noexcept;
+	static inline bool performSleanTrimmingLoop(MTL::Device *device, const unsigned int deviceIndex) noexcept;
 	
 // Otherwise
 #else
 
 	// Create slean trimming context
-	static inline cl_context createSleanTrimmingContext(const cl_platform_id platforms[], const cl_uint numberOfPlatforms) noexcept;
+	static inline cl_context createSleanTrimmingContext(const cl_platform_id platforms[], const cl_uint numberOfPlatforms, const unsigned int deviceIndex) noexcept;
 	
 	// Perform slean trimming loop
-	static inline bool performSleanTrimmingLoop(const cl_context context) noexcept;
+	static inline bool performSleanTrimmingLoop(const cl_context context, const unsigned int deviceIndex) noexcept;
 #endif
 
 
@@ -99,10 +99,13 @@ using namespace std;
 #ifdef __APPLE__
 
 	// Create slean trimming context
-	MTL::Device *createSleanTrimmingContext() noexcept {
+	MTL::Device *createSleanTrimmingContext(const unsigned int deviceIndex) noexcept {
 	
 		// TODO
 		return nullptr;
+		
+		// Set index to zero
+		unsigned int index = 0;
 		
 		// Check if getting all devices was successful
 		static const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
@@ -118,14 +121,32 @@ using namespace std;
 				// Get device
 				MTL::Device *device = reinterpret_cast<MTL::Device *>(devices->object(i));
 				
-				// Check if device supports the Metal version, its memory size is large enough, and its work group memory size is large enough
-				if(device && device->supportsFamily(MTL::GPUFamilyMetal3) && device->recommendedMaxWorkingSetSize() >= SLEAN_TRIMMING_REQUIRED_RAM_BYTES && device->maxThreadgroupMemoryLength() >= SLEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES) {
+				// Check if device supports the Metal version
+				if(device && device->supportsFamily(MTL::GPUFamilyMetal3)) {
 				
-					// Don't free device when devices is freed
-					device->retain();
+					// Check if device's name exists
+					const NS::String *name = device->name();
+					if(name) {
 					
-					// Return device
-					return device;
+						// Check if name's UTF-8 string exists
+						const char *utf8String = name->utf8String();
+						if(utf8String) {
+						
+							// Check if device index isn't specified or index is for the specified device
+							if(deviceIndex == ALL_DEVICES || ++index == deviceIndex) {
+							
+								// Check if device's memory size and work group memory size are large enough
+								if(device->recommendedMaxWorkingSetSize() >= SLEAN_TRIMMING_REQUIRED_RAM_BYTES && device->maxThreadgroupMemoryLength() >= SLEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES) {
+							
+									// Don't free device when devices is freed
+									device->retain();
+									
+									// Return device
+									return device;
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -138,10 +159,13 @@ using namespace std;
 #else
 
 	// Create slean trimming context
-	cl_context createSleanTrimmingContext(const cl_platform_id platforms[], const cl_uint numberOfPlatforms) noexcept {
+	cl_context createSleanTrimmingContext(const cl_platform_id platforms[], const cl_uint numberOfPlatforms, const unsigned int deviceIndex) noexcept {
 	
 		// TODO
 		return nullptr;
+		
+		// Set index to zero
+		unsigned int index = 0;
 		
 		// Go through all platforms
 		for(cl_uint i = 0; i < numberOfPlatforms; ++i) {
@@ -167,22 +191,32 @@ using namespace std;
 							size_t openClVersionSize;
 							if(clGetDeviceInfo(devices[j], CL_DEVICE_PROFILE, profileSize, profile, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_OPENCL_C_VERSION, 0, nullptr, &openClVersionSize) == CL_SUCCESS && !strcmp(profile, "FULL_PROFILE") && openClVersionSize) {
 							
-								// Check if getting device's OpenCL version and is little endian was successful, OpenCL version is compatible, and device is little endian
+								// Check if getting device's OpenCL version, is little endian, and name size was successful, OpenCL version is compatible, device is little endian, and its name exists
 								char openClVersion[openClVersionSize];
 								cl_bool isLittleEndian;
-								if(clGetDeviceInfo(devices[j], CL_DEVICE_OPENCL_C_VERSION, openClVersionSize, openClVersion, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_ENDIAN_LITTLE, sizeof(isLittleEndian), &isLittleEndian, nullptr) == CL_SUCCESS && !strncmp(openClVersion, "OpenCL C ", sizeof("OpenCL C ") - sizeof('\0')) && strtod(&openClVersion[sizeof("OpenCL C ") - sizeof('\0')], nullptr) >= 1.2 && isLittleEndian == CL_TRUE) {
+								size_t nameSize;
+								if(clGetDeviceInfo(devices[j], CL_DEVICE_OPENCL_C_VERSION, openClVersionSize, openClVersion, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_ENDIAN_LITTLE, sizeof(isLittleEndian), &isLittleEndian, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_NAME, 0, nullptr, &nameSize) == CL_SUCCESS && !strncmp(openClVersion, "OpenCL C ", sizeof("OpenCL C ") - sizeof('\0')) && strtod(&openClVersion[sizeof("OpenCL C ") - sizeof('\0')], nullptr) >= 1.2 && isLittleEndian == CL_TRUE && nameSize) {
 								
-									// Check if getting device's memory size and work group memory size was successful, memory size is large enough, and work group memory size is large enough
-									cl_ulong memorySize;
-									cl_ulong workGroupMemorySize;
-									if(clGetDeviceInfo(devices[j], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(memorySize), &memorySize, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(workGroupMemorySize), &workGroupMemorySize, nullptr) == CL_SUCCESS && memorySize >= SLEAN_TRIMMING_REQUIRED_RAM_BYTES && workGroupMemorySize >= SLEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES) {
+									// Check if getting device's name was successful
+									char name[nameSize];
+									if(clGetDeviceInfo(devices[j], CL_DEVICE_NAME, nameSize, name, nullptr) == CL_SUCCESS) {
 									
-										// Check if creating context for the device was successful
-										cl_context context = clCreateContext(unmove((const cl_context_properties[]){CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties>(platforms[i]), 0}), 1, &devices[j], nullptr, nullptr, nullptr);
-										if(context) {
+										// Check if device index isn't specified or index is for the specified device
+										if(deviceIndex == ALL_DEVICES || ++index == deviceIndex) {
 										
-											// Return context
-											return context;
+											// Check if getting device's memory size and work group memory size was successful, memory size is large enough, and work group memory size is large enough
+											cl_ulong memorySize;
+											cl_ulong workGroupMemorySize;
+											if(clGetDeviceInfo(devices[j], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(memorySize), &memorySize, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(workGroupMemorySize), &workGroupMemorySize, nullptr) == CL_SUCCESS && memorySize >= SLEAN_TRIMMING_REQUIRED_RAM_BYTES && workGroupMemorySize >= SLEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES) {
+											
+												// Check if creating context for the device was successful
+												cl_context context = clCreateContext(unmove((const cl_context_properties[]){CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties>(platforms[i]), 0}), 1, &devices[j], nullptr, nullptr, nullptr);
+												if(context) {
+												
+													// Return context
+													return context;
+												}
+											}
 										}
 									}
 								}
@@ -202,7 +236,7 @@ using namespace std;
 #ifdef __APPLE__
 
 	// Perform slean trimming loop
-	bool performSleanTrimmingLoop(MTL::Device *device) noexcept {
+	bool performSleanTrimmingLoop(MTL::Device *device, const unsigned int deviceIndex) noexcept {
 	
 		// TODO
 		
@@ -214,7 +248,7 @@ using namespace std;
 #else
 
 	// Perform slean trimming loop
-	bool performSleanTrimmingLoop(const cl_context context) noexcept {
+	bool performSleanTrimmingLoop(const cl_context context, const unsigned int deviceIndex) noexcept {
 	
 		// Check if getting context's device failed
 		cl_device_id device;
@@ -227,13 +261,12 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if getting device's queue properties, name size, max work group size, max memory allocation size, or work group memory size failed, or its name or max work group size don't exists
+		// Check if getting device's queue properties, max work group size, max memory allocation size, or work group memory size failed, or its max work group size don't exists
 		cl_command_queue_properties queueProperties;
-		size_t nameSize;
 		size_t maxWorkGroupSize;
 		cl_ulong maxMemoryAllocationSize;
 		cl_ulong workGroupMemorySize;
-		if(clGetDeviceInfo(device, CL_DEVICE_QUEUE_PROPERTIES, sizeof(queueProperties), &queueProperties, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &nameSize) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(maxMemoryAllocationSize), &maxMemoryAllocationSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(workGroupMemorySize), &workGroupMemorySize, nullptr) != CL_SUCCESS || !nameSize || !maxWorkGroupSize) {
+		if(clGetDeviceInfo(device, CL_DEVICE_QUEUE_PROPERTIES, sizeof(queueProperties), &queueProperties, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(maxMemoryAllocationSize), &maxMemoryAllocationSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(workGroupMemorySize), &workGroupMemorySize, nullptr) != CL_SUCCESS || !maxWorkGroupSize) {
 		
 			// Display message
 			cout << "Getting GPU's info failed" << endl;
@@ -242,19 +275,41 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if getting device's name failed
-		char name[nameSize];
-		if(clGetDeviceInfo(device, CL_DEVICE_NAME, nameSize, name, nullptr) != CL_SUCCESS) {
+		// Check if device index is specified
+		if(deviceIndex != ALL_DEVICES) {
 		
 			// Display message
-			cout << "Getting GPU's info failed" << endl;
-			
-			// Return false
-			return false;
+			cout << "Using GPU for slean trimming" << endl;
 		}
 		
-		// Display message
-		cout << "Using " << name << " for slean trimming" << endl;
+		// Otherwise
+		else {
+		
+			// Check if getting device's name size failed or its name exists
+			size_t nameSize;
+			if(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &nameSize) != CL_SUCCESS || !nameSize) {
+			
+				// Display message
+				cout << "Getting GPU's info failed" << endl;
+				
+				// Return false
+				return false;
+			}
+			
+			// Check if getting device's name failed
+			char name[nameSize];
+			if(clGetDeviceInfo(device, CL_DEVICE_NAME, nameSize, name, nullptr) != CL_SUCCESS) {
+			
+				// Display message
+				cout << "Getting GPU's info failed" << endl;
+				
+				// Return false
+				return false;
+			}
+			
+			// Display message
+			cout << "Using " << name << " for slean trimming" << endl;
+		}
 		
 		// Check if device's work group memory isn't fully utilized
 		if(bit_floor(workGroupMemorySize) / BYTES_IN_A_KILOBYTE > LOCAL_RAM_KILOBYTES) {

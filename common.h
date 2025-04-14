@@ -113,6 +113,9 @@ static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_
 // Milliseconds in a second
 #define MILLISECONDS_IN_A_SECOND 1000
 
+// All devices
+#define ALL_DEVICES 0
+
 // To string
 #define STRINGIFY(a) #a
 #define TO_STRING(a) STRINGIFY(a)

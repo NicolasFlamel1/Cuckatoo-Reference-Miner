@@ -235,7 +235,51 @@ int main(int argc, char *argv[]) noexcept {
 	#endif
 	
 	// Display message
-	cout << ")" << endl;
+	cout << ')' << endl;
+	
+	// Check if using macOS
+	#ifdef __APPLE__
+	
+		// Check if creating autorelease pool failed
+		static const unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
+		
+			// Free autorelease pool
+			autoreleasePool->release();
+		});
+		if(!autoreleasePool) {
+		
+			// Display message
+			cout << "Creating autorelease pool failed" << endl;
+			
+			// Return failure
+			exit(EXIT_FAILURE);
+		}
+		
+	// Otherwise check if there's trimming rounds
+	#elif TRIMMING_ROUNDS != 0
+	
+		// Check if getting number of platforms failed or no platforms exist
+		cl_uint numberOfPlatforms;
+		if(clGetPlatformIDs(0, nullptr, &numberOfPlatforms) != CL_SUCCESS || !numberOfPlatforms) {
+		
+			// Display message
+			cout << "No OpenCL platforms found" << endl;
+			
+			// Return failure
+			exit(EXIT_FAILURE);
+		}
+		
+		// Check if getting platforms failed
+		cl_platform_id platforms[numberOfPlatforms];
+		if(clGetPlatformIDs(numberOfPlatforms, platforms, nullptr) != CL_SUCCESS) {
+		
+			// Display message
+			cout << "Getting OpenCL platforms failed" << endl;
+			
+			// Return failure
+			exit(EXIT_FAILURE);
+		}
+	#endif
 	
 	// Check if not tuning
 	#ifndef TUNING
@@ -253,6 +297,9 @@ int main(int argc, char *argv[]) noexcept {
 	// Check if there's trimming rounds
 	#if TRIMMING_ROUNDS != 0
 	
+		// Set device index to all devices
+		unsigned int deviceIndex = ALL_DEVICES;
+		
 		// Set trimming types to all trimming types
 		underlying_type_t<TrimmingType> trimmingTypes = ALL_TRIMMING_TYPES;
 	#endif
@@ -271,6 +318,12 @@ int main(int argc, char *argv[]) noexcept {
 		
 		// Stratum server username
 		{"stratum_server_username", required_argument, nullptr, 'u'},
+		
+		// Display GPUs
+		{"display_gpus", no_argument, nullptr, 'd'},
+		
+		// GPU
+		{"gpu", required_argument, nullptr, 'g'},
 		
 		// Mean trimming
 		{"mean_trimming", no_argument, nullptr, 'm'},
@@ -291,9 +344,12 @@ int main(int argc, char *argv[]) noexcept {
 	// Set display help to false
 	bool displayHelp = false;
 	
+	// Set help requested to false
+	bool helpRequested = false;
+	
 	// Go through all options
 	int option;
-	while((option = getopt_long(argc, argv, "va:p:u:mslh", options, nullptr)) != -1) {
+	while((option = getopt_long(argc, argv, "va:p:u:dg:mslh", options, nullptr)) != -1) {
 	
 		// Check option
 		switch(option) {
@@ -404,6 +460,141 @@ int main(int argc, char *argv[]) noexcept {
 			// Check if there's trimming rounds
 			#if TRIMMING_ROUNDS != 0
 			
+				// Display GPUs
+				case 'd': {
+				
+					// Display message
+					cout << "Available GPUs:" << endl;
+					
+					// Set index to zero
+					unsigned int index = 0;
+					
+					// Check if using macOS
+					#ifdef __APPLE__
+					
+						// Check if getting all devices was successful
+						const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+						
+							// Free devices
+							devices->release();
+						});
+						if(devices) {
+						
+							// Go through all devices
+							for(NS::UInteger i = 0; i < devices->count(); ++i) {
+							
+								// Get device
+								MTL::Device *device = reinterpret_cast<MTL::Device *>(devices->object(i));
+								
+								// Check if device supports the Metal version
+								if(device && device->supportsFamily(MTL::GPUFamilyMetal3)) {
+								
+									// Check if device's name exists
+									const NS::String *name = device->name();
+									if(name) {
+									
+										// Check if name's UTF-8 string exists
+										const char *utf8String = name->utf8String();
+										if(utf8String) {
+										
+											// Display message
+											cout << ++index << ": " << utf8String << endl;
+										}
+									}
+								}
+							}
+						}
+						
+					// Otherwise
+					#else
+					
+						// Go through all platforms
+						for(cl_uint i = 0; i < numberOfPlatforms; ++i) {
+							
+							// Check if getting platform's number of devices was successful and devices exist
+							cl_uint numberOfDevices;
+							if(clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, 0, nullptr, &numberOfDevices) == CL_SUCCESS && numberOfDevices) {
+							
+								// Check if getting platform's devices was successful
+								cl_device_id devices[numberOfDevices];
+								if(clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, numberOfDevices, devices, nullptr) == CL_SUCCESS) {
+								
+									// Go through all of the platform's devices
+									for(cl_uint j = 0; j < numberOfDevices; ++j) {
+									
+										// Check if getting device's availability and profile size was successful, device is available, and profile exists
+										cl_bool isAvailable;
+										size_t profileSize;
+										if(clGetDeviceInfo(devices[j], CL_DEVICE_AVAILABLE, sizeof(isAvailable), &isAvailable, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_PROFILE, 0, nullptr, &profileSize) == CL_SUCCESS && isAvailable == CL_TRUE && profileSize) {
+										
+											// Check if getting device's profile and OpenCL version size was successful, profile is full profile, and OpenCL version exists
+											char profile[profileSize];
+											size_t openClVersionSize;
+											if(clGetDeviceInfo(devices[j], CL_DEVICE_PROFILE, profileSize, profile, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_OPENCL_C_VERSION, 0, nullptr, &openClVersionSize) == CL_SUCCESS && !strcmp(profile, "FULL_PROFILE") && openClVersionSize) {
+											
+												// Check if getting device's OpenCL version, is little endian, and name size was successful, OpenCL version is compatible, device is little endian, and its name exists
+												char openClVersion[openClVersionSize];
+												cl_bool isLittleEndian;
+												size_t nameSize;
+												if(clGetDeviceInfo(devices[j], CL_DEVICE_OPENCL_C_VERSION, openClVersionSize, openClVersion, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_ENDIAN_LITTLE, sizeof(isLittleEndian), &isLittleEndian, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_NAME, 0, nullptr, &nameSize) == CL_SUCCESS && !strncmp(openClVersion, "OpenCL C ", sizeof("OpenCL C ") - sizeof('\0')) && strtod(&openClVersion[sizeof("OpenCL C ") - sizeof('\0')], nullptr) >= 1.2 && isLittleEndian == CL_TRUE && nameSize) {
+												
+													// Check if getting device's name was successful
+													char name[nameSize];
+													if(clGetDeviceInfo(devices[j], CL_DEVICE_NAME, nameSize, name, nullptr) == CL_SUCCESS) {
+													
+														// Display message
+														cout << ++index << ": " << name << endl;
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					#endif
+					
+					// Check if no available device exists
+					if(!index) {
+					
+						// Display message
+						cout << "None" << endl;
+					}
+					
+					// Return success
+					exit(EXIT_SUCCESS);
+					
+					// Break
+					break;
+				}
+				
+				// GPU
+				case 'g': {
+				
+					// Check if option is invalid
+					char *end;
+					errno = 0;
+					const unsigned long index = optarg ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
+					if(!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !index || index > UINT_MAX) {
+					
+						// Display message
+						cout << argv[0] << ": invalid GPU -- '" << (optarg ? optarg : "") << '\'' << endl;
+						
+						// Set display help to true
+						displayHelp = true;
+					}
+					
+					// Otherwise
+					else {
+					
+						// Set device index to the option
+						deviceIndex = index;
+					}
+					
+					// Break
+					break;
+				}
+				
 				// Mean trimming
 				case 'm':
 				
@@ -432,8 +623,13 @@ int main(int argc, char *argv[]) noexcept {
 					break;
 			#endif
 			
-			// Help or default
+			// Help
 			case 'h':
+			
+				// Set help requested to true
+				helpRequested = true;
+			
+			// Default
 			default:
 			
 				// Set display help to true
@@ -450,7 +646,7 @@ int main(int argc, char *argv[]) noexcept {
 		// Display message
 		cout << endl << "Usage:" << endl << '\t' << argv[0] << " [options]" << endl << endl;
 		cout << "Options:" << endl;
-		cout << "\t-v, --version\t\t\tDisplay version information" << endl;
+		cout << "\t-v, --version\t\t\tDisplay version and build information" << endl;
 		
 		// Check if not tuning
 		#ifndef TUNING
@@ -465,6 +661,8 @@ int main(int argc, char *argv[]) noexcept {
 		#if TRIMMING_ROUNDS != 0
 		
 			// Display message
+			cout << "\t-d, --display_gpus\t\tDisplay available GPUs" << endl;
+			cout << "\t-g, --gpu\t\t\tThe index of the GPU to use" << endl;
 			cout << "\t-m, --mean_trimming\t\tUse only mean trimming" << endl;
 			cout << "\t-s, --slean_trimming\t\tUse only slean trimming" << endl;
 			cout << "\t-l, --lean_trimming\t\tUse only lean trimming" << endl;
@@ -473,8 +671,8 @@ int main(int argc, char *argv[]) noexcept {
 		// Display message
 		cout << "\t-h, --help\t\t\tDisplay help information" << endl;
 		
-		// Return failure
-		exit(EXIT_FAILURE);
+		// Return success if help was requested otherwise failure
+		exit(helpRequested ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
 	
 	// Check if setting interrupt signal handler failed
@@ -496,34 +694,16 @@ int main(int argc, char *argv[]) noexcept {
 		exit(EXIT_FAILURE);
 	}
 	
-	// Check if using Windows
-	#ifdef _WIN32
-	
-		// Create Windows socket
-		static const WindowsSocket windowsSocket;
-		
-	// Otherwise check if using macOS
-	#elif defined __APPLE__
-	
-		// Check if creating autorelease pool failed
-		static const unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
-		
-			// Free autorelease pool
-			autoreleasePool->release();
-		});
-		if(!autoreleasePool) {
-		
-			// Display message
-			cout << "Creating autorelease pool failed" << endl;
-			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-	#endif
-	
 	// Check if not tuning
 	#ifndef TUNING
 	
+		// Check if using Windows
+		#ifdef _WIN32
+		
+			// Create Windows socket
+			static const WindowsSocket windowsSocket;
+		#endif
+		
 		// Display message
 		cout << "Connecting to the stratum server at " << stratumServerAddress << ':' << stratumServerPort << endl;
 		
@@ -974,8 +1154,131 @@ int main(int argc, char *argv[]) noexcept {
 	// Otherwise
 	#else
 	
+		// Check if device index isn't specified
+		if(deviceIndex == ALL_DEVICES) {
+		
+			// Display message
+			cout << "Using first applicable GPU" << endl;
+		}
+		
+		// Otherwise
+		else {
+		
+			// Set index to zero
+			unsigned int index = 0;
+			
+			// Check if using macOS
+			#ifdef __APPLE__
+			
+				// Check if getting all devices was successful
+				const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+				
+					// Free devices
+					devices->release();
+				});
+				if(devices) {
+				
+					// Go through all devices
+					for(NS::UInteger i = 0; i < devices->count(); ++i) {
+					
+						// Get device
+						MTL::Device *device = reinterpret_cast<MTL::Device *>(devices->object(i));
+						
+						// Check if device supports the Metal version
+						if(device && device->supportsFamily(MTL::GPUFamilyMetal3)) {
+						
+							// Check if device's name exists
+							const NS::String *name = device->name();
+							if(name) {
+							
+								// Check if name's UTF-8 string exists
+								const char *utf8String = name->utf8String();
+								if(utf8String) {
+								
+									// Check if index is for the specified device
+									if(++index == deviceIndex) {
+									
+										// Display message
+										cout << "Using GPU at the specified index: " << index << " (" << utf8String << ')' << endl;
+										
+										// Break
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
+				
+			// Otherwise
+			#else
+			
+				// Go through all platforms while the specified device isn't found
+				for(cl_uint i = 0; i < numberOfPlatforms && index != deviceIndex; ++i) {
+					
+					// Check if getting platform's number of devices was successful and devices exist
+					cl_uint numberOfDevices;
+					if(clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, 0, nullptr, &numberOfDevices) == CL_SUCCESS && numberOfDevices) {
+					
+						// Check if getting platform's devices was successful
+						cl_device_id devices[numberOfDevices];
+						if(clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, numberOfDevices, devices, nullptr) == CL_SUCCESS) {
+						
+							// Go through all of the platform's devices
+							for(cl_uint j = 0; j < numberOfDevices; ++j) {
+							
+								// Check if getting device's availability and profile size was successful, device is available, and profile exists
+								cl_bool isAvailable;
+								size_t profileSize;
+								if(clGetDeviceInfo(devices[j], CL_DEVICE_AVAILABLE, sizeof(isAvailable), &isAvailable, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_PROFILE, 0, nullptr, &profileSize) == CL_SUCCESS && isAvailable == CL_TRUE && profileSize) {
+								
+									// Check if getting device's profile and OpenCL version size was successful, profile is full profile, and OpenCL version exists
+									char profile[profileSize];
+									size_t openClVersionSize;
+									if(clGetDeviceInfo(devices[j], CL_DEVICE_PROFILE, profileSize, profile, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_OPENCL_C_VERSION, 0, nullptr, &openClVersionSize) == CL_SUCCESS && !strcmp(profile, "FULL_PROFILE") && openClVersionSize) {
+									
+										// Check if getting device's OpenCL version, is little endian, and name size was successful, OpenCL version is compatible, device is little endian, and its name exists
+										char openClVersion[openClVersionSize];
+										cl_bool isLittleEndian;
+										size_t nameSize;
+										if(clGetDeviceInfo(devices[j], CL_DEVICE_OPENCL_C_VERSION, openClVersionSize, openClVersion, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_ENDIAN_LITTLE, sizeof(isLittleEndian), &isLittleEndian, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_NAME, 0, nullptr, &nameSize) == CL_SUCCESS && !strncmp(openClVersion, "OpenCL C ", sizeof("OpenCL C ") - sizeof('\0')) && strtod(&openClVersion[sizeof("OpenCL C ") - sizeof('\0')], nullptr) >= 1.2 && isLittleEndian == CL_TRUE && nameSize) {
+										
+											// Check if getting device's name was successful
+											char name[nameSize];
+											if(clGetDeviceInfo(devices[j], CL_DEVICE_NAME, nameSize, name, nullptr) == CL_SUCCESS) {
+											
+												// Check if index is for the specified device
+												if(++index == deviceIndex) {
+												
+													// Display message
+													cout << "Using GPU at the specified index: " << index << " (" << name << ')' << endl;
+													
+													// Break
+													break;
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			#endif
+			
+			// Check if specified device doesn't exist
+			if(index != deviceIndex) {
+			
+				// Display message
+				cout << "GPU at the specified index doesn't exist" << endl;
+				
+				// Return failure
+				exit(EXIT_FAILURE);
+			}
+		}
+		
 		// Display message
-		cout << "Using trimming type(s):";
+		cout << "Trying trimming type(s):";
 		
 		// Set trimming type displayed to false
 		bool trimmingTypeDisplay = false;
@@ -1017,7 +1320,7 @@ int main(int argc, char *argv[]) noexcept {
 		#ifdef __APPLE__
 		
 			// Create context
-			static unique_ptr<MTL::Device, void(*)(MTL::Device *)> context(nullptr, [](MTL::Device *context) noexcept {
+			static unique_ptr<MTL::Device, void(*)(MTL::Device *)> context(nullptr, [](__attribute__((unused)) MTL::Device *context) noexcept {
 			
 			});
 			
@@ -1026,28 +1329,6 @@ int main(int argc, char *argv[]) noexcept {
 		
 			// Create context
 			static unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)> context(nullptr, clReleaseContext);
-			
-			// Check if getting number of platforms failed or no platforms exist
-			cl_uint numberOfPlatforms;
-			if(clGetPlatformIDs(0, nullptr, &numberOfPlatforms) != CL_SUCCESS || !numberOfPlatforms) {
-			
-				// Display message
-				cout << "No OpenCL platforms found" << endl;
-				
-				// Return failure
-				exit(EXIT_FAILURE);
-			}
-			
-			// Check if getting platforms failed
-			cl_platform_id platforms[numberOfPlatforms];
-			if(clGetPlatformIDs(numberOfPlatforms, platforms, nullptr) != CL_SUCCESS) {
-			
-				// Display message
-				cout << "Getting OpenCL platforms failed" << endl;
-				
-				// Return failure
-				exit(EXIT_FAILURE);
-			}
 		#endif
 		
 		// Check if using all trimming types or mean trimming is enabled
@@ -1057,7 +1338,7 @@ int main(int argc, char *argv[]) noexcept {
 			#ifdef __APPLE__
 			
 				// Create mean trimming context
-				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createMeanTrimmingContext(), [](MTL::Device *context) noexcept {
+				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createMeanTrimmingContext(deviceIndex), [](MTL::Device *context) noexcept {
 				
 					// Free context
 					context->release();
@@ -1067,7 +1348,7 @@ int main(int argc, char *argv[]) noexcept {
 			#else
 				
 				// Create mean trimming context
-				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createMeanTrimmingContext(platforms, numberOfPlatforms), clReleaseContext);
+				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createMeanTrimmingContext(platforms, numberOfPlatforms, deviceIndex), clReleaseContext);
 			#endif
 			
 			// Check if creating mean trimming context was successful
@@ -1218,18 +1499,21 @@ int main(int argc, char *argv[]) noexcept {
 				}
 				
 				// Check if performing mean trimming loop failed
-				if(!performMeanTrimmingLoop(context.get())) {
+				if(!performMeanTrimmingLoop(context.get(), deviceIndex)) {
 				
 					// Return failure
 					exit(EXIT_FAILURE);
 				}
+				
+				// Return success
+				exit(EXIT_SUCCESS);
 			}
 			
 			// Otherwise
 			else {
 			
 				// Display message
-				cout << "No applicable GPU found for mean trimming. Mean trimming requires ";
+				cout << ((deviceIndex == ALL_DEVICES) ? "No applicable GPU found for mean trimming" : "GPU isn't applicable for mean trimming") << ". Mean trimming requires ";
 				
 				// Check if RAM requirement can be expressed in bytes
 				if(MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE / 2) {
@@ -1278,7 +1562,7 @@ int main(int argc, char *argv[]) noexcept {
 			#ifdef __APPLE__
 			
 				// Create slean trimming context
-				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createSleanTrimmingContext(), [](MTL::Device *context) noexcept {
+				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createSleanTrimmingContext(deviceIndex), [](MTL::Device *context) noexcept {
 				
 					// Free context
 					context->release();
@@ -1288,7 +1572,7 @@ int main(int argc, char *argv[]) noexcept {
 			#else
 			
 				// Create slean trimming context
-				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createSleanTrimmingContext(platforms, numberOfPlatforms), clReleaseContext);
+				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createSleanTrimmingContext(platforms, numberOfPlatforms, deviceIndex), clReleaseContext);
 			#endif
 			
 			// Check if creating slean trimming context was successful
@@ -1572,18 +1856,21 @@ int main(int argc, char *argv[]) noexcept {
 				}
 				
 				// Check if performing slean trimming loop failed
-				if(!performSleanTrimmingLoop(context.get())) {
+				if(!performSleanTrimmingLoop(context.get(), deviceIndex)) {
 				
 					// Return failure
 					exit(EXIT_FAILURE);
 				}
+				
+				// Return success
+				exit(EXIT_SUCCESS);
 			}
 			
 			// Otherwise
 			else {
 			
 				// Display message
-				cout << "No applicable GPU found for slean trimming. Slean trimming requires ";
+				cout << ((deviceIndex == ALL_DEVICES) ? "No applicable GPU found for slean trimming" : "GPU isn't applicable for slean trimming") << ". Slean trimming requires ";
 				
 				// Check if RAM requirement can be expressed in bytes
 				if(SLEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE / 2) {
@@ -1639,7 +1926,7 @@ int main(int argc, char *argv[]) noexcept {
 			#ifdef __APPLE__
 			
 				// Create lean trimming context
-				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createLeanTrimmingContext(), [](MTL::Device *context) noexcept {
+				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createLeanTrimmingContext(deviceIndex), [](MTL::Device *context) noexcept {
 				
 					// Free context
 					context->release();
@@ -1649,7 +1936,7 @@ int main(int argc, char *argv[]) noexcept {
 			#else
 			
 				// Create lean trimming context
-				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createLeanTrimmingContext(platforms, numberOfPlatforms), clReleaseContext);
+				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createLeanTrimmingContext(platforms, numberOfPlatforms, deviceIndex), clReleaseContext);
 			#endif
 			
 			// Check if creating lean trimming context was successful
@@ -1933,18 +2220,21 @@ int main(int argc, char *argv[]) noexcept {
 				}
 				
 				// Check if performing lean trimming loop failed
-				if(!performLeanTrimmingLoop(context.get())) {
+				if(!performLeanTrimmingLoop(context.get(), deviceIndex)) {
 				
 					// Return failure
 					exit(EXIT_FAILURE);
 				}
+				
+				// Return success
+				exit(EXIT_SUCCESS);
 			}
 			
 			// Otherwise
 			else {
 			
 				// Display message
-				cout << "No applicable GPU found for lean trimming. Lean trimming requires ";
+				cout << ((deviceIndex == ALL_DEVICES) ? "No applicable GPU found for lean trimming" : "GPU isn't applicable for lean trimming") << ". Lean trimming requires ";
 				
 				// Check if RAM requirement can be expressed in bytes
 				if(LEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE / 2) {
@@ -1976,9 +2266,6 @@ int main(int argc, char *argv[]) noexcept {
 				
 				// Display message
 				cout << " of RAM" << endl;
-				
-				// Return failure
-				exit(EXIT_FAILURE);
 			}
 		}
 	#endif
