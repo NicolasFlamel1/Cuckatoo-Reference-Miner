@@ -1072,6 +1072,9 @@ using namespace std;
 			return false;
 		}
 		
+		// Display message
+		cout << "Mining started" << endl;
+		
 		// Get SipHash keys from job's header and nonce
 		uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) sipHashKeysOne;
 		uint64_t heightOne = jobHeight;
@@ -2033,6 +2036,9 @@ using namespace std;
 				return false;
 			}
 		}
+		
+		// Display message
+		cout << "Mining started" << endl;
 		
 		// Check if queuing clearing number of edges per bucket one on the device failed
 		static Event clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 2];

@@ -541,6 +541,9 @@ using namespace std;
 			}
 		}
 		
+		// Display message
+		cout << "Mining started" << endl;
+		
 		// Check if queuing clearing number of edges per bucket one on the device failed
 		static Event clearNumberOfEdgesPerBucketEvents[SLEAN_TRIMMING_PARTS * 3 - 1];
 		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[0].getAddress()) != CL_SUCCESS) {

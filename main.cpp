@@ -104,6 +104,9 @@ using namespace std;
 
 // Constants
 
+// Failed server connect delay seconds
+#define FAILED_SERVER_CONNECT_DELAY_SECONDS 1
+
 // Trimming type
 enum TrimmingType {
 
@@ -156,6 +159,15 @@ static condition_variable *searchingThreadsFinishedConditionalVariable;
 // Check if not tuning
 #ifndef TUNING
 
+	// Set stratum server address to the default stratum server address
+	static const char *stratumServerAddress = DEFAULT_STRATUM_SERVER_ADDRESS;
+	
+	// Set stratum server port to the default stratum server port
+	static const char *stratumServerPort = DEFAULT_STRATUM_SERVER_PORT;
+	
+	// Set stratum server username to nothing
+	static const char *stratumServerUsername = nullptr;
+	
 	// Random number generator
 	static mt19937_64 randomNumberGenerator((random_device())());
 	
@@ -163,13 +175,13 @@ static condition_variable *searchingThreadsFinishedConditionalVariable;
 	#ifdef _WIN32
 	
 		// Socket descriptor
-		static SOCKET socketDescriptor = INVALID_SOCKET;
+		static SOCKET socketDescriptor;
 		
 	// Otherwise
 	#else
 	
 		// Socket descriptor
-		static int socketDescriptor = -1;
+		static int socketDescriptor;
 	#endif
 	
 	// Server response
@@ -197,6 +209,9 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 // Check if not tuning
 #ifndef TUNING
 
+	// Connect to server
+	static inline bool connectToServer() noexcept;
+	
 	// Process server response
 	static inline bool processServerResponse() noexcept;
 	
@@ -279,19 +294,6 @@ int main(int argc, char *argv[]) noexcept {
 			// Return failure
 			exit(EXIT_FAILURE);
 		}
-	#endif
-	
-	// Check if not tuning
-	#ifndef TUNING
-	
-		// Set stratum server address to the default stratum server address
-		const char *stratumServerAddress = DEFAULT_STRATUM_SERVER_ADDRESS;
-		
-		// Set stratum server port to the default stratum server port
-		const char *stratumServerPort = DEFAULT_STRATUM_SERVER_PORT;
-		
-		// Set stratum server username to nothing
-		const char *stratumServerUsername = nullptr;
 	#endif
 	
 	// Check if there's trimming rounds
@@ -704,218 +706,9 @@ int main(int argc, char *argv[]) noexcept {
 			static const WindowsSocket windowsSocket;
 		#endif
 		
-		// Display message
-		cout << "Connecting to the stratum server at " << stratumServerAddress << ':' << stratumServerPort << endl;
+		// Check if connecting to the server failed
+		if(!connectToServer()) {
 		
-		// Check if getting address info for the stratum server failed
-		const addrinfo addressInfoHints = {
-		
-			// Port provided
-			.ai_flags = AI_NUMERICSERV,
-			
-			// IPv4 or IPv6
-			.ai_family = AF_UNSPEC,
-			
-			// TCP
-			.ai_socktype = SOCK_STREAM,
-		};
-		static addrinfo *addressInfo;
-		if(getaddrinfo(stratumServerAddress, stratumServerPort, &addressInfoHints, &addressInfo)) {
-		
-			// Display message
-			cout << "Getting address info for the stratum server failed" << endl;
-			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-		
-		// Automatically free address info when done
-		static const unique_ptr<addrinfo, decltype(&freeaddrinfo)> addressInfoUniquePointer(addressInfo, freeaddrinfo);
-		
-		// Go through all addresses for the stratum server
-		for(const addrinfo *address = addressInfo; address; address = address->ai_next) {
-		
-			// Create socket descriptor
-			socketDescriptor = socket(address->ai_family, address->ai_socktype, address->ai_protocol);
-			
-			// Check if using Windows
-			#ifdef _WIN32
-			
-				// Check if creating socket descriptor was successful
-				if(socketDescriptor != INVALID_SOCKET) {
-				
-			// Otherwise
-			#else
-			
-				// Check if creating socket descriptor was successful
-				if(socketDescriptor != -1) {
-			#endif
-			
-				// Check if Windows
-				#ifdef _WIN32
-					
-					// Set read timeout
-					const DWORD readTimeout = READ_TIMEOUT_SECONDS * MILLISECONDS_IN_A_SECOND;
-					
-					// Set write timeout
-					const DWORD writeTimeout = WRITE_TIMEOUT_SECONDS * MILLISECONDS_IN_A_SECOND;
-				
-				// Otherwise
-				#else
-				
-					// Set read timeout
-					const timeval readTimeout = {
-					
-						// Seconds
-						.tv_sec = READ_TIMEOUT_SECONDS
-					};
-					
-					// Set write timeout
-					const timeval writeTimeout = {
-					
-						// Seconds
-						.tv_sec = WRITE_TIMEOUT_SECONDS
-					};
-				#endif
-				
-				// Check if setting socket descriptor's read and write timeouts was successful and connecting to the address was successful
-				if(!setsockopt(socketDescriptor, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&readTimeout), sizeof(readTimeout)) && !setsockopt(socketDescriptor, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char *>(&writeTimeout), sizeof(writeTimeout)) && !connect(socketDescriptor, address->ai_addr, address->ai_addrlen)) {
-				
-					// Break
-					break;
-				}
-				
-				// Otherwise
-				else {
-				
-					// Check if using Windows
-					#ifdef _WIN32
-					
-						// Close socket descriptor
-						closesocket(socketDescriptor);
-						
-						// Reset socket descriptor
-						socketDescriptor = INVALID_SOCKET;
-						
-					// Otherwise
-					#else
-					
-						// Close socket descriptor
-						close(socketDescriptor);
-						
-						// Reset socket descriptor
-						socketDescriptor = -1;
-					#endif
-				}
-			}
-		}
-		
-		// Check if using Windows
-		#ifdef _WIN32
-		
-			// Check if connecting to the stratum server failed
-			if(socketDescriptor == INVALID_SOCKET) {
-			
-		// Otherwise
-		#else
-		
-			// Check if connecting to the stratum server failed
-			if(socketDescriptor == -1) {
-		#endif
-		
-			// Display message
-			cout << "Connecting to the stratum server failed" << endl;
-			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-		
-		// Automatically free socket descriptor when done
-		static const unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)> socketDescriptorUniquePointer(&socketDescriptor, [](decltype(socketDescriptor) *socketDescriptorPointer) noexcept {
-		
-			// Check if using Windows
-			#ifdef _WIN32
-			
-				// Shutdown socket descriptor receive and send
-				shutdown(*socketDescriptorPointer, SD_BOTH);
-				
-				// Close socket descriptor
-				closesocket(*socketDescriptorPointer);
-				
-			// Otherwise
-			#else
-			
-				// Shutdown socket descriptor receive and send
-				shutdown(*socketDescriptorPointer, SHUT_RDWR);
-				
-				// Close socket descriptor
-				close(*socketDescriptorPointer);
-			#endif
-		});
-		
-		// Check if stratum server username exists
-		if(stratumServerUsername) {
-		
-			// Display message
-			cout << "Logging into the stratum server with username " << stratumServerUsername << endl;
-		}
-		
-		// Check if sending login request to the stratum server failed
-		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0')) || (stratumServerUsername && !sendFull(stratumServerUsername, strlen(stratumServerUsername))) || !sendFull("\",\"pass\":\"\",\"agent\":\"" TO_STRING(NAME) "\"}}\n", sizeof("\",\"pass\":\"\",\"agent\":\"" TO_STRING(NAME) "\"}}\n") - sizeof('\0'))) {
-		
-			// Display message
-			cout << "Sending login request to the stratum server failed" << endl;
-			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-		
-		// Check if receiving response from the stratum server failed
-		if(!receiveFull(serverResponse, sizeof(serverResponse))) {
-		
-			// Display message
-			cout << "Receiving response from the stratum server failed" << endl;
-			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-		
-		// Check if logging into the stratum server failed
-		if(!strstr(serverResponse, "\"error\":null") && !strstr(serverResponse, "\"error\": null")) {
-		
-			// Display message
-			cout << "Logging into the stratum server failed" << endl;
-			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-		
-		// Check if sending get job template request to the stratum server failed
-		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n") - sizeof('\0'))) {
-		
-			// Display message
-			cout << "Sending get job template request to the stratum server failed" << endl;
-			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-		
-		// Check if receiving response from the stratum server failed
-		if(!receiveFull(serverResponse, sizeof(serverResponse))) {
-		
-			// Display message
-			cout << "Receiving response from the stratum server failed" << endl;
-			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-		
-		// Check if getting job from the stratum server failed
-		if(!processServerResponse()) {
-		
-			// Display message
-			cout << "Getting job from the stratum server failed" << endl;
-			
 			// Return failure
 			exit(EXIT_FAILURE);
 		}
@@ -1139,6 +932,9 @@ int main(int argc, char *argv[]) noexcept {
 		// Enable all edges in edges bitmap
 		Bitmap<NUMBER_OF_EDGES> edgesBitmap;
 		edgesBitmap.setAllBits();
+		
+		// Display message
+		cout << "Mining started" << endl;
 		
 		// While not closing
 		while(!closing) {
@@ -2319,6 +2115,9 @@ int main(int argc, char *argv[]) noexcept {
 		// Display message
 		cout << "Solutions:\t" << solutionsFound << endl;
 		
+		// Set reconnect to server to false
+		bool reconnectToServer = false;
+		
 		// Check if searching threads found a solution
 		if(searchingThreadsSolution[1]) {
 		
@@ -2332,19 +2131,16 @@ int main(int argc, char *argv[]) noexcept {
 			
 				// Display message
 				cout << "Creating submit request failed" << endl;
-				
-				// Return failure
-				exit(EXIT_FAILURE);
 			}
 			
-			// Check if sending submit request to the stratum server failed
-			if(!sendFull(submitRequest, requestSize)) {
+			// Otherwise check if sending submit request to the stratum server failed
+			else if(!sendFull(submitRequest, requestSize)) {
 			
 				// Display message
 				cout << "Sending submit request to the stratum server failed" << endl;
 				
-				// Return failure
-				exit(EXIT_FAILURE);
+				// Set reconnect to server to true
+				reconnectToServer = true;
 			}
 		}
 		
@@ -2355,137 +2151,433 @@ int main(int argc, char *argv[]) noexcept {
 			if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
 			
 				// Display message
-				cout << "Sending get keep alive request to the stratum server failed" << endl;
+				cout << "Sending keep alive request to the stratum server failed" << endl;
 				
-				// Return failure
-				exit(EXIT_FAILURE);
+				// Set reconnect to server to true
+				reconnectToServer = true;
 			}
 		}
 		
-		// Loop while a response from stratum server is available
-		int responseAvailable;
-		do {
+		// Check if not reconnecting to the server
+		if(!reconnectToServer) {
 		
-			// Check if using Windows
-			#ifdef _WIN32
+			// Loop while a response from stratum server is available
+			int responseAvailable;
+			do {
 			
-				// Check if getting if a response from the stratum server exists failed
-				pollfd pollInfo = {
+				// Check if using Windows
+				#ifdef _WIN32
 				
-					// Socket descriptor
-					.fd = socketDescriptor,
+					// Check if getting if a response from the stratum server exists failed
+					pollfd pollInfo = {
 					
-					// Events
-					.events = POLLIN
-				};
-				responseAvailable = WSAPoll(&pollInfo, 1, 0);
-				if(responseAvailable == SOCKET_ERROR) {
-				
-			// Otherwise
-			#else
-			
-				// Check if getting if a response from the stratum server exists failed
-				pollfd pollInfo = {
-				
-					// Socket descriptor
-					.fd = socketDescriptor,
-					
-					// Events
-					.events = POLLIN
-				};
-				responseAvailable = poll(&pollInfo, 1, 0);
-				if(responseAvailable == -1) {
-			#endif
-			
-				// Display message
-				cout << "Getting if a response from the stratum server exists failed" << endl;
-				
-				// Return failure
-				exit(EXIT_FAILURE);
-			}
-			
-			// Check if a response from the stratum server exists
-			if(responseAvailable) {
-			
-				// Check if receiving response from the stratum server failed
-				decltype(function(recv))::result_type responseSize = recv(socketDescriptor, serverResponse, sizeof(serverResponse) - sizeof('\0'), MSG_PEEK);
-				if(responseSize <= 0) {
-				
-					// Check if disconnected from the stratum server
-					if(!responseSize) {
-					
-						// Display message
-						cout << "Disconnected from the stratum server" << endl;
-					}
-					
-					// Otherwise
-					else {
-					
-						// Display message
-						cout << "Receiving response from the stratum server failed. Error " << errno << endl;
-					}
-					
-					// Return failure
-					exit(EXIT_FAILURE);
-				}
-				
-				// Check if full response wasn't received
-				if(!memchr(serverResponse, '\n', responseSize)) {
-				
-					// Check if server response buffer is full
-					if(responseSize == sizeof(serverResponse) - sizeof('\0')) {
-					
-						// Display message
-						cout << "Receiving response from the stratum server failed. Buffer full" << endl;
+						// Socket descriptor
+						.fd = socketDescriptor,
 						
-						// Return failure
-						exit(EXIT_FAILURE);
-					}
+						// Events
+						.events = POLLIN
+					};
+					responseAvailable = WSAPoll(&pollInfo, 1, 0);
+					if(responseAvailable == SOCKET_ERROR) {
+					
+				// Otherwise
+				#else
+				
+					// Check if getting if a response from the stratum server exists failed
+					pollfd pollInfo = {
+					
+						// Socket descriptor
+						.fd = socketDescriptor,
+						
+						// Events
+						.events = POLLIN
+					};
+					responseAvailable = poll(&pollInfo, 1, 0);
+					if(responseAvailable == -1) {
+				#endif
+				
+					// Display message
+					cout << "Getting if a response from the stratum server exists failed" << endl;
+					
+					// Set reconnect to server to true
+					reconnectToServer = true;
 					
 					// Break
 					break;
 				}
 				
-				// Check if receiving response from the stratum server failed
-				responseSize = recv(socketDescriptor, serverResponse, sizeof(serverResponse) - sizeof('\0'), 0);
-				if(responseSize <= 0) {
+				// Check if a response from the stratum server exists
+				if(responseAvailable) {
 				
-					// Check if disconnected from the stratum server
-					if(!responseSize) {
+					// Check if receiving response from the stratum server failed
+					decltype(function(recv))::result_type responseSize = recv(socketDescriptor, serverResponse, sizeof(serverResponse) - sizeof('\0'), MSG_PEEK);
+					if(responseSize <= 0) {
 					
 						// Display message
-						cout << "Disconnected from the stratum server" << endl;
+						cout << "Receiving response from the stratum server failed" << endl;
+						
+						// Set reconnect to server to true
+						reconnectToServer = true;
+						
+						// Break
+						break;
 					}
 					
-					// Otherwise
-					else {
+					// Check if full response wasn't received
+					if(!memchr(serverResponse, '\n', responseSize)) {
+					
+						// Check if server response buffer is full
+						if(responseSize == sizeof(serverResponse) - sizeof('\0')) {
+						
+							// Display message
+							cout << "Receiving response from the stratum server failed" << endl;
+							
+							// Set reconnect to server to true
+							reconnectToServer = true;
+						}
+						
+						// Break
+						break;
+					}
+					
+					// Check if receiving response from the stratum server failed
+					responseSize = recv(socketDescriptor, serverResponse, sizeof(serverResponse) - sizeof('\0'), 0);
+					if(responseSize <= 0) {
 					
 						// Display message
-						cout << "Receiving response from the stratum server failed. Error " << errno << endl;
+						cout << "Receiving response from the stratum server failed" << endl;
+						
+						// Set reconnect to server to true
+						reconnectToServer = true;
+						
+						// Break
+						break;
 					}
 					
-					// Return failure
-					exit(EXIT_FAILURE);
+					// Null terminate server response
+					serverResponse[responseSize] = '\0';
+					
+					// Process server response
+					processServerResponse();
 				}
 				
-				// Null terminate server response
-				serverResponse[responseSize] = '\0';
-				
-				// Process server response
-				processServerResponse();
-			}
+			} while(responseAvailable);
+		}
+		
+		// Record end time
+		const chrono::high_resolution_clock::time_point endTime = chrono::high_resolution_clock::now();
+		
+		// Check if reconnecting to the stratum server
+		if(reconnectToServer) {
+		
+			// Display message
+			cout << "Disconnected from the stratum server" << endl;
 			
-		} while(responseAvailable);
+			// Loop while not closing, not connecting to server, and not closing
+			while(!closing && !connectToServer() && !closing) {
+			
+				// Check if using Windows
+				#ifdef _WIN32
+				
+					// Wait
+					Sleep(FAILED_SERVER_CONNECT_DELAY_SECONDS * MILLISECONDS_IN_A_SECOND);
+					
+				// Otherwise
+				#else
+				
+					// Wait
+					sleep(FAILED_SERVER_CONNECT_DELAY_SECONDS);
+				#endif
+			}
+		}
+		
+	// Otherwise
+	#else
+	
+		// Record end time
+		const chrono::high_resolution_clock::time_point endTime = chrono::high_resolution_clock::now();
 	#endif
 	
-	// Display message
-	const chrono::high_resolution_clock::time_point endTime = chrono::high_resolution_clock::now();
-	cout << endl << "Pipeline stages:" << endl << "Searching:\t" << static_cast<chrono::duration<double>>(endTime - startTime).count() << " second(s)" << endl;
+	// Check if not closing
+	if(!closing) {
+	
+		// Display message
+		cout << endl << "Pipeline stages:" << endl << "Searching:\t" << static_cast<chrono::duration<double>>(endTime - startTime).count() << " second(s)" << endl;
+	}
 }
 
 // Check if not tuning
 #ifndef TUNING
 
+	// Connect to server
+	bool connectToServer() noexcept {
+	
+		// Display message
+		cout << "Connecting to the stratum server at: " << stratumServerAddress << ':' << stratumServerPort << endl;
+		
+		// Create socket descriptor unique pointer
+		static unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)> socketDescriptorUniquePointer(nullptr, [](__attribute__((unused)) decltype(socketDescriptor) *socketDescriptorPointer) noexcept {
+		
+		});
+		
+		// Free socket descriptor if it exists
+		socketDescriptorUniquePointer.reset();
+		
+		// Create address info unique pointer
+		static addrinfo *addressInfo;
+		static unique_ptr<addrinfo, decltype(&freeaddrinfo)> addressInfoUniquePointer(nullptr, freeaddrinfo);
+		
+		// Free address info if it exists
+		addressInfoUniquePointer.reset();
+		
+		// Check if getting address info for the stratum server failed
+		const addrinfo addressInfoHints = {
+		
+			// Port provided
+			.ai_flags = AI_NUMERICSERV,
+			
+			// IPv4 or IPv6
+			.ai_family = AF_UNSPEC,
+			
+			// TCP
+			.ai_socktype = SOCK_STREAM,
+		};
+		if(getaddrinfo(stratumServerAddress, stratumServerPort, &addressInfoHints, &addressInfo)) {
+		
+			// Display message
+			cout << "Getting address info for the stratum server failed" << endl;
+			
+			// Return false
+			return false;
+		}
+		
+		// Automatically free address info when done
+		addressInfoUniquePointer = unique_ptr<addrinfo, decltype(&freeaddrinfo)>(addressInfo, freeaddrinfo);
+		
+		// Check if using Windows
+		#ifdef _WIN32
+		
+			// Reset socket descriptor
+			socketDescriptor = INVALID_SOCKET;
+			
+		// Otherwise
+		#else
+		
+			// Reset socket descriptor
+			socketDescriptor = -1;
+		#endif
+		
+		// Go through all addresses for the stratum server
+		for(const addrinfo *address = addressInfo; address; address = address->ai_next) {
+		
+			// Create socket descriptor
+			socketDescriptor = socket(address->ai_family, address->ai_socktype, address->ai_protocol);
+			
+			// Check if using Windows
+			#ifdef _WIN32
+			
+				// Check if creating socket descriptor was successful
+				if(socketDescriptor != INVALID_SOCKET) {
+				
+			// Otherwise
+			#else
+			
+				// Check if creating socket descriptor was successful
+				if(socketDescriptor != -1) {
+			#endif
+			
+				// Check if Windows
+				#ifdef _WIN32
+					
+					// Set read timeout
+					const DWORD readTimeout = READ_TIMEOUT_SECONDS * MILLISECONDS_IN_A_SECOND;
+					
+					// Set write timeout
+					const DWORD writeTimeout = WRITE_TIMEOUT_SECONDS * MILLISECONDS_IN_A_SECOND;
+				
+				// Otherwise
+				#else
+				
+					// Set read timeout
+					const timeval readTimeout = {
+					
+						// Seconds
+						.tv_sec = READ_TIMEOUT_SECONDS
+					};
+					
+					// Set write timeout
+					const timeval writeTimeout = {
+					
+						// Seconds
+						.tv_sec = WRITE_TIMEOUT_SECONDS
+					};
+				#endif
+				
+				// Check if setting socket descriptor's read and write timeouts was successful and connecting to the address was successful
+				if(!setsockopt(socketDescriptor, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&readTimeout), sizeof(readTimeout)) && !setsockopt(socketDescriptor, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char *>(&writeTimeout), sizeof(writeTimeout)) && !connect(socketDescriptor, address->ai_addr, address->ai_addrlen)) {
+				
+					// Break
+					break;
+				}
+				
+				// Otherwise
+				else {
+				
+					// Check if using Windows
+					#ifdef _WIN32
+					
+						// Close socket descriptor
+						closesocket(socketDescriptor);
+						
+						// Reset socket descriptor
+						socketDescriptor = INVALID_SOCKET;
+						
+					// Otherwise
+					#else
+					
+						// Close socket descriptor
+						close(socketDescriptor);
+						
+						// Reset socket descriptor
+						socketDescriptor = -1;
+					#endif
+				}
+			}
+		}
+		
+		// Check if using Windows
+		#ifdef _WIN32
+		
+			// Check if connecting to the stratum server failed
+			if(socketDescriptor == INVALID_SOCKET) {
+			
+		// Otherwise
+		#else
+		
+			// Check if connecting to the stratum server failed
+			if(socketDescriptor == -1) {
+		#endif
+		
+			// Display message
+			cout << "Connecting to the stratum server failed" << endl;
+			
+			// Return false
+			return false;
+		}
+		
+		// Display message
+		cout << "Connected to the stratum server" << endl;
+		
+		// Automatically free socket descriptor when done
+		socketDescriptorUniquePointer = unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)>(&socketDescriptor, [](decltype(socketDescriptor) *socketDescriptorPointer) noexcept {
+		
+			// Check if using Windows
+			#ifdef _WIN32
+			
+				// Shutdown socket descriptor receive and send
+				shutdown(*socketDescriptorPointer, SD_BOTH);
+				
+				// Close socket descriptor
+				closesocket(*socketDescriptorPointer);
+				
+			// Otherwise
+			#else
+			
+				// Shutdown socket descriptor receive and send
+				shutdown(*socketDescriptorPointer, SHUT_RDWR);
+				
+				// Close socket descriptor
+				close(*socketDescriptorPointer);
+			#endif
+		});
+		
+		// Check if stratum server username exists
+		if(stratumServerUsername) {
+		
+			// Display message
+			cout << "Logging into the stratum server with username: " << stratumServerUsername << endl;
+		}
+		
+		// Otherwise
+		else {
+		
+			// Display message
+			cout << "Logging into the stratum server without a username" << endl;
+		}
+		
+		// Check if sending login request to the stratum server failed
+		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0')) || (stratumServerUsername && !sendFull(stratumServerUsername, strlen(stratumServerUsername))) || !sendFull("\",\"pass\":\"\",\"agent\":\"" TO_STRING(NAME) "\"}}\n", sizeof("\",\"pass\":\"\",\"agent\":\"" TO_STRING(NAME) "\"}}\n") - sizeof('\0'))) {
+		
+			// Display message
+			cout << "Sending login request to the stratum server failed" << endl;
+			
+			// Return false
+			return false;
+		}
+		
+		// Check if receiving response from the stratum server failed
+		if(!receiveFull(serverResponse, sizeof(serverResponse))) {
+		
+			// Display message
+			cout << "Receiving response from the stratum server failed" << endl;
+			
+			// Return false
+			return false;
+		}
+		
+		// Check if logging into the stratum server failed
+		if(!strstr(serverResponse, "\"error\":null") && !strstr(serverResponse, "\"error\": null")) {
+		
+			// Display message
+			cout << "Logging into the stratum server failed" << endl;
+			
+			// Return false
+			return false;
+		}
+		
+		// Display message
+		cout << "Logged into the stratum server" << endl;
+		
+		// Display message
+		cout << "Getting job from the stratum server" << endl;
+		
+		// Check if sending get job template request to the stratum server failed
+		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n") - sizeof('\0'))) {
+		
+			// Display message
+			cout << "Sending get job template request to the stratum server failed" << endl;
+			
+			// Return false
+			return false;
+		}
+		
+		// Check if receiving response from the stratum server failed
+		if(!receiveFull(serverResponse, sizeof(serverResponse))) {
+		
+			// Display message
+			cout << "Receiving response from the stratum server failed" << endl;
+			
+			// Return false
+			return false;
+		}
+		
+		// Check if getting job from the stratum server failed
+		if(!processServerResponse()) {
+		
+			// Display message
+			cout << "Getting job from the stratum server failed" << endl;
+			
+			// Return false
+			return false;
+		}
+		
+		// Display message
+		cout << "Got job from the stratum server" << endl;
+		
+		// Return true
+		return true;
+	}
+	
 	// Process server response
 	bool processServerResponse() noexcept {
 	
