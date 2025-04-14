@@ -53,7 +53,7 @@ using namespace std;
 		unsigned int index = 0;
 		
 		// Check if getting all devices was successful
-		static const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+		const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 		
 			// Free devices
 			devices->release();

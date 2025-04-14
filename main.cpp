@@ -101,11 +101,11 @@ using namespace std;
 // Write timeout seconds
 #define WRITE_TIMEOUT_SECONDS 60
 
-
-// Constants
-
 // Failed server connect delay seconds
 #define FAILED_SERVER_CONNECT_DELAY_SECONDS 1
+
+
+// Constants
 
 // Trimming type
 enum TrimmingType {
@@ -2125,7 +2125,7 @@ int main(int argc, char *argv[]) noexcept {
 			++solutionsFound;
 			
 			// Check if creating submit request failed
-			static char submitRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"submit\",\"params\":{\"edge_bits\":" TO_STRING(EDGE_BITS) ",\"height\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"job_id\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"nonce\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"pow\":[") - sizeof('\0') + (sizeof("4294967295,") - sizeof('\0')) * SOLUTION_SIZE - sizeof(',') + sizeof("]}}\n")];
+			char submitRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"submit\",\"params\":{\"edge_bits\":" TO_STRING(EDGE_BITS) ",\"height\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"job_id\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"nonce\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"pow\":[") - sizeof('\0') + (sizeof("4294967295,") - sizeof('\0')) * SOLUTION_SIZE - sizeof(',') + sizeof("]}}\n")];
 			const int requestSize = snprintf(submitRequest, sizeof(submitRequest), "{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"submit\",\"params\":{\"edge_bits\":" TO_STRING(EDGE_BITS) ",\"height\":%" PRIu64 ",\"job_id\":%" PRIu64 ",\"nonce\":%" PRIu64 ",\"pow\":[%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "]}}\n", height, id, nonce, searchingThreadsSolution[0], searchingThreadsSolution[1], searchingThreadsSolution[2], searchingThreadsSolution[3], searchingThreadsSolution[4], searchingThreadsSolution[5], searchingThreadsSolution[6], searchingThreadsSolution[7], searchingThreadsSolution[8], searchingThreadsSolution[9], searchingThreadsSolution[10], searchingThreadsSolution[11], searchingThreadsSolution[12], searchingThreadsSolution[13], searchingThreadsSolution[14], searchingThreadsSolution[15], searchingThreadsSolution[16], searchingThreadsSolution[17], searchingThreadsSolution[18], searchingThreadsSolution[19], searchingThreadsSolution[20], searchingThreadsSolution[21], searchingThreadsSolution[22], searchingThreadsSolution[23], searchingThreadsSolution[24], searchingThreadsSolution[25], searchingThreadsSolution[26], searchingThreadsSolution[27], searchingThreadsSolution[28], searchingThreadsSolution[29], searchingThreadsSolution[30], searchingThreadsSolution[31], searchingThreadsSolution[32], searchingThreadsSolution[33], searchingThreadsSolution[34], searchingThreadsSolution[35], searchingThreadsSolution[36], searchingThreadsSolution[37], searchingThreadsSolution[38], searchingThreadsSolution[39], searchingThreadsSolution[40], searchingThreadsSolution[41]);
 			if(requestSize < 0) {
 			

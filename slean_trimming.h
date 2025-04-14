@@ -108,7 +108,7 @@ using namespace std;
 		unsigned int index = 0;
 		
 		// Check if getting all devices was successful
-		static const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+		const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 		
 			// Free devices
 			devices->release();
@@ -320,7 +320,7 @@ using namespace std;
 		
 		// Try to allocate more than the max memory allocation size
 		cl_int errorCode;
-		static unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> moreThanMaxMemoryAllocation(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, maxMemoryAllocationSize + 1, nullptr, &errorCode), clReleaseMemObject);
+		unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> moreThanMaxMemoryAllocation(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, maxMemoryAllocationSize + 1, nullptr, &errorCode), clReleaseMemObject);
 		
 		// Set enforce max memory allocation size to if the allocation failed because of an invalid buffer size
 		const bool enforceMaxMemoryAllocationSize = errorCode == CL_INVALID_BUFFER_SIZE;
@@ -603,16 +603,6 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if queuing clearing number of edges per bucket two on the device failed
-		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[1].getAddress()) != CL_SUCCESS) {
-		
-			// Display message
-			cout << "Preparing program's arguments on the GPU failed" << endl;
-			
-			// Return false
-			return false;
-		}
-		
 		// Check if setting program's SipHash keys argument failed
 		if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 		
@@ -627,7 +617,7 @@ using namespace std;
 		for(unsigned int i = 1; i < SLEAN_TRIMMING_PARTS; ++i) {
 		
 			// Check if queuing clearing number of edges per bucket one on the device failed
-			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[(i - 1) * 2 + 1].getAddress(), clearNumberOfEdgesPerBucketEvents[i + 1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[(i - 1) * 2 + 1].getAddress(), clearNumberOfEdgesPerBucketEvents[i].getAddress()) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -647,7 +637,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step one on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNumberOfEdgesPerBucketEvents[i + 1].getAddress(), runStepEvents[(i - 1) * 2 + 2].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNumberOfEdgesPerBucketEvents[i].getAddress(), runStepEvents[(i - 1) * 2 + 2].getAddress()) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -673,6 +663,16 @@ using namespace std;
 			// Otherwise
 			else {
 			
+				// Check if queuing clearing number of edges per bucket two on the device failed
+				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[i + 1].getAddress()) != CL_SUCCESS) {
+				
+					// Display message
+					cout << "Preparing program's arguments on the GPU failed" << endl;
+					
+					// Return false
+					return false;
+				}
+				
 				// Check if setting program's SipHash keys argument failed
 				if(clSetKernelArg(stepFourKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
@@ -684,7 +684,7 @@ using namespace std;
 				}
 				
 				// Check if queuing running step four on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 2, unmove((const cl_event []){runStepEvents[(i - 1) * 2 + 2].get(), clearNumberOfEdgesPerBucketEvents[1].get()}), runStepEvents[(i - 1) * 2 + 3].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 2, unmove((const cl_event []){runStepEvents[(i - 1) * 2 + 2].get(), clearNumberOfEdgesPerBucketEvents[i + 1].get()}), runStepEvents[(i - 1) * 2 + 3].getAddress()) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Running program on the GPU failed" << endl;

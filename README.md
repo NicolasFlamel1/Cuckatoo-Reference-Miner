@@ -42,6 +42,18 @@ A stratum server address, port, and username can be provided when running this p
 ```
 "./Cuckatoo Reference Miner" --stratum_server_address 127.0.0.1 --stratum_server_port 3416 --stratum_server_username username
 ```
+You can display all your available GPUs and their indices that this program can use by running it with the `--display_gpus` command line argument.
+```
+"./Cuckatoo Reference Miner" --display_gpus
+```
+This program will attempt to use the first applicable GPU that it finds. However you can make it use a specific GPU by running it with the `--gpu` command line argument with the index of the GPU. For example, the following command will use the GPU with the index `1`.
+```
+"./Cuckatoo Reference Miner" --gpu 1
+```
+This program will try to use mean trimming, then slean trimming, and finally lean trimming in that order until it's able to perform one of those trimming types. You can choose to only try certain trimming types by running this program with the `--mean_trimming`, `--slean_trimming`, and/or `--lean_trimming` command line arguments for mean trimming, slean trimming, and lean trimming respectively. For example, the following command will only try to use slean and lean trimming.
+```
+"./Cuckatoo Reference Miner" --slean_trimming --lean_trimming
+```
 
 ### Tuning
 A `TRIMMING_ROUNDS` setting can be provided when building this program that can be adjusted to make the `Searching` time displayed when running this program as close to, but not greater than, the `Trimming` time displayed to maximize this program's performance (without regard for power usage). Increasing the `TRIMMING_ROUNDS` setting decreases the `Searching` time and increases the `Trimming` time, and decreasing the `TRIMMING_ROUNDS` setting increases the `Searching` time and decreases the `Trimming` time while also increasing CPU RAM usage.
@@ -60,7 +72,6 @@ A `TUNING=1` setting can be provided when building this program which will make 
 ```
 make EDGE_BITS=30 TRIMMING_ROUNDS=25 SLEAN_TRIMMING_PARTS=4 LOCAL_RAM_KILOBYTES=64 TUNING=1
 ```
-
 Also be sure to set your operating system's power mode to best performance when running this program.
 
 Increasing your operating system's page size may lead to better performance when using this program.

@@ -90,7 +90,7 @@ using namespace std;
 		unsigned int index = 0;
 		
 		// Check if getting all devices was successful
-		static const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+		const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 		
 			// Free devices
 			devices->release();
@@ -261,7 +261,7 @@ using namespace std;
 		}
 		
 		// Try to allocate more than the max memory allocation size
-		static unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> moreThanMaxMemoryAllocation(device->newBuffer(device->maxBufferLength() + 1, MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *moreThanMaxMemoryAllocation) noexcept {
+		unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> moreThanMaxMemoryAllocation(device->newBuffer(device->maxBufferLength() + 1, MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *moreThanMaxMemoryAllocation) noexcept {
 		
 			// Free more than max memory allocation
 			moreThanMaxMemoryAllocation->release();
@@ -1576,11 +1576,11 @@ using namespace std;
 			// Display message
 			cout << "Trimming:\t" << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
 			
-			// Free objects with autorelease memory
-			autoreleasePool.reset();
-			
 			// Set start time to now
 			startTime = chrono::high_resolution_clock::now();
+			
+			// Free objects with autorelease memory
+			autoreleasePool.reset();
 			
 			// Check if recreating autorelease pool failed
 			autoreleasePool = unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)>(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
@@ -1817,7 +1817,7 @@ using namespace std;
 		
 		// Try to allocate more than the max memory allocation size
 		cl_int errorCode;
-		static unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> moreThanMaxMemoryAllocation(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, maxMemoryAllocationSize + 1, nullptr, &errorCode), clReleaseMemObject);
+		unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> moreThanMaxMemoryAllocation(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, maxMemoryAllocationSize + 1, nullptr, &errorCode), clReleaseMemObject);
 		
 		// Set enforce max memory allocation size to if the allocation failed because of an invalid buffer size
 		const bool enforceMaxMemoryAllocationSize = errorCode == CL_INVALID_BUFFER_SIZE;
