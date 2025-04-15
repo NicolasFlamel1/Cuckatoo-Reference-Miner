@@ -209,6 +209,9 @@ template<typename ValueType> static inline ValueType &unmove(ValueType &&value) 
 // Set thread priority and affinity
 static inline bool setThreadPriorityAndAffinity(const unsigned int threadIndex) noexcept;
 
+// Securely clear
+static inline void securelyClear(void *data, const size_t length) noexcept;
+
 
 // Supporting function implementation
 
@@ -402,6 +405,29 @@ template<typename ValueType> ValueType &unmove(ValueType &&value) noexcept {
 	
 	// Return true
 	return true;
+}
+
+// Securely clear
+void securelyClear(void *data, const size_t length) noexcept {
+
+	// Check if using Windows
+	#ifdef _WIN32
+	
+		// Securely clear data
+		SecureZeroMemory(data, length);
+	
+	// Otherwise check if using macOS
+	#elif defined __APPLE__
+	
+		// Securely clear data
+		memset_s(data, length, 0, length);
+		
+	// Otherwise
+	#else
+	
+		// Securely clear data
+		explicit_bzero(data, length);
+	#endif
 }
 
 

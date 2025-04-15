@@ -24,6 +24,9 @@
 	
 	// Use NS
 	#define NS_PRIVATE_IMPLEMENTATION
+	
+	// Use bounds-checking interfaces
+	#define __STDC_WANT_LIB_EXT1__ 1
 #endif
 
 
@@ -40,6 +43,7 @@
 #elif defined __APPLE__
 
 	// Header files
+	#include <arpa/inet.h>
 	#include <netdb.h>
 	#include <poll.h>
 	#include "./metal.h"
@@ -48,6 +52,7 @@
 #else
 
 	// Header files
+	#include <arpa/inet.h>
 	#include <CL/cl.h>
 	#include <netdb.h>
 	#include <poll.h>
@@ -160,13 +165,16 @@ static condition_variable *searchingThreadsFinishedConditionalVariable;
 #ifndef TUNING
 
 	// Set stratum server address to the default stratum server address
-	static const char *stratumServerAddress = DEFAULT_STRATUM_SERVER_ADDRESS;
+	static char *stratumServerAddress = DEFAULT_STRATUM_SERVER_ADDRESS;
 	
 	// Set stratum server port to the default stratum server port
 	static const char *stratumServerPort = DEFAULT_STRATUM_SERVER_PORT;
 	
 	// Set stratum server username to nothing
 	static const char *stratumServerUsername = nullptr;
+	
+	// Set stratum server password to nothing
+	static char *stratumServerPassword = nullptr;
 	
 	// Random number generator
 	static mt19937_64 randomNumberGenerator((random_device())());
@@ -296,16 +304,6 @@ int main(int argc, char *argv[]) noexcept {
 		}
 	#endif
 	
-	// Check if there's trimming rounds
-	#if TRIMMING_ROUNDS != 0
-	
-		// Set device index to all devices
-		unsigned int deviceIndex = ALL_DEVICES;
-		
-		// Set trimming types to all trimming types
-		underlying_type_t<TrimmingType> trimmingTypes = ALL_TRIMMING_TYPES;
-	#endif
-	
 	// Set options
 	const option options[] = {
 	
@@ -320,6 +318,9 @@ int main(int argc, char *argv[]) noexcept {
 		
 		// Stratum server username
 		{"stratum_server_username", required_argument, nullptr, 'u'},
+		
+		// Stratum server password
+		{"stratum_server_password", required_argument, nullptr, 'w'},
 		
 		// Display GPUs
 		{"display_gpus", no_argument, nullptr, 'd'},
@@ -343,6 +344,28 @@ int main(int argc, char *argv[]) noexcept {
 		{}
 	};
 	
+	// Check if not tuning
+	#ifndef TUNING
+	
+		// Set stratum server port set to false
+		bool stratumServerPortSet = false;
+		
+		// Create stratum server password unique pointer
+		static unique_ptr<char, void(*)(char *)> stratumServerPasswordUniquePointer(nullptr, [](__attribute__((unused)) char *stratumServerPassword) noexcept {
+		
+		});
+	#endif
+	
+	// Check if there's trimming rounds
+	#if TRIMMING_ROUNDS != 0
+	
+		// Set device index to all devices
+		unsigned int deviceIndex = ALL_DEVICES;
+		
+		// Set trimming types to all trimming types
+		underlying_type_t<TrimmingType> trimmingTypes = ALL_TRIMMING_TYPES;
+	#endif
+	
 	// Set display help to false
 	bool displayHelp = false;
 	
@@ -351,7 +374,7 @@ int main(int argc, char *argv[]) noexcept {
 	
 	// Go through all options
 	int option;
-	while((option = getopt_long(argc, argv, "va:p:u:dg:mslh", options, nullptr)) != -1) {
+	while((option = getopt_long(argc, argv, "va:p:u:w:dg:mslh", options, nullptr)) != -1) {
 	
 		// Check option
 		switch(option) {
@@ -381,11 +404,87 @@ int main(int argc, char *argv[]) noexcept {
 						displayHelp = true;
 					}
 					
+					// Otherwise check if option is for a secure connection
+					else if(!strncmp(optarg, "stratum+ssl://", sizeof("stratum+ssl://") - sizeof('\0'))) {
+					
+						// Display message
+						cout << argv[0] << ": secure stratum server addresses aren't supported -- '" << optarg << '\'' << endl;
+						
+						// Set display help to true
+						displayHelp = true;
+					}
+					
 					// Otherwise
 					else {
 					
 						// Set stratum server address to the option
 						stratumServerAddress = optarg;
+						
+						// Otherwise check if stratum server address has a protocol
+						if(!strncmp(stratumServerAddress, "stratum+tcp://", sizeof("stratum+tcp://") - sizeof('\0'))) {
+						
+							// Remove stratum server address's protocol
+							stratumServerAddress = &stratumServerAddress[sizeof("stratum+tcp://") - sizeof('\0')];
+						}
+						
+						// Set search for port to true
+						bool searchForPort = true;
+						
+						// Check if stratum server address might be an IPv6 address
+						if(stratumServerAddress[0] == '[') {
+						
+							// Check if stratum server address contains a closing bracket
+							char *index = strchr(stratumServerAddress, ']');
+							if(index) {
+							
+								// End stratum server address before the closing bracket
+								*index = '\0';
+								
+								// Check if stratum server address is an IPv6 address and is followed by nothing or a port
+								in6_addr temp;
+								if(inet_pton(AF_INET6, &stratumServerAddress[sizeof('[')], &temp) == 1 && (!index[sizeof(']')] || index[sizeof(']')] == ':')) {
+								
+									// Remove opening bracket from stratum server address
+									stratumServerAddress = &stratumServerAddress[sizeof('[')];
+									
+									// Check if stratum server port hasn't been set and there's a port after the stratum server address
+									if(!stratumServerPortSet && index[sizeof(']')] == ':') {
+									
+										// Set stratum server port to the port
+										stratumServerPort = &index[sizeof("]:") - sizeof('\0')];
+									}
+									
+									// Set search for port to false
+									searchForPort = false;
+								}
+								
+								// Otherwise
+								else {
+								
+									// Restore stratum server addresses end
+									*index = ']';
+								}
+							}
+						}
+						
+						// Check if searching for port
+						if(searchForPort) {
+						
+							// Check if stratum server address contains a port
+							char *index = strchr(stratumServerAddress, ':');
+							if(index) {
+							
+								// End stratum server address before the port
+								*index = '\0';
+								
+								// Check if stratum server port hasn't been set
+								if(!stratumServerPortSet) {
+								
+									// Set stratum server port to the port
+									stratumServerPort = &index[sizeof(':')];
+								}
+							}
+						}
 					}
 					
 					// Break
@@ -394,6 +493,9 @@ int main(int argc, char *argv[]) noexcept {
 				// Stratum server port
 				case 'p': {
 				
+					// Set stratum server port set to true
+					stratumServerPortSet = true;
+					
 					// Check if option is invalid
 					char *end;
 					errno = 0;
@@ -453,6 +555,53 @@ int main(int argc, char *argv[]) noexcept {
 						
 						// Set stratum server username to the option
 						stratumServerUsername = optarg;
+					}
+					
+					// Break
+					break;
+				
+				// Stratum server password
+				case 'w':
+				
+					// Check if option is invalid
+					if(!optarg || !*optarg) {
+					
+						// Display message
+						cout << argv[0] << ": invalid stratum server password -- '" << (optarg ? optarg : "") << '\'' << endl;
+						
+						// Set display help to true
+						displayHelp = true;
+					}
+					
+					// Otherwise
+					else {
+					
+						// Automatically clear stratum server password when done
+						stratumServerPasswordUniquePointer = unique_ptr<char, void(*)(char *)>(optarg, [](char *stratumServerPassword) noexcept {
+						
+							// Securley clear stratum server password
+							securelyClear(stratumServerPassword, strlen(stratumServerPassword));
+						});
+						
+						// Go through all characters in the option
+						for(const char *character = optarg; *character; ++character) {
+						
+							// Check if character is invalid
+							if(!isprint(*character) || *character == '"' || *character == '\\') {
+							
+								// Display message
+								cout << argv[0] << ": invalid stratum server password -- '" << optarg << '\'' << endl;
+								
+								// Set display help to true
+								displayHelp = true;
+								
+								// Break
+								break;
+							}
+						}
+						
+						// Set stratum server password to the option
+						stratumServerPassword = optarg;
 					}
 					
 					// Break
@@ -642,6 +791,27 @@ int main(int argc, char *argv[]) noexcept {
 		}
 	}
 	
+	// Check if not tuning
+	#ifndef TUNING
+	
+		// Check if stratum server port hasn't been set
+		if(!stratumServerPortSet) {
+		
+			// Check if stratum server port is invalid
+			char *end;
+			errno = 0;
+			const unsigned long port = strtoul(stratumServerPort, &end, DECIMAL_NUMBER_BASE);
+			if(end == stratumServerPort || *end || !isdigit(stratumServerPort[0]) || (stratumServerPort[0] == '0' && isdigit(stratumServerPort[1])) || errno || !port || port > UINT16_MAX) {
+			
+				// Display message
+				cout << argv[0] << ": invalid port in stratum server address -- '" << stratumServerPort << '\'' << endl;
+				
+				// Set display help to true
+				displayHelp = true;
+			}
+		}
+	#endif
+	
 	// Check if displaying help
 	if(displayHelp) {
 	
@@ -657,6 +827,7 @@ int main(int argc, char *argv[]) noexcept {
 			cout << "\t-a, --stratum_server_address\tThe address of the stratum server to connect to (default: " << DEFAULT_STRATUM_SERVER_ADDRESS << ')' << endl;
 			cout << "\t-p, --stratum_server_port\tThe port of the stratum server to connect to (default: " << DEFAULT_STRATUM_SERVER_PORT << ')' << endl;
 			cout << "\t-u, --stratum_server_username\tThe username to use when logging into the stratum server" << endl;
+			cout << "\t-w, --stratum_server_password\tThe password to use when logging into the stratum server (This is sent as plaintext)" << endl;
 		#endif
 		
 		// Check if there's trimming rounds
@@ -2131,6 +2302,16 @@ int main(int argc, char *argv[]) noexcept {
 			
 				// Display message
 				cout << "Creating submit request failed" << endl;
+				
+				// Check if sending keep alive request to the stratum server failed
+				if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
+				
+					// Display message
+					cout << "Sending keep alive request to the stratum server failed" << endl;
+					
+					// Set reconnect to server to true
+					reconnectToServer = true;
+				}
 			}
 			
 			// Otherwise check if sending submit request to the stratum server failed
@@ -2144,18 +2325,14 @@ int main(int argc, char *argv[]) noexcept {
 			}
 		}
 		
-		// Otherwise
-		else {
+		// Otherwise check if sending keep alive request to the stratum server failed
+		else if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
 		
-			// Check if sending keep alive request to the stratum server failed
-			if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
+			// Display message
+			cout << "Sending keep alive request to the stratum server failed" << endl;
 			
-				// Display message
-				cout << "Sending keep alive request to the stratum server failed" << endl;
-				
-				// Set reconnect to server to true
-				reconnectToServer = true;
-			}
+			// Set reconnect to server to true
+			reconnectToServer = true;
 		}
 		
 		// Check if not reconnecting to the server
@@ -2313,7 +2490,25 @@ int main(int argc, char *argv[]) noexcept {
 	bool connectToServer() noexcept {
 	
 		// Display message
-		cout << "Connecting to the stratum server at: " << stratumServerAddress << ':' << stratumServerPort << endl;
+		cout << "Connecting to the stratum server at: stratum+tcp://";
+		
+		// Check if stratum server address is an IPv6 address
+		in6_addr temp;
+		if(inet_pton(AF_INET6, stratumServerAddress, &temp) == 1) {
+		
+			// Display message
+			cout << '[' << stratumServerAddress << ']';
+		}
+		
+		// Otherwise
+		else {
+		
+			// Display message
+			cout << stratumServerAddress;
+		}
+		
+		// Display message
+		cout << ':' << stratumServerPort << endl;
 		
 		// Create socket descriptor unique pointer
 		static unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)> socketDescriptorUniquePointer(nullptr, [](__attribute__((unused)) decltype(socketDescriptor) *socketDescriptorPointer) noexcept {
@@ -2322,13 +2517,6 @@ int main(int argc, char *argv[]) noexcept {
 		
 		// Free socket descriptor if it exists
 		socketDescriptorUniquePointer.reset();
-		
-		// Create address info unique pointer
-		static addrinfo *addressInfo;
-		static unique_ptr<addrinfo, decltype(&freeaddrinfo)> addressInfoUniquePointer(nullptr, freeaddrinfo);
-		
-		// Free address info if it exists
-		addressInfoUniquePointer.reset();
 		
 		// Check if getting address info for the stratum server failed
 		const addrinfo addressInfoHints = {
@@ -2342,6 +2530,7 @@ int main(int argc, char *argv[]) noexcept {
 			// TCP
 			.ai_socktype = SOCK_STREAM,
 		};
+		addrinfo *addressInfo;
 		if(getaddrinfo(stratumServerAddress, stratumServerPort, &addressInfoHints, &addressInfo)) {
 		
 			// Display message
@@ -2352,7 +2541,7 @@ int main(int argc, char *argv[]) noexcept {
 		}
 		
 		// Automatically free address info when done
-		addressInfoUniquePointer = unique_ptr<addrinfo, decltype(&freeaddrinfo)>(addressInfo, freeaddrinfo);
+		const unique_ptr<addrinfo, decltype(&freeaddrinfo)> addressInfoUniquePointer(addressInfo, freeaddrinfo);
 		
 		// Check if using Windows
 		#ifdef _WIN32
@@ -2505,8 +2694,22 @@ int main(int argc, char *argv[]) noexcept {
 			cout << "Logging into the stratum server without a username" << endl;
 		}
 		
+		// Check if stratum server password exists
+		if(stratumServerPassword) {
+		
+			// Display message
+			cout << "Logging into the stratum server with the specified password" << endl;
+		}
+		
+		// Otherwise
+		else {
+		
+			// Display message
+			cout << "Logging into the stratum server without a password" << endl;
+		}
+		
 		// Check if sending login request to the stratum server failed
-		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0')) || (stratumServerUsername && !sendFull(stratumServerUsername, strlen(stratumServerUsername))) || !sendFull("\",\"pass\":\"\",\"agent\":\"" TO_STRING(NAME) "\"}}\n", sizeof("\",\"pass\":\"\",\"agent\":\"" TO_STRING(NAME) "\"}}\n") - sizeof('\0'))) {
+		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0')) || (stratumServerUsername && !sendFull(stratumServerUsername, strlen(stratumServerUsername))) || !sendFull("\",\"pass\":\"", sizeof("\",\"pass\":\"") - sizeof('\0')) || (stratumServerPassword && !sendFull(stratumServerPassword, strlen(stratumServerPassword))) || !sendFull("\",\"agent\":\"" TO_STRING(NAME) "\"}}\n", sizeof("\",\"agent\":\"" TO_STRING(NAME) "\"}}\n") - sizeof('\0'))) {
 		
 			// Display message
 			cout << "Sending login request to the stratum server failed" << endl;
@@ -2526,10 +2729,44 @@ int main(int argc, char *argv[]) noexcept {
 		}
 		
 		// Check if logging into the stratum server failed
-		if(!strstr(serverResponse, "\"error\":null") && !strstr(serverResponse, "\"error\": null")) {
+		if((strstr(serverResponse, "\"error\":") && !strstr(serverResponse, "\"error\":null") && !strstr(serverResponse, "\"error\": null")) || strstr(serverResponse, "\"result\":null") || strstr(serverResponse, "\"result\": null")) {
 		
 			// Display message
 			cout << "Logging into the stratum server failed" << endl;
+			
+			// Check if response contains a message
+			const char *message = strstr(serverResponse, "\"message\":");
+			if(message) {
+			
+				// Check if message contains a value
+				message = strchr(&message[sizeof("\"message\":") - sizeof('\0')], '"');
+				if(message) {
+				
+					// Display message
+					cout << "Failure reason from the stratum server: ";
+					
+					// Go through all characters in the message
+					for(++message; *message && *message != '"'; ++message) {
+					
+						// Check if character is an escaped double quote or backslash
+						if(*message == '\\' && (message[sizeof('\\')] == '"' || message[sizeof('\\')] == '\\')) {
+						
+							// Go to next character
+							++message;
+						}
+						
+						// Check if character is printable
+						if(isprint(*message)) {
+						
+							// Display character
+							cout << *message;
+						}
+					}
+					
+					// Display new line
+					cout << endl;
+				}
+			}
 			
 			// Return false
 			return false;
@@ -2610,7 +2847,7 @@ int main(int argc, char *argv[]) noexcept {
 					newJobFound = false;
 					
 					// Check if getting job was successful
-					if(strstr(partStart, "\"error\":null") || strstr(partStart, "\"error\": null") || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"job\"", sizeof("\"job\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], " \"job\"", sizeof(" \"job\"") - sizeof('\0'))) {
+					if(!strstr(partStart, "\"error\":") || strstr(partStart, "\"error\":null") || strstr(partStart, "\"error\": null") || (!strstr(partStart, "\"result\":null") && !strstr(partStart, "\"result\": null")) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"job\"", sizeof("\"job\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], " \"job\"", sizeof(" \"job\"") - sizeof('\0'))) {
 					
 						// Check if getting job's height was successful
 						const char *height = strstr(partStart, "\"height\":");
@@ -2736,30 +2973,27 @@ int main(int argc, char *argv[]) noexcept {
 	// Receive full
 	bool receiveFull(char *data, const size_t size) noexcept {
 	
+		// Set total received to zero
+		size_t totalReceived = 0;
+		
 		// Loop until full message is received
-		decltype(function(recv))::result_type received;
 		do {
 		
 			// Check if receiving data from the stratum server failed
-			received = recv(socketDescriptor, data, size - sizeof('\0'), MSG_PEEK);
-			if(received <= 0 || (static_cast<size_t>(received) == size - sizeof('\0') && !memchr(data, '\n', received))) {
+			const decltype(function(recv))::result_type received = recv(socketDescriptor, &data[totalReceived], size - totalReceived - sizeof('\0'), 0);
+			if(received <= 0 || (static_cast<size_t>(received) == size - totalReceived - sizeof('\0') && !memchr(&data[totalReceived], '\n', received))) {
 			
 				// Return false
 				return false;
 			}
+			
+			// Update total received
+			totalReceived += received;
 		
-		} while(!memchr(data, '\n', received));
-		
-		// Check if receiving data from the stratum server failed
-		received = recv(socketDescriptor, data, size - sizeof('\0'), 0);
-		if(received <= 0) {
-		
-			// Return false
-			return false;
-		}
+		} while(!memchr(data, '\n', totalReceived));
 		
 		// Null terminate the data
-		data[received] = '\0';
+		data[totalReceived] = '\0';
 		
 		// Return true
 		return true;
