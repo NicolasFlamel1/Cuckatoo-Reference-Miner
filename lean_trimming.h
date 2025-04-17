@@ -720,8 +720,24 @@ using namespace std;
 			return false;
 		}
 		
+		// Display message
+		cout << "Mining started" << endl << endl << "Mining info:" << endl << "\tMining rate:\t 0 graph(s)/second" << endl << "\tGraphs checked:\t 0" << endl;
+		
+		// Check if not tuning
+		#ifndef TUNING
+		
+			// Display message
+			cout << "\tSolutions found: 0" << endl;
+		#endif
+		
+		// Display message
+		cout << "Pipeline stages:" << endl;
+		
+		// Set previous graph processed time to now
+		previousGraphProcessedTime = chrono::high_resolution_clock::now();
+		
 		// Set start time to now
-		chrono::high_resolution_clock::time_point startTime = chrono::high_resolution_clock::now();
+		chrono::high_resolution_clock::time_point startTime = previousGraphProcessedTime;
 		
 		// Check if creating autorelease pool failed
 		static unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
@@ -759,9 +775,6 @@ using namespace std;
 			// Return false
 			return false;
 		}
-		
-		// Display message
-		cout << "Mining started" << endl;
 		
 		// Get SipHash keys from job's header and nonce
 		uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) sipHashKeysOne;
@@ -836,7 +849,7 @@ using namespace std;
 		}
 		
 		// Display message
-		cout << endl << "Pipeline stages:" << endl << "Trimming:\t" << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
+		cout << "\tTrimming time:\t " << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
 		
 		// Set start time to now
 		startTime = chrono::high_resolution_clock::now();
@@ -953,7 +966,7 @@ using namespace std;
 			}
 			
 			// Display message
-			cout << "Trimming:\t" << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
+			cout << "\tTrimming time:\t " << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
 			
 			// Set start time to now
 			startTime = chrono::high_resolution_clock::now();
@@ -1073,7 +1086,7 @@ using namespace std;
 			}
 			
 			// Display message
-			cout << "Trimming:\t" << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
+			cout << "\tTrimming time:\t " << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
 			
 			// Set start time to now
 			startTime = chrono::high_resolution_clock::now();
@@ -1415,7 +1428,20 @@ using namespace std;
 		}
 		
 		// Display message
-		cout << "Mining started" << endl;
+		cout << "Mining started" << endl << endl << "Mining info:" << endl << "\tMining rate:\t 0 graph(s)/second" << endl << "\tGraphs checked:\t 0" << endl;
+		
+		// Check if not tuning
+		#ifndef TUNING
+		
+			// Display message
+			cout << "\tSolutions found: 0" << endl;
+		#endif
+		
+		// Display message
+		cout << "Pipeline stages:" << endl;
+		
+		// Set previous graph processed time to now
+		previousGraphProcessedTime = chrono::high_resolution_clock::now();
 		
 		// Check if queuing clearing nodes bitmap on the device failed
 		static Event clearNodesBitmapEvents[TRIMMING_ROUNDS];
@@ -1456,7 +1482,7 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if setting program's edges bitmap and SipHash keys arguments failed
+		// Check if setting program's edges bitmap or SipHash keys arguments failed
 		if(clSetKernelArg(stepTwoKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 		
 			// Display message
@@ -1476,7 +1502,7 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if setting program's edges bitmap and SipHash keys arguments failed
+		// Check if setting program's edges bitmap or SipHash keys arguments failed
 		if(clSetKernelArg(stepThreeKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 		
 			// Display message
@@ -1594,7 +1620,7 @@ using namespace std;
 		}
 		
 		// Display message
-		cout << endl << "Pipeline stages:" << endl << "Trimming:\t" << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
+		cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 		
 		// Check if queuing clearing nodes bitmap on the device failed
 		clearNodesBitmapEvents[0].free();
@@ -1646,7 +1672,7 @@ using namespace std;
 			runStepEvents[i].free();
 		}
 		
-		// Check if setting program's edges bitmap and SipHash keys arguments failed
+		// Check if setting program's edges bitmap or SipHash keys arguments failed
 		if(clSetKernelArg(stepTwoKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 		
 			// Display message
@@ -1666,7 +1692,7 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if setting program's edges bitmap and SipHash keys arguments failed
+		// Check if setting program's edges bitmap or SipHash keys arguments failed
 		if(clSetKernelArg(stepThreeKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 		
 			// Display message
@@ -1795,7 +1821,7 @@ using namespace std;
 			}
 			
 			// Display message
-			cout << "Trimming:\t" << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
+			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 			
 			// Check if queuing clearing nodes bitmap on the device failed
 			clearNodesBitmapEvents[0].free();
@@ -1847,7 +1873,7 @@ using namespace std;
 				runStepEvents[i].free();
 			}
 			
-			// Check if setting program's edges bitmap and SipHash keys arguments failed
+			// Check if setting program's edges bitmap or SipHash keys arguments failed
 			if(clSetKernelArg(stepTwoKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
@@ -1867,7 +1893,7 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's edges bitmap and SipHash keys arguments failed
+			// Check if setting program's edges bitmap or SipHash keys arguments failed
 			if(clSetKernelArg(stepThreeKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
@@ -1986,7 +2012,7 @@ using namespace std;
 			}
 			
 			// Display message
-			cout << "Trimming:\t" << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
+			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 			
 			// Check if queuing clearing nodes bitmap on the device failed
 			clearNodesBitmapEvents[0].free();
@@ -2038,7 +2064,7 @@ using namespace std;
 				runStepEvents[i].free();
 			}
 			
-			// Check if setting program's edges bitmap and SipHash keys arguments failed
+			// Check if setting program's edges bitmap or SipHash keys arguments failed
 			if(clSetKernelArg(stepTwoKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
@@ -2058,7 +2084,7 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's edges bitmap and SipHash keys arguments failed
+			// Check if setting program's edges bitmap or SipHash keys arguments failed
 			if(clSetKernelArg(stepThreeKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message

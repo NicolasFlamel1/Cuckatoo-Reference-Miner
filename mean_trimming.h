@@ -1032,8 +1032,24 @@ using namespace std;
 			return false;
 		}
 		
+		// Display message
+		cout << "Mining started" << endl << endl << "Mining info:" << endl << "\tMining rate:\t 0 graph(s)/second" << endl << "\tGraphs checked:\t 0" << endl;
+		
+		// Check if not tuning
+		#ifndef TUNING
+		
+			// Display message
+			cout << "\tSolutions found: 0" << endl;
+		#endif
+		
+		// Display message
+		cout << "Pipeline stages:" << endl;
+		
+		// Set previous graph processed time to now
+		previousGraphProcessedTime = chrono::high_resolution_clock::now();
+		
 		// Set start time to now
-		chrono::high_resolution_clock::time_point startTime = chrono::high_resolution_clock::now();
+		chrono::high_resolution_clock::time_point startTime = previousGraphProcessedTime;
 		
 		// Check if creating autorelease pool failed
 		static unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
@@ -1071,9 +1087,6 @@ using namespace std;
 			// Return false
 			return false;
 		}
-		
-		// Display message
-		cout << "Mining started" << endl;
 		
 		// Get SipHash keys from job's header and nonce
 		uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) sipHashKeysOne;
@@ -1211,7 +1224,7 @@ using namespace std;
 		}
 		
 		// Display message
-		cout << endl << "Pipeline stages:" << endl << "Trimming:\t" << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
+		cout << "\tTrimming time:\t " << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
 		
 		// Set start time to now
 		startTime = chrono::high_resolution_clock::now();
@@ -1391,7 +1404,7 @@ using namespace std;
 			}
 			
 			// Display message
-			cout << "Trimming:\t" << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
+			cout << "\tTrimming time:\t " << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
 			
 			// Set start time to now
 			startTime = chrono::high_resolution_clock::now();
@@ -1574,7 +1587,7 @@ using namespace std;
 			}
 			
 			// Display message
-			cout << "Trimming:\t" << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
+			cout << "\tTrimming time:\t " << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
 			
 			// Set start time to now
 			startTime = chrono::high_resolution_clock::now();
@@ -2038,7 +2051,20 @@ using namespace std;
 		}
 		
 		// Display message
-		cout << "Mining started" << endl;
+		cout << "Mining started" << endl << endl << "Mining info:" << endl << "\tMining rate:\t 0 graph(s)/second" << endl << "\tGraphs checked:\t 0" << endl;
+		
+		// Check if not tuning
+		#ifndef TUNING
+		
+			// Display message
+			cout << "\tSolutions found: 0" << endl;
+		#endif
+		
+		// Display message
+		cout << "Pipeline stages:" << endl;
+		
+		// Set previous graph processed time to now
+		previousGraphProcessedTime = chrono::high_resolution_clock::now();
 		
 		// Check if queuing clearing number of edges per bucket one on the device failed
 		static Event clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 2];
@@ -2188,7 +2214,7 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if setting program's source buckets, number of edges per source bucket, destination buckets, and number of edges per destination bucket arguments failed
+					// Check if setting program's source buckets, number of edges per source bucket, destination buckets, or number of edges per destination bucket arguments failed
 					if(clSetKernelArg(stepFiveKernel.get(), 0, (i % 2) ? sizeof(bucketsTwo.get()) : sizeof(bucketsOne.get()), &unmove((i % 2) ? bucketsTwo.get() : bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 1, (i % 2) ? sizeof(numberOfEdgesPerBucketTwo.get()) : sizeof(numberOfEdgesPerBucketOne.get()), &unmove((i % 2) ? numberOfEdgesPerBucketTwo.get() : numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 2, (i % 2) ? sizeof(bucketsOne.get()) : sizeof(bucketsTwo.get()), &unmove((i % 2) ? bucketsOne.get() : bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 3, (i % 2) ? sizeof(numberOfEdgesPerBucketOne.get()) : sizeof(numberOfEdgesPerBucketTwo.get()), &unmove((i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS) {
 					
 						// Display message
@@ -2309,7 +2335,7 @@ using namespace std;
 		}
 		
 		// Display message
-		cout << endl << "Pipeline stages:" << endl << "Trimming:\t" << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
+		cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 		
 		// Check if queuing clearing number of edges per bucket one on the device failed
 		clearNumberOfEdgesPerBucketEvents[0].free();
@@ -2470,7 +2496,7 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if setting program's source buckets, number of edges per source bucket, destination buckets, and number of edges per destination bucket arguments failed
+					// Check if setting program's source buckets, number of edges per source bucket, destination buckets, or number of edges per destination bucket arguments failed
 					if(clSetKernelArg(stepFiveKernel.get(), 0, (i % 2) ? sizeof(bucketsTwo.get()) : sizeof(bucketsOne.get()), &unmove((i % 2) ? bucketsTwo.get() : bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 1, (i % 2) ? sizeof(numberOfEdgesPerBucketTwo.get()) : sizeof(numberOfEdgesPerBucketOne.get()), &unmove((i % 2) ? numberOfEdgesPerBucketTwo.get() : numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 2, (i % 2) ? sizeof(bucketsOne.get()) : sizeof(bucketsTwo.get()), &unmove((i % 2) ? bucketsOne.get() : bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 3, (i % 2) ? sizeof(numberOfEdgesPerBucketOne.get()) : sizeof(numberOfEdgesPerBucketTwo.get()), &unmove((i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS) {
 					
 						// Display message
@@ -2503,7 +2529,7 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if setting program's remaining edge arguments failed
+		// Check if setting program's remaining edge argument failed
 		if(clSetKernelArg(stepSixKernel.get(), 2, sizeof(remainingEdgesTwo.get()), &unmove(remainingEdgesTwo.get())) != CL_SUCCESS) {
 		
 			// Display message
@@ -2602,7 +2628,7 @@ using namespace std;
 			}
 			
 			// Display message
-			cout << "Trimming:\t" << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
+			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 			
 			// Check if queuing clearing number of edges per bucket one on the device failed
 			clearNumberOfEdgesPerBucketEvents[0].free();
@@ -2763,7 +2789,7 @@ using namespace std;
 							return false;
 						}
 						
-						// Check if setting program's source buckets, number of edges per source bucket, destination buckets, and number of edges per destination bucket arguments failed
+						// Check if setting program's source buckets, number of edges per source bucket, destination buckets, or number of edges per destination bucket arguments failed
 						if(clSetKernelArg(stepFiveKernel.get(), 0, (i % 2) ? sizeof(bucketsTwo.get()) : sizeof(bucketsOne.get()), &unmove((i % 2) ? bucketsTwo.get() : bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 1, (i % 2) ? sizeof(numberOfEdgesPerBucketTwo.get()) : sizeof(numberOfEdgesPerBucketOne.get()), &unmove((i % 2) ? numberOfEdgesPerBucketTwo.get() : numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 2, (i % 2) ? sizeof(bucketsOne.get()) : sizeof(bucketsTwo.get()), &unmove((i % 2) ? bucketsOne.get() : bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 3, (i % 2) ? sizeof(numberOfEdgesPerBucketOne.get()) : sizeof(numberOfEdgesPerBucketTwo.get()), &unmove((i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS) {
 						
 							// Display message
@@ -2796,7 +2822,7 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's remaining edge arguments failed
+			// Check if setting program's remaining edge argument failed
 			if(clSetKernelArg(stepSixKernel.get(), 2, sizeof(remainingEdgesOne.get()), &unmove(remainingEdgesOne.get())) != CL_SUCCESS) {
 			
 				// Display message
@@ -2885,7 +2911,7 @@ using namespace std;
 			}
 			
 			// Display message
-			cout << "Trimming:\t" << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
+			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 			
 			// Check if queuing clearing number of edges per bucket one on the device failed
 			clearNumberOfEdgesPerBucketEvents[0].free();
@@ -3046,7 +3072,7 @@ using namespace std;
 							return false;
 						}
 						
-						// Check if setting program's source buckets, number of edges per source bucket, destination buckets, and number of edges per destination bucket arguments failed
+						// Check if setting program's source buckets, number of edges per source bucket, destination buckets, or number of edges per destination bucket arguments failed
 						if(clSetKernelArg(stepFiveKernel.get(), 0, (i % 2) ? sizeof(bucketsTwo.get()) : sizeof(bucketsOne.get()), &unmove((i % 2) ? bucketsTwo.get() : bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 1, (i % 2) ? sizeof(numberOfEdgesPerBucketTwo.get()) : sizeof(numberOfEdgesPerBucketOne.get()), &unmove((i % 2) ? numberOfEdgesPerBucketTwo.get() : numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 2, (i % 2) ? sizeof(bucketsOne.get()) : sizeof(bucketsTwo.get()), &unmove((i % 2) ? bucketsOne.get() : bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 3, (i % 2) ? sizeof(numberOfEdgesPerBucketOne.get()) : sizeof(numberOfEdgesPerBucketTwo.get()), &unmove((i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS) {
 						
 							// Display message
@@ -3079,7 +3105,7 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's remaining edge arguments failed
+			// Check if setting program's remaining edge argument failed
 			if(clSetKernelArg(stepSixKernel.get(), 2, sizeof(remainingEdgesTwo.get()), &unmove(remainingEdgesTwo.get())) != CL_SUCCESS) {
 			
 				// Display message

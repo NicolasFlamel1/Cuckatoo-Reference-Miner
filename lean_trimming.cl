@@ -1,6 +1,15 @@
 R"(
 
-// A pair of steps is one trimming round and the steps are called in this order: clear nodes bitmap, step one, step two, clear nodes bitmap, step three, step four, clear nodes bitmap, step three, step four, ..., clear nodes bitmap, step three, step four, get result from edges bitmap
+/*
+N trimming rounds can be performed with the following:
+Trimming round 1: clear nodes bitmap, step one, step two
+Trimming round 2: clear nodes bitmap, step three, step four
+Trimming round 3: clear nodes bitmap, step three, step four
+...
+Trimming round n - 1: clear nodes bitmap, step three, step four
+Trimming round n: clear nodes bitmap, step three, step four
+Get result from edges bitmap
+*/
 
 
 // Constants

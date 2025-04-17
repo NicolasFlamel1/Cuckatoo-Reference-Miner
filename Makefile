@@ -1,6 +1,6 @@
 # Parameters
 NAME = "Cuckatoo Reference Miner"
-VERSION = 0.0.2
+VERSION = 0.1.0
 EDGE_BITS = 30
 TRIMMING_ROUNDS = 25
 SLEAN_TRIMMING_PARTS = 2

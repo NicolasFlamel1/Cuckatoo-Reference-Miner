@@ -38,7 +38,7 @@ make CC=x86_64-w64-mingw32-g++-posix EDGE_BITS=30
 ```
 
 ### Usage
-A stratum server address, port, username, and password can be provided when running this program to set the stratum server that it will mine to. For example, the following command will connect to the stratum server with the address `127.0.0.1` at port `3416` using the username `username` and password `password`. Once the software connects to a stratum server, it will start mining using mean, slean, or lean edge trimming depending on your available hardware and display the `Searching` and `Trimming` times for each graph that it processes. Those two pipeline stages run in parallel with the GPU being responsible for trimming and the CPU being responsible for searching, and you can determine your mining rate for each graph in graphs/second by dividing 1 by the greater of the two times.
+A stratum server address, port, username, and password can be provided when running this program to set the stratum server that it will mine to. For example, the following command will connect to the stratum server with the address `127.0.0.1` at port `3416` using the username `username` and password `password`. Once the software connects to a stratum server, it will start mining using mean, slean, or lean edge trimming depending on your available hardware and display the searching and trimming times for each graph that it processes. Those two pipeline stages run in parallel with the GPU being responsible for trimming and the CPU being responsible for searching.
 ```
 "./Cuckatoo Reference Miner" --stratum_server_address 127.0.0.1 --stratum_server_port 3416 --stratum_server_username username --stratum_server_password password
 ```
@@ -56,7 +56,7 @@ This program will try to use mean trimming, then slean trimming, and finally lea
 ```
 
 ### Tuning
-A `TRIMMING_ROUNDS` setting can be provided when building this program that can be adjusted to make the `Searching` time displayed when running this program as close to, but not greater than, the `Trimming` time displayed to maximize this program's performance (without regard for power usage). Increasing the `TRIMMING_ROUNDS` setting decreases the `Searching` time and increases the `Trimming` time, and decreasing the `TRIMMING_ROUNDS` setting increases the `Searching` time and decreases the `Trimming` time while also increasing CPU RAM usage.
+A `TRIMMING_ROUNDS` setting can be provided when building this program that can be adjusted to make the `Searching time` displayed when running this program as close to, but not greater than, the `Trimming time` displayed to maximize this program's performance (without regard for power usage). Increasing the `TRIMMING_ROUNDS` setting decreases the `Searching time` and increases the `Trimming time`, and decreasing the `TRIMMING_ROUNDS` setting increases the `Searching time` and decreases the `Trimming time`.
 ```
 make EDGE_BITS=30 TRIMMING_ROUNDS=25
 ```

@@ -1,6 +1,17 @@
 MTLSTR(R"(
 
-// Steps two through five are each one trimming round and the steps are called in this order: clear number of edges per bucket one, step one, clear number of edges per bucket two, step two, clear number of edges per bucket one, step three, clear number of edges per bucket two, step four, clear number of edges per bucket one, step five, clear number of edges per bucket two, step five, ..., clear number of edges per bucket one or two, step five, step six, get result from remaining edges
+/*
+N trimming rounds can be performed with the following:
+Trimming round 1: clear number of edges per bucket one, step one, clear number of edges per bucket two, step two
+Trimming round 2: clear number of edges per bucket one, step three
+Trimming round 3: clear number of edges per bucket two, step four
+Trimming round 4: clear number of edges per bucket one, step five
+Trimming round 5: clear number of edges per bucket two, step five
+...
+Trimming round n - 1: clear number of edges per bucket one, step five
+Trimming round n: clear number of edges per bucket two, step five, step six
+Get result from remaining edges
+*/
 
 
 // Header files

@@ -34,7 +34,7 @@ static_assert(endian::native == endian::little, "Host's byte order isn't little 
 static_assert(EDGE_BITS >= 10 && EDGE_BITS <= 32, "Edge bits is invalid");
 
 // Throw error if trimming rounds is invalid (Number of edges after a pair of trimming rounds ≈ NUMBER_OF_EDGES / (pow(roundNumber / 2 + 1, 2) + 2))
-static_assert(TRIMMING_ROUNDS >= 0 && TRIMMING_ROUNDS <= 20222 && static_cast<double>(NUMBER_OF_EDGES) / (((TRIMMING_ROUNDS + 1) / 2 + 1) * ((TRIMMING_ROUNDS + 1) / 2 + 1) + 2) >= SOLUTION_SIZE, "Trimming rounds is invalid");
+static_assert(TRIMMING_ROUNDS >= 0 && TRIMMING_ROUNDS <= 1000 && static_cast<double>(NUMBER_OF_EDGES) / (((TRIMMING_ROUNDS + 1) / 2 + 1) * ((TRIMMING_ROUNDS + 1) / 2 + 1) + 2) >= SOLUTION_SIZE, "Trimming rounds is invalid");
 
 // Throw error if slean trimming parts is invalid
 static_assert(SLEAN_TRIMMING_PARTS >= 2 && SLEAN_TRIMMING_PARTS <= MAX_SLEAN_TRIMMING_PARTS && has_single_bit(static_cast<unsigned int>(SLEAN_TRIMMING_PARTS)), "Slean trimming parts is invalid");

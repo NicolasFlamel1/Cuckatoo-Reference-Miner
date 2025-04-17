@@ -109,6 +109,12 @@ using namespace std;
 // Failed server connect delay seconds
 #define FAILED_SERVER_CONNECT_DELAY_SECONDS 1
 
+// Send keep alive request interval
+#define SEND_KEEP_ALIVE_REQUEST_INTERVAL 10s
+
+// Too many trimming rounds max remaining number of edges
+#define TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES ((TRIMMING_ROUNDS > 10) ? 200000 : 0)
+
 
 // Constants
 
@@ -133,6 +139,9 @@ enum TrimmingType {
 
 // Closing
 static volatile sig_atomic_t closing = false;
+
+// Previous graph processed time
+static chrono::high_resolution_clock::time_point previousGraphProcessedTime;
 
 // Searching threads mutex
 static mutex searchingThreadsMutex;
@@ -826,16 +835,16 @@ int main(int argc, char *argv[]) noexcept {
 			// Display message
 			cout << "\t-a, --stratum_server_address\tThe address of the stratum server to connect to (default: " << DEFAULT_STRATUM_SERVER_ADDRESS << ')' << endl;
 			cout << "\t-p, --stratum_server_port\tThe port of the stratum server to connect to (default: " << DEFAULT_STRATUM_SERVER_PORT << ')' << endl;
-			cout << "\t-u, --stratum_server_username\tThe username to use when logging into the stratum server" << endl;
-			cout << "\t-w, --stratum_server_password\tThe password to use when logging into the stratum server (This is sent as plaintext)" << endl;
+			cout << "\t-u, --stratum_server_username\tThe optional username to use when logging into the stratum server" << endl;
+			cout << "\t-w, --stratum_server_password\tThe optional password to use when logging into the stratum server. This is sent as plaintext" << endl;
 		#endif
 		
 		// Check if there's trimming rounds
 		#if TRIMMING_ROUNDS != 0
 		
 			// Display message
-			cout << "\t-d, --display_gpus\t\tDisplay available GPUs" << endl;
-			cout << "\t-g, --gpu\t\t\tThe index of the GPU to use" << endl;
+			cout << "\t-d, --display_gpus\t\tDisplay available GPUs and their indices" << endl;
+			cout << "\t-g, --gpu\t\t\tThe optional index of the GPU to use" << endl;
 			cout << "\t-m, --mean_trimming\t\tUse only mean trimming" << endl;
 			cout << "\t-s, --slean_trimming\t\tUse only slean trimming" << endl;
 			cout << "\t-l, --lean_trimming\t\tUse only lean trimming" << endl;
@@ -1408,18 +1417,19 @@ int main(int argc, char *argv[]) noexcept {
 								// Check if too may edges exist
 								if(numberOfEdges > MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
 								
-									// Check if there's too few trimming rounds
-									#if TRIMMING_ROUNDS <= 10
+									// Check if there's too many trimming rounds
+									if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
-										
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+									}
+									
 									// Otherwise
-									#else
+									else {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
-									#endif
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+									}
 								}
 								
 								// Check if getting solution was successful
@@ -1678,18 +1688,19 @@ int main(int argc, char *argv[]) noexcept {
 										// Check if first searching thread
 										if(!searchingThreadIndex) {
 										
-											// Check if there's too few trimming rounds
-											#if TRIMMING_ROUNDS <= 10
+											// Check if there's too many trimming rounds
+											if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
-												
+												cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+											}
+											
 											// Otherwise
-											#else
+											else {
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
-											#endif
+												cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+											}
 										}
 										
 										// Break
@@ -1704,18 +1715,19 @@ int main(int argc, char *argv[]) noexcept {
 								// Check if first searching thread
 								if(!searchingThreadIndex) {
 								
-									// Check if there's too few trimming rounds
-									#if TRIMMING_ROUNDS <= 10
+									// Check if there's too many trimming rounds
+									if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
-										
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+									}
+									
 									// Otherwise
-									#else
+									else {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
-									#endif
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+									}
 								}
 								
 								// Go through all searching threads
@@ -2042,18 +2054,19 @@ int main(int argc, char *argv[]) noexcept {
 										// Check if first searching thread
 										if(!searchingThreadIndex) {
 										
-											// Check if there's too few trimming rounds
-											#if TRIMMING_ROUNDS <= 10
+											// Check if there's too many trimming rounds
+											if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
-												
+												cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+											}
+											
 											// Otherwise
-											#else
+											else {
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
-											#endif
+												cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+											}
 										}
 										
 										// Break
@@ -2068,18 +2081,19 @@ int main(int argc, char *argv[]) noexcept {
 								// Check if first searching thread
 								if(!searchingThreadIndex) {
 								
-									// Check if there's too few trimming rounds
-									#if TRIMMING_ROUNDS <= 10
+									// Check if there's too many trimming rounds
+									if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges won't be searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
-										
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+									}
+									
 									// Otherwise
-									#else
+									else {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges won't be searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
-									#endif
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+									}
 								}
 								
 								// Go through all searching threads
@@ -2277,17 +2291,35 @@ int main(int argc, char *argv[]) noexcept {
 		return searchingThreadsFinished;
 	});
 	
+	// Record end time
+	const chrono::high_resolution_clock::time_point endTime = chrono::high_resolution_clock::now();
+	
+	// Display message
+	cout << endl << "Mining info:" << endl;
+	
+	// Set graphs searched to zero
+	static uint64_t graphsProcessed = 0;
+	
+	// Display message
+	cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (graphsProcessed ? "" : ". This is lower for the first graph since it includes the time taken to prime the pipeline") << endl;
+	
+	// Update previous graph processed time
+	previousGraphProcessedTime = endTime;
+	
+	// Display message
+	cout << "\tGraphs checked:\t " << ++graphsProcessed << endl;
+	
 	// Check if not tuning
 	#ifndef TUNING
 	
-		// Initialize solutions found
+		// Set solutions found to zero
 		static uint64_t solutionsFound = 0;
-		
-		// Display message
-		cout << "Solutions:\t" << solutionsFound << endl;
 		
 		// Set reconnect to server to false
 		bool reconnectToServer = false;
+		
+		// Record last keep alive time
+		static chrono::high_resolution_clock::time_point lastKeepAliveTime = endTime;
 		
 		// Check if searching threads found a solution
 		if(searchingThreadsSolution[1]) {
@@ -2302,16 +2334,6 @@ int main(int argc, char *argv[]) noexcept {
 			
 				// Display message
 				cout << "Creating submit request failed" << endl;
-				
-				// Check if sending keep alive request to the stratum server failed
-				if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
-				
-					// Display message
-					cout << "Sending keep alive request to the stratum server failed" << endl;
-					
-					// Set reconnect to server to true
-					reconnectToServer = true;
-				}
 			}
 			
 			// Otherwise check if sending submit request to the stratum server failed
@@ -2323,17 +2345,41 @@ int main(int argc, char *argv[]) noexcept {
 				// Set reconnect to server to true
 				reconnectToServer = true;
 			}
-		}
-		
-		// Otherwise check if sending keep alive request to the stratum server failed
-		else if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
-		
-			// Display message
-			cout << "Sending keep alive request to the stratum server failed" << endl;
 			
-			// Set reconnect to server to true
-			reconnectToServer = true;
+			// Otherwise
+			else {
+			
+				// Update last keep alive time
+				lastKeepAliveTime = chrono::high_resolution_clock::now();
+			}
 		}
+		
+		// Display message
+		cout << "\tSolutions found: " << solutionsFound << endl;
+		
+		// Check if not reconnecting to the server and it's time to send a keep alive request to the stratum server
+		if(!reconnectToServer && endTime - lastKeepAliveTime >= SEND_KEEP_ALIVE_REQUEST_INTERVAL) {
+		
+			// Check if sending keep alive request to the stratum server failed
+			if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
+			
+				// Display message
+				cout << "Sending keep alive request to the stratum server failed" << endl;
+				
+				// Set reconnect to server to true
+				reconnectToServer = true;
+			}
+			
+			// Otherwise
+			else {
+			
+				// Update last keep alive time
+				lastKeepAliveTime = chrono::high_resolution_clock::now();
+			}
+		}
+			
+		// Set total received to zero
+		static size_t totalReceived = 0;
 		
 		// Check if not reconnecting to the server
 		if(!reconnectToServer) {
@@ -2342,18 +2388,20 @@ int main(int argc, char *argv[]) noexcept {
 			int responseAvailable;
 			do {
 			
+				// Set poll info to check if a response from the stratum server exists
+				pollfd pollInfo = {
+					
+					// Socket descriptor
+					.fd = socketDescriptor,
+					
+					// Events
+					.events = POLLIN
+				};
+				
 				// Check if using Windows
 				#ifdef _WIN32
 				
 					// Check if getting if a response from the stratum server exists failed
-					pollfd pollInfo = {
-					
-						// Socket descriptor
-						.fd = socketDescriptor,
-						
-						// Events
-						.events = POLLIN
-					};
 					responseAvailable = WSAPoll(&pollInfo, 1, 0);
 					if(responseAvailable == SOCKET_ERROR) {
 					
@@ -2361,14 +2409,6 @@ int main(int argc, char *argv[]) noexcept {
 				#else
 				
 					// Check if getting if a response from the stratum server exists failed
-					pollfd pollInfo = {
-					
-						// Socket descriptor
-						.fd = socketDescriptor,
-						
-						// Events
-						.events = POLLIN
-					};
 					responseAvailable = poll(&pollInfo, 1, 0);
 					if(responseAvailable == -1) {
 				#endif
@@ -2385,10 +2425,10 @@ int main(int argc, char *argv[]) noexcept {
 				
 				// Check if a response from the stratum server exists
 				if(responseAvailable) {
-				
+					
 					// Check if receiving response from the stratum server failed
-					decltype(function(recv))::result_type responseSize = recv(socketDescriptor, serverResponse, sizeof(serverResponse) - sizeof('\0'), MSG_PEEK);
-					if(responseSize <= 0) {
+					const decltype(function(recv))::result_type received = recv(socketDescriptor, &serverResponse[totalReceived], sizeof(serverResponse) - totalReceived - sizeof('\0'), 0);
+					if(received <= 0) {
 					
 						// Display message
 						cout << "Receiving response from the stratum server failed" << endl;
@@ -2401,52 +2441,49 @@ int main(int argc, char *argv[]) noexcept {
 					}
 					
 					// Check if full response wasn't received
-					if(!memchr(serverResponse, '\n', responseSize)) {
+					if(!memchr(&serverResponse[totalReceived], '\n', received)) {
 					
 						// Check if server response buffer is full
-						if(responseSize == sizeof(serverResponse) - sizeof('\0')) {
+						if(static_cast<size_t>(received) == sizeof(serverResponse) - totalReceived - sizeof('\0')) {
 						
 							// Display message
 							cout << "Receiving response from the stratum server failed" << endl;
 							
 							// Set reconnect to server to true
 							reconnectToServer = true;
+							
+							// Break
+							break;
 						}
 						
-						// Break
-						break;
+						// Otherwise
+						else {
+						
+							// Update total received
+							totalReceived += received;
+						}
 					}
 					
-					// Check if receiving response from the stratum server failed
-					responseSize = recv(socketDescriptor, serverResponse, sizeof(serverResponse) - sizeof('\0'), 0);
-					if(responseSize <= 0) {
+					// Otherwise
+					else {
 					
-						// Display message
-						cout << "Receiving response from the stratum server failed" << endl;
+						// Null terminate server response
+						serverResponse[totalReceived + received] = '\0';
 						
-						// Set reconnect to server to true
-						reconnectToServer = true;
+						// Process server response
+						processServerResponse();
 						
-						// Break
-						break;
+						// Set total received to zero
+						totalReceived = 0;
 					}
-					
-					// Null terminate server response
-					serverResponse[responseSize] = '\0';
-					
-					// Process server response
-					processServerResponse();
 				}
 				
 			} while(responseAvailable);
 		}
 		
-		// Record end time
-		const chrono::high_resolution_clock::time_point endTime = chrono::high_resolution_clock::now();
-		
 		// Check if reconnecting to the stratum server
 		if(reconnectToServer) {
-		
+			
 			// Display message
 			cout << "Disconnected from the stratum server" << endl;
 			
@@ -2466,21 +2503,20 @@ int main(int argc, char *argv[]) noexcept {
 					sleep(FAILED_SERVER_CONNECT_DELAY_SECONDS);
 				#endif
 			}
+			
+			// Set total received to zero
+			totalReceived = 0;
+			
+			// Update last keep alive time
+			lastKeepAliveTime = chrono::high_resolution_clock::now();
+			
+			// Update previous graph processed time
+			previousGraphProcessedTime = lastKeepAliveTime;
 		}
-		
-	// Otherwise
-	#else
-	
-		// Record end time
-		const chrono::high_resolution_clock::time_point endTime = chrono::high_resolution_clock::now();
 	#endif
 	
-	// Check if not closing
-	if(!closing) {
-	
-		// Display message
-		cout << endl << "Pipeline stages:" << endl << "Searching:\t" << static_cast<chrono::duration<double>>(endTime - startTime).count() << " second(s)" << endl;
-	}
+	// Display message
+	cout << "Pipeline stages:" << endl << "\tSearching time:\t " << static_cast<chrono::duration<double>>(endTime - startTime).count() << " second(s)" << endl;
 }
 
 // Check if not tuning
