@@ -876,6 +876,9 @@ int main(int argc, char *argv[]) noexcept {
 		exit(EXIT_FAILURE);
 	}
 	
+	// Display message
+	cout << "Using the cuckatoo" TO_STRING(EDGE_BITS) " (C" TO_STRING(EDGE_BITS) ") mining algorithm. Verify that this is the correct algorithm for the cryptocurrency that you are mining. You can change this mining algorithm to a different cuckatoo variation by building this program with a different EDGE_BITS value" << endl;
+	
 	// Check if not tuning
 	#ifndef TUNING
 	
@@ -910,6 +913,9 @@ int main(int argc, char *argv[]) noexcept {
 		
 		// Get number of searching threads searching edges
 		const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
+		
+		// Display message
+		cout << "Using " << numberOfSearchingThreadsSearchingEdges << " CPU core(s) for searching" << endl;
 		
 		// Go through all searching threads
 		uint64_t numberOfEdges[numberOfSearchingThreads];
@@ -1134,7 +1140,7 @@ int main(int argc, char *argv[]) noexcept {
 		if(deviceIndex == ALL_DEVICES) {
 		
 			// Display message
-			cout << "Using first applicable GPU" << endl;
+			cout << "Using the first applicable GPU" << endl;
 		}
 		
 		// Otherwise
@@ -1175,7 +1181,7 @@ int main(int argc, char *argv[]) noexcept {
 									if(++index == deviceIndex) {
 									
 										// Display message
-										cout << "Using GPU at the specified index: " << index << " (" << utf8String << ')' << endl;
+										cout << "Using the GPU at the specified index: " << index << " (" << utf8String << ')' << endl;
 										
 										// Break
 										break;
@@ -1227,7 +1233,7 @@ int main(int argc, char *argv[]) noexcept {
 												if(++index == deviceIndex) {
 												
 													// Display message
-													cout << "Using GPU at the specified index: " << index << " (" << name << ')' << endl;
+													cout << "Using the GPU at the specified index: " << index << " (" << name << ')' << endl;
 													
 													// Break
 													break;
@@ -1332,6 +1338,9 @@ int main(int argc, char *argv[]) noexcept {
 				
 				// Get number of searching threads
 				const unsigned int numberOfSearchingThreads = min(min(max(thread::hardware_concurrency(), static_cast<unsigned int>(1)), static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
+				
+				// Display message
+				cout << "Using " << numberOfSearchingThreads << " CPU core(s) for searching" << endl;
 				
 				// Go through all searching threads
 				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreads];
@@ -1560,6 +1569,9 @@ int main(int argc, char *argv[]) noexcept {
 				
 				// Get number of searching threads searching edges
 				const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
+				
+				// Display message
+				cout << "Using " << numberOfSearchingThreadsSearchingEdges << " CPU core(s) for searching" << endl;
 				
 				// Go through all searching threads
 				uint64_t numberOfEdges[numberOfSearchingThreads];
@@ -1926,6 +1938,9 @@ int main(int argc, char *argv[]) noexcept {
 				
 				// Get number of searching threads searching edges
 				const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
+				
+				// Display message
+				cout << "Using " << numberOfSearchingThreadsSearchingEdges << " CPU core(s) for searching" << endl;
 				
 				// Go through all searching threads
 				uint64_t numberOfEdges[numberOfSearchingThreads];

@@ -183,7 +183,7 @@ using namespace std;
 		if(deviceIndex != ALL_DEVICES) {
 		
 			// Display message
-			cout << "Using GPU for lean trimming" << endl;
+			cout << "Using the GPU for lean trimming" << endl;
 		}
 		
 		// Otherwise
@@ -1222,7 +1222,7 @@ using namespace std;
 		if(deviceIndex != ALL_DEVICES) {
 		
 			// Display message
-			cout << "Using GPU for lean trimming" << endl;
+			cout << "Using the GPU for lean trimming" << endl;
 		}
 		
 		// Otherwise

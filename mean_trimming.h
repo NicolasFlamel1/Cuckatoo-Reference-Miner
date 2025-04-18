@@ -221,7 +221,7 @@ using namespace std;
 		if(deviceIndex != ALL_DEVICES) {
 		
 			// Display message
-			cout << "Using GPU for mean trimming" << endl;
+			cout << "Using the GPU for mean trimming" << endl;
 		}
 		
 		// Otherwise
@@ -1788,7 +1788,7 @@ using namespace std;
 		if(deviceIndex != ALL_DEVICES) {
 		
 			// Display message
-			cout << "Using GPU for mean trimming" << endl;
+			cout << "Using the GPU for mean trimming" << endl;
 		}
 		
 		// Otherwise
