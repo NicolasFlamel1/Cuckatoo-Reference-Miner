@@ -1207,10 +1207,9 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if getting device's queue properties or max work group size failed, or its max work group size don't exists
-		cl_command_queue_properties queueProperties;
+		// Check if getting device's max work group size failed or its max work group size don't exists
 		size_t maxWorkGroupSize;
-		if(clGetDeviceInfo(device, CL_DEVICE_QUEUE_PROPERTIES, sizeof(queueProperties), &queueProperties, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, nullptr) != CL_SUCCESS || !maxWorkGroupSize) {
+		if(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, nullptr) != CL_SUCCESS || !maxWorkGroupSize) {
 		
 			// Display message
 			cout << "Getting GPU's info failed" << endl;
@@ -1407,7 +1406,14 @@ using namespace std;
 		}
 		
 		// Check if creating command queue for the device failed
-		static const unique_ptr<remove_pointer<cl_command_queue>::type, decltype(&clReleaseCommandQueue)> commandQueue(clCreateCommandQueue(context, device, queueProperties & (CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE | CL_QUEUE_PROFILING_ENABLE), nullptr), clReleaseCommandQueue);
+		static const unique_ptr<remove_pointer<cl_command_queue>::type, void(*)(cl_command_queue)> commandQueue(clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, nullptr), [](cl_command_queue commandQueue) noexcept {
+		
+			// Wait for all commands in the queue to finish
+			clFinish(commandQueue);
+			
+			// Free command queue
+			clReleaseCommandQueue(commandQueue);
+		});
 		if(!commandQueue) {
 		
 			// Display message
@@ -1444,8 +1450,8 @@ using namespace std;
 		previousGraphProcessedTime = chrono::high_resolution_clock::now();
 		
 		// Check if queuing clearing nodes bitmap on the device failed
-		static Event clearNodesBitmapEvents[TRIMMING_ROUNDS];
-		if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, clearNodesBitmapEvents[0].getAddress()) != CL_SUCCESS) {
+		static Event firstCommandEvent;
+		if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -1472,8 +1478,7 @@ using namespace std;
 		}
 		
 		// Check if queuing running step one on the device failed
-		static Event runStepEvents[TRIMMING_ROUNDS * 2];
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNodesBitmapEvents[0].getAddress(), runStepEvents[0].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
@@ -1493,7 +1498,7 @@ using namespace std;
 		}
 		
 		// Check if queuing running step Two on the device failed
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 1, runStepEvents[0].getAddress(), runStepEvents[1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
@@ -1516,7 +1521,7 @@ using namespace std;
 		for(unsigned int i = 1; i < TRIMMING_ROUNDS; ++i) {
 		
 			// Check if queuing clearing nodes bitmap on the device failed
-			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 1, runStepEvents[i * 2 - 1].getAddress(), clearNodesBitmapEvents[i].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -1536,7 +1541,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step three on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 1, clearNodesBitmapEvents[i].getAddress(), runStepEvents[i * 2].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -1556,7 +1561,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step four on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 1, runStepEvents[i * 2].getAddress(), runStepEvents[i * 2 + 1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -1568,7 +1573,7 @@ using namespace std;
 		
 		// Check if queuing map result failed
 		static Event mapEvent;
-		static uint64_t *resultOne = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapOne.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 1, runStepEvents[TRIMMING_ROUNDS * 2 - 1].getAddress(), mapEvent.getAddress(), nullptr));
+		static uint64_t *resultOne = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapOne.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
 		if(!resultOne) {
 		
 			// Display message
@@ -1585,8 +1590,7 @@ using namespace std;
 			if(resultOne) {
 			
 				// Queue unmapping result one
-				Event unmapEvent;
-				clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), unmapEvent.getAddress());
+				clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), nullptr);
 			}
 		});
 		
@@ -1610,7 +1614,7 @@ using namespace std;
 		// Check if getting trimming time failed
 		cl_ulong startTime;
 		cl_ulong endTime;
-		if(clGetEventProfilingInfo(clearNodesBitmapEvents[0].get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
+		if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Getting GPU trimming time failed" << endl;
@@ -1623,8 +1627,8 @@ using namespace std;
 		cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 		
 		// Check if queuing clearing nodes bitmap on the device failed
-		clearNodesBitmapEvents[0].free();
-		if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, clearNodesBitmapEvents[0].getAddress()) != CL_SUCCESS) {
+		firstCommandEvent.free();
+		if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -1651,25 +1655,13 @@ using namespace std;
 		}
 		
 		// Check if queuing running step one on the device failed
-		runStepEvents[0].free();
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNodesBitmapEvents[0].getAddress(), runStepEvents[0].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
 			
 			// Return false
 			return false;
-		}
-		
-		// Free events
-		mapEvent.free();
-		
-		for(unsigned int i = 1; i < TRIMMING_ROUNDS; ++i) {
-			clearNodesBitmapEvents[i].free();
-		}
-		
-		for(unsigned int i = 1; i < TRIMMING_ROUNDS * 2; ++i) {
-			runStepEvents[i].free();
 		}
 		
 		// Check if setting program's edges bitmap or SipHash keys arguments failed
@@ -1683,7 +1675,7 @@ using namespace std;
 		}
 		
 		// Check if queuing running step two on the device failed
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 1, runStepEvents[0].getAddress(), runStepEvents[1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
@@ -1706,7 +1698,7 @@ using namespace std;
 		for(unsigned int i = 1; i < TRIMMING_ROUNDS; ++i) {
 		
 			// Check if queuing clearing nodes bitmap on the device failed
-			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 1, runStepEvents[i * 2 - 1].getAddress(), clearNodesBitmapEvents[i].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -1726,7 +1718,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step three on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 1, clearNodesBitmapEvents[i].getAddress(), runStepEvents[i * 2].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -1746,7 +1738,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step four on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 1, runStepEvents[i * 2].getAddress(), runStepEvents[i * 2 + 1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -1757,7 +1749,8 @@ using namespace std;
 		}
 		
 		// Check if queuing map result failed
-		static uint64_t *resultTwo = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapTwo.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 1, runStepEvents[TRIMMING_ROUNDS * 2 - 1].getAddress(), mapEvent.getAddress(), nullptr));
+		mapEvent.free();
+		static uint64_t *resultTwo = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapTwo.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
 		if(!resultTwo) {
 		
 			// Display message
@@ -1774,8 +1767,7 @@ using namespace std;
 			if(resultTwo) {
 			
 				// Queue unmapping result two
-				Event unmapEvent;
-				clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), unmapEvent.getAddress());
+				clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), nullptr);
 			}
 		});
 		
@@ -1783,8 +1775,7 @@ using namespace std;
 		trimmingFinished(resultOne, sipHashKeysOne, heightOne, idOne, nonceOne);
 		
 		// Check if queuing unmap result failed
-		static Event unmapEventOne;
-		if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, unmapEventOne.getAddress()) != CL_SUCCESS) {
+		if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Getting result from the GPU failed" << endl;
@@ -1797,7 +1788,6 @@ using namespace std;
 		resultOne = nullptr;
 		
 		// While not closing
-		static Event unmapEventTwo;
 		while(!closing) {
 		
 			// Check if waiting for map event to finish failed
@@ -1811,7 +1801,7 @@ using namespace std;
 			}
 			
 			// Check if getting trimming time failed
-			if(clGetEventProfilingInfo(clearNodesBitmapEvents[0].get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
+			if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Getting GPU trimming time failed" << endl;
@@ -1824,8 +1814,8 @@ using namespace std;
 			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 			
 			// Check if queuing clearing nodes bitmap on the device failed
-			clearNodesBitmapEvents[0].free();
-			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, clearNodesBitmapEvents[0].getAddress()) != CL_SUCCESS) {
+			firstCommandEvent.free();
+			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -1851,26 +1841,13 @@ using namespace std;
 			}
 			
 			// Check if queuing running step one on the device failed
-			runStepEvents[0].free();
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNodesBitmapEvents[0].getAddress(), runStepEvents[0].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
 				
 				// Return false
 				return false;
-			}
-			
-			// Free events
-			mapEvent.free();
-			unmapEventTwo.free();
-			
-			for(unsigned int i = 1; i < TRIMMING_ROUNDS; ++i) {
-				clearNodesBitmapEvents[i].free();
-			}
-			
-			for(unsigned int i = 1; i < TRIMMING_ROUNDS * 2; ++i) {
-				runStepEvents[i].free();
 			}
 			
 			// Check if setting program's edges bitmap or SipHash keys arguments failed
@@ -1884,7 +1861,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step two on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 2, unmove((const cl_event []){unmapEventOne.get(), runStepEvents[0].get()}), runStepEvents[1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -1907,7 +1884,7 @@ using namespace std;
 			for(unsigned int i = 1; i < TRIMMING_ROUNDS; ++i) {
 			
 				// Check if queuing clearing nodes bitmap on the device failed
-				if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 1, runStepEvents[i * 2 - 1].getAddress(), clearNodesBitmapEvents[i].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -1927,7 +1904,7 @@ using namespace std;
 				}
 				
 				// Check if queuing running step three on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 1, clearNodesBitmapEvents[i].getAddress(), runStepEvents[i * 2].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Running program on the GPU failed" << endl;
@@ -1947,7 +1924,7 @@ using namespace std;
 				}
 				
 				// Check if queuing running step four on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 1, runStepEvents[i * 2].getAddress(), runStepEvents[i * 2 + 1].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Running program on the GPU failed" << endl;
@@ -1958,7 +1935,8 @@ using namespace std;
 			}
 			
 			// Check if queuing map result failed
-			resultOne = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapOne.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 1, runStepEvents[TRIMMING_ROUNDS * 2 - 1].getAddress(), mapEvent.getAddress(), nullptr));
+			mapEvent.free();
+			resultOne = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapOne.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
 			if(!resultOne) {
 			
 				// Display message
@@ -1972,7 +1950,7 @@ using namespace std;
 			trimmingFinished(resultTwo, sipHashKeysTwo, heightTwo, idTwo, nonceTwo);
 			
 			// Check if queuing unmap result failed
-			if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), 0, nullptr, unmapEventTwo.getAddress()) != CL_SUCCESS) {
+			if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Getting result from the GPU failed" << endl;
@@ -2002,7 +1980,7 @@ using namespace std;
 			}
 			
 			// Check if getting trimming time failed
-			if(clGetEventProfilingInfo(clearNodesBitmapEvents[0].get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
+			if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Getting GPU trimming time failed" << endl;
@@ -2015,8 +1993,8 @@ using namespace std;
 			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 			
 			// Check if queuing clearing nodes bitmap on the device failed
-			clearNodesBitmapEvents[0].free();
-			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, clearNodesBitmapEvents[0].getAddress()) != CL_SUCCESS) {
+			firstCommandEvent.free();
+			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2042,26 +2020,13 @@ using namespace std;
 			}
 			
 			// Check if queuing running step one on the device failed
-			runStepEvents[0].free();
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNodesBitmapEvents[0].getAddress(), runStepEvents[0].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
 				
 				// Return false
 				return false;
-			}
-			
-			// Free events
-			mapEvent.free();
-			unmapEventOne.free();
-			
-			for(unsigned int i = 1; i < TRIMMING_ROUNDS; ++i) {
-				clearNodesBitmapEvents[i].free();
-			}
-			
-			for(unsigned int i = 1; i < TRIMMING_ROUNDS * 2; ++i) {
-				runStepEvents[i].free();
 			}
 			
 			// Check if setting program's edges bitmap or SipHash keys arguments failed
@@ -2075,7 +2040,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step two on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 2, unmove((const cl_event []){unmapEventTwo.get(), runStepEvents[0].get()}), runStepEvents[1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -2098,7 +2063,7 @@ using namespace std;
 			for(unsigned int i = 1; i < TRIMMING_ROUNDS; ++i) {
 			
 				// Check if queuing clearing nodes bitmap on the device failed
-				if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 1, runStepEvents[i * 2 - 1].getAddress(), clearNodesBitmapEvents[i].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2118,7 +2083,7 @@ using namespace std;
 				}
 				
 				// Check if queuing running step three on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 1, clearNodesBitmapEvents[i].getAddress(), runStepEvents[i * 2].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Running program on the GPU failed" << endl;
@@ -2138,7 +2103,7 @@ using namespace std;
 				}
 				
 				// Check if queuing running step four on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 1, runStepEvents[i * 2].getAddress(), runStepEvents[i * 2 + 1].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Running program on the GPU failed" << endl;
@@ -2149,7 +2114,8 @@ using namespace std;
 			}
 			
 			// Check if queuing map result failed
-			resultTwo = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapTwo.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 1, runStepEvents[TRIMMING_ROUNDS * 2 - 1].getAddress(), mapEvent.getAddress(), nullptr));
+			mapEvent.free();
+			resultTwo = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapTwo.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
 			if(!resultTwo) {
 			
 				// Display message
@@ -2163,7 +2129,7 @@ using namespace std;
 			trimmingFinished(resultOne, sipHashKeysOne, heightOne, idOne, nonceOne);
 			
 			// Check if queuing unmap result failed
-			if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, unmapEventOne.getAddress()) != CL_SUCCESS) {
+			if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Getting result from the GPU failed" << endl;

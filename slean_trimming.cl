@@ -1934,7 +1934,7 @@ void setBitInBitmap(__local uint *bitmap, const uint index) {
 // Clear bit in bitmap
 void clearBitInBitmap(__local uint *bitmap, const uint index) {
 
-	// Set bit in bitmap
+	// Clear bit in bitmap
 	atomic_xor(&bitmap[index / (char)(sizeof(uint) * BITS_IN_A_BYTE)], 1 << (index % (char)(sizeof(uint) * BITS_IN_A_BYTE)));
 }
 

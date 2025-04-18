@@ -2377,7 +2377,7 @@ int main(int argc, char *argv[]) noexcept {
 				lastKeepAliveTime = chrono::high_resolution_clock::now();
 			}
 		}
-			
+		
 		// Set total received to zero
 		static size_t totalReceived = 0;
 		
@@ -2425,7 +2425,7 @@ int main(int argc, char *argv[]) noexcept {
 				
 				// Check if a response from the stratum server exists
 				if(responseAvailable) {
-					
+				
 					// Check if receiving response from the stratum server failed
 					const decltype(function(recv))::result_type received = recv(socketDescriptor, &serverResponse[totalReceived], sizeof(serverResponse) - totalReceived - sizeof('\0'), 0);
 					if(received <= 0) {
@@ -2483,7 +2483,7 @@ int main(int argc, char *argv[]) noexcept {
 		
 		// Check if reconnecting to the stratum server
 		if(reconnectToServer) {
-			
+		
 			// Display message
 			cout << "Disconnected from the stratum server" << endl;
 			

@@ -1771,12 +1771,11 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if getting device's queue properties, max work group size, max memory allocation size, or work group memory size failed, or its max work group size don't exists
-		cl_command_queue_properties queueProperties;
+		// Check if getting device's max work group size, max memory allocation size, or work group memory size failed, or its max work group size don't exists
 		size_t maxWorkGroupSize;
 		cl_ulong maxMemoryAllocationSize;
 		cl_ulong workGroupMemorySize;
-		if(clGetDeviceInfo(device, CL_DEVICE_QUEUE_PROPERTIES, sizeof(queueProperties), &queueProperties, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(maxMemoryAllocationSize), &maxMemoryAllocationSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(workGroupMemorySize), &workGroupMemorySize, nullptr) != CL_SUCCESS || !maxWorkGroupSize) {
+		if(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(maxMemoryAllocationSize), &maxMemoryAllocationSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(workGroupMemorySize), &workGroupMemorySize, nullptr) != CL_SUCCESS || !maxWorkGroupSize) {
 		
 			// Display message
 			cout << "Getting GPU's info failed" << endl;
@@ -2016,7 +2015,14 @@ using namespace std;
 		}
 		
 		// Check if creating command queue for the device failed
-		static const unique_ptr<remove_pointer<cl_command_queue>::type, decltype(&clReleaseCommandQueue)> commandQueue(clCreateCommandQueue(context, device, queueProperties & (CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE | CL_QUEUE_PROFILING_ENABLE), nullptr), clReleaseCommandQueue);
+		static const unique_ptr<remove_pointer<cl_command_queue>::type, void(*)(cl_command_queue)> commandQueue(clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, nullptr), [](cl_command_queue commandQueue) noexcept {
+		
+			// Wait for all commands in the queue to finish
+			clFinish(commandQueue);
+			
+			// Free command queue
+			clReleaseCommandQueue(commandQueue);
+		});
 		if(!commandQueue) {
 		
 			// Display message
@@ -2067,8 +2073,8 @@ using namespace std;
 		previousGraphProcessedTime = chrono::high_resolution_clock::now();
 		
 		// Check if queuing clearing number of edges per bucket one on the device failed
-		static Event clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 2];
-		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[0].getAddress()) != CL_SUCCESS) {
+		static Event firstCommandEvent;
+		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2095,8 +2101,7 @@ using namespace std;
 		}
 		
 		// Check if queuing running step one on the device failed
-		static Event runStepEvents[TRIMMING_ROUNDS + 2];
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNumberOfEdgesPerBucketEvents[0].getAddress(), runStepEvents[0].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
@@ -2106,7 +2111,7 @@ using namespace std;
 		}
 		
 		// Check if queuing clearing number of edges per bucket two on the device failed
-		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2126,7 +2131,7 @@ using namespace std;
 		}
 		
 		// Check if queuing running step two on the device failed
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 2, unmove((const cl_event []){runStepEvents[0].get(), clearNumberOfEdgesPerBucketEvents[1].get()}), runStepEvents[1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
@@ -2139,7 +2144,7 @@ using namespace std;
 		if(TRIMMING_ROUNDS > 1) {
 		
 			// Check if queuing clearing number of edges per bucket one on the device failed
-			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[1].getAddress(), clearNumberOfEdgesPerBucketEvents[2].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2159,7 +2164,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step three on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 1, clearNumberOfEdgesPerBucketEvents[2].getAddress(), runStepEvents[2].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -2172,7 +2177,7 @@ using namespace std;
 			if(TRIMMING_ROUNDS > 2) {
 			
 				// Check if queuing clearing number of edges per bucket two on the device failed
-				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[2].getAddress(), clearNumberOfEdgesPerBucketEvents[3].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2192,7 +2197,7 @@ using namespace std;
 				}
 				
 				// Check if queuing running step four on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 1, clearNumberOfEdgesPerBucketEvents[3].getAddress(), runStepEvents[3].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Running program on the GPU failed" << endl;
@@ -2205,7 +2210,7 @@ using namespace std;
 				for(unsigned int i = 3; i < TRIMMING_ROUNDS; ++i) {
 				
 					// Check if queuing clearing number of edges per bucket on the device failed
-					if(clEnqueueFillBuffer(commandQueue.get(), (i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[i].getAddress(), clearNumberOfEdgesPerBucketEvents[i + 1].getAddress()) != CL_SUCCESS) {
+					if(clEnqueueFillBuffer(commandQueue.get(), (i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2225,7 +2230,7 @@ using namespace std;
 					}
 					
 					// Check if queuing running step five on the device failed
-					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 1, clearNumberOfEdgesPerBucketEvents[i + 1].getAddress(), runStepEvents[i + 1].getAddress()) != CL_SUCCESS) {
+					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Running program on the GPU failed" << endl;
@@ -2238,7 +2243,7 @@ using namespace std;
 		}
 		
 		// Check if queuing clearing the beginning of remaining edges one on the device failed
-		if(clEnqueueFillBuffer(commandQueue.get(), remainingEdgesOne.get(), (const cl_uint[]){0}, sizeof(cl_uint), 0, sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueFillBuffer(commandQueue.get(), remainingEdgesOne.get(), (const cl_uint[]){0}, sizeof(cl_uint), 0, sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2272,7 +2277,7 @@ using namespace std;
 		}
 		
 		// Check if queuing running step six on the device failed
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 2, unmove((const cl_event []){runStepEvents[TRIMMING_ROUNDS].get(), clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 1].get()}), runStepEvents[TRIMMING_ROUNDS + 1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
@@ -2283,7 +2288,7 @@ using namespace std;
 		
 		// Check if queuing map result failed
 		static Event mapEvent;
-		static uint32_t *resultOne = reinterpret_cast<uint32_t *>(clEnqueueMapBuffer(commandQueue.get(), remainingEdgesOne.get(), CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), 1, runStepEvents[TRIMMING_ROUNDS + 1].getAddress(), mapEvent.getAddress(), nullptr));
+		static uint32_t *resultOne = reinterpret_cast<uint32_t *>(clEnqueueMapBuffer(commandQueue.get(), remainingEdgesOne.get(), CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), 0, nullptr, mapEvent.getAddress(), nullptr));
 		if(!resultOne) {
 		
 			// Display message
@@ -2300,8 +2305,7 @@ using namespace std;
 			if(resultOne) {
 			
 				// Queue unmapping result one
-				Event unmapEvent;
-				clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesOne.get(), reinterpret_cast<void *>(resultOne), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), unmapEvent.getAddress());
+				clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesOne.get(), reinterpret_cast<void *>(resultOne), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), nullptr);
 			}
 		});
 		
@@ -2325,7 +2329,7 @@ using namespace std;
 		// Check if getting trimming time failed
 		cl_ulong startTime;
 		cl_ulong endTime;
-		if(clGetEventProfilingInfo(clearNumberOfEdgesPerBucketEvents[0].get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
+		if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Getting GPU trimming time failed" << endl;
@@ -2338,8 +2342,8 @@ using namespace std;
 		cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 		
 		// Check if queuing clearing number of edges per bucket one on the device failed
-		clearNumberOfEdgesPerBucketEvents[0].free();
-		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[0].getAddress()) != CL_SUCCESS) {
+		firstCommandEvent.free();
+		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2366,8 +2370,7 @@ using namespace std;
 		}
 		
 		// Check if queuing running step one on the device failed
-		runStepEvents[0].free();
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNumberOfEdgesPerBucketEvents[0].getAddress(), runStepEvents[0].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
@@ -2376,19 +2379,8 @@ using namespace std;
 			return false;
 		}
 		
-		// Free events
-		mapEvent.free();
-		
-		for(unsigned int i = 1; i < TRIMMING_ROUNDS + 2; ++i) {
-			clearNumberOfEdgesPerBucketEvents[i].free();
-		}
-		
-		for(unsigned int i = 1; i < TRIMMING_ROUNDS + 2; ++i) {
-			runStepEvents[i].free();
-		}
-		
 		// Check if queuing clearing number of edges per bucket two on the device failed
-		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2408,7 +2400,7 @@ using namespace std;
 		}
 		
 		// Check if queuing running step two on the device failed
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 2, unmove((const cl_event []){runStepEvents[0].get(), clearNumberOfEdgesPerBucketEvents[1].get()}), runStepEvents[1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
@@ -2421,7 +2413,7 @@ using namespace std;
 		if(TRIMMING_ROUNDS > 1) {
 		
 			// Check if queuing clearing number of edges per bucket one on the device failed
-			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[1].getAddress(), clearNumberOfEdgesPerBucketEvents[2].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2441,7 +2433,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step three on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 1, clearNumberOfEdgesPerBucketEvents[2].getAddress(), runStepEvents[2].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -2454,7 +2446,7 @@ using namespace std;
 			if(TRIMMING_ROUNDS > 2) {
 			
 				// Check if queuing clearing number of edges per bucket two on the device failed
-				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[2].getAddress(), clearNumberOfEdgesPerBucketEvents[3].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2474,7 +2466,7 @@ using namespace std;
 				}
 				
 				// Check if queuing running step four on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 1, clearNumberOfEdgesPerBucketEvents[3].getAddress(), runStepEvents[3].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Running program on the GPU failed" << endl;
@@ -2487,7 +2479,7 @@ using namespace std;
 				for(unsigned int i = 3; i < TRIMMING_ROUNDS; ++i) {
 				
 					// Check if queuing clearing number of edges per bucket on the device failed
-					if(clEnqueueFillBuffer(commandQueue.get(), (i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[i].getAddress(), clearNumberOfEdgesPerBucketEvents[i + 1].getAddress()) != CL_SUCCESS) {
+					if(clEnqueueFillBuffer(commandQueue.get(), (i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2507,7 +2499,7 @@ using namespace std;
 					}
 					
 					// Check if queuing running step five on the device failed
-					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 1, clearNumberOfEdgesPerBucketEvents[i + 1].getAddress(), runStepEvents[i + 1].getAddress()) != CL_SUCCESS) {
+					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Running program on the GPU failed" << endl;
@@ -2520,7 +2512,7 @@ using namespace std;
 		}
 		
 		// Check if queuing clearing the beginning of remaining edges two on the device failed
-		if(clEnqueueFillBuffer(commandQueue.get(), remainingEdgesTwo.get(), (const cl_uint[]){0}, sizeof(cl_uint), 0, sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueFillBuffer(commandQueue.get(), remainingEdgesTwo.get(), (const cl_uint[]){0}, sizeof(cl_uint), 0, sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2554,7 +2546,7 @@ using namespace std;
 		}
 		
 		// Check if queuing running step six on the device failed
-		if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 2, unmove((const cl_event []){runStepEvents[TRIMMING_ROUNDS].get(), clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 1].get()}), runStepEvents[TRIMMING_ROUNDS + 1].getAddress()) != CL_SUCCESS) {
+		if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Running program on the GPU failed" << endl;
@@ -2564,7 +2556,8 @@ using namespace std;
 		}
 		
 		// Check if queuing map result failed
-		static uint32_t *resultTwo = reinterpret_cast<uint32_t *>(clEnqueueMapBuffer(commandQueue.get(), remainingEdgesTwo.get(), CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), 1, runStepEvents[TRIMMING_ROUNDS + 1].getAddress(), mapEvent.getAddress(), nullptr));
+		mapEvent.free();
+		static uint32_t *resultTwo = reinterpret_cast<uint32_t *>(clEnqueueMapBuffer(commandQueue.get(), remainingEdgesTwo.get(), CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), 0, nullptr, mapEvent.getAddress(), nullptr));
 		if(!resultTwo) {
 		
 			// Display message
@@ -2581,8 +2574,7 @@ using namespace std;
 			if(resultTwo) {
 			
 				// Queue unmapping result two
-				Event unmapEvent;
-				clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesTwo.get(), reinterpret_cast<void *>(resultTwo), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), unmapEvent.getAddress());
+				clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesTwo.get(), reinterpret_cast<void *>(resultTwo), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), nullptr);
 			}
 		});
 		
@@ -2590,8 +2582,7 @@ using namespace std;
 		trimmingFinished(resultOne, sipHashKeysOne, heightOne, idOne, nonceOne);
 		
 		// Check if queuing unmap result failed
-		static Event unmapEventOne;
-		if(clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, unmapEventOne.getAddress()) != CL_SUCCESS) {
+		if(clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Getting result from the GPU failed" << endl;
@@ -2604,7 +2595,6 @@ using namespace std;
 		resultOne = nullptr;
 		
 		// While not closing
-		static Event unmapEventTwo;
 		while(!closing) {
 		
 			// Check if waiting for map event to finish failed
@@ -2618,7 +2608,7 @@ using namespace std;
 			}
 			
 			// Check if getting trimming time failed
-			if(clGetEventProfilingInfo(clearNumberOfEdgesPerBucketEvents[0].get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
+			if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Getting GPU trimming time failed" << endl;
@@ -2631,8 +2621,8 @@ using namespace std;
 			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 			
 			// Check if queuing clearing number of edges per bucket one on the device failed
-			clearNumberOfEdgesPerBucketEvents[0].free();
-			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[0].getAddress()) != CL_SUCCESS) {
+			firstCommandEvent.free();
+			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2658,8 +2648,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step one on the device failed
-			runStepEvents[0].free();
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNumberOfEdgesPerBucketEvents[0].getAddress(), runStepEvents[0].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -2668,20 +2657,8 @@ using namespace std;
 				return false;
 			}
 			
-			// Free events
-			mapEvent.free();
-			unmapEventTwo.free();
-			
-			for(unsigned int i = 1; i < TRIMMING_ROUNDS + 2; ++i) {
-				clearNumberOfEdgesPerBucketEvents[i].free();
-			}
-			
-			for(unsigned int i = 1; i < TRIMMING_ROUNDS + 2; ++i) {
-				runStepEvents[i].free();
-			}
-			
 			// Check if queuing clearing number of edges per bucket two on the device failed
-			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2701,7 +2678,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step two on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 2, unmove((const cl_event []){runStepEvents[0].get(), clearNumberOfEdgesPerBucketEvents[1].get()}), runStepEvents[1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -2714,7 +2691,7 @@ using namespace std;
 			if(TRIMMING_ROUNDS > 1) {
 			
 				// Check if queuing clearing number of edges per bucket one on the device failed
-				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[1].getAddress(), clearNumberOfEdgesPerBucketEvents[2].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2734,7 +2711,7 @@ using namespace std;
 				}
 				
 				// Check if queuing running step three on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 1, clearNumberOfEdgesPerBucketEvents[2].getAddress(), runStepEvents[2].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Running program on the GPU failed" << endl;
@@ -2747,7 +2724,7 @@ using namespace std;
 				if(TRIMMING_ROUNDS > 2) {
 				
 					// Check if queuing clearing number of edges per bucket two on the device failed
-					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[2].getAddress(), clearNumberOfEdgesPerBucketEvents[3].getAddress()) != CL_SUCCESS) {
+					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2767,7 +2744,7 @@ using namespace std;
 					}
 					
 					// Check if queuing running step four on the device failed
-					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 1, clearNumberOfEdgesPerBucketEvents[3].getAddress(), runStepEvents[3].getAddress()) != CL_SUCCESS) {
+					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Running program on the GPU failed" << endl;
@@ -2780,7 +2757,7 @@ using namespace std;
 					for(unsigned int i = 3; i < TRIMMING_ROUNDS; ++i) {
 					
 						// Check if queuing clearing number of edges per bucket on the device failed
-						if(clEnqueueFillBuffer(commandQueue.get(), (i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[i].getAddress(), clearNumberOfEdgesPerBucketEvents[i + 1].getAddress()) != CL_SUCCESS) {
+						if(clEnqueueFillBuffer(commandQueue.get(), (i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2800,7 +2777,7 @@ using namespace std;
 						}
 						
 						// Check if queuing running step five on the device failed
-						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 1, clearNumberOfEdgesPerBucketEvents[i + 1].getAddress(), runStepEvents[i + 1].getAddress()) != CL_SUCCESS) {
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Running program on the GPU failed" << endl;
@@ -2813,7 +2790,7 @@ using namespace std;
 			}
 			
 			// Check if queuing clearing the beginning of remaining edges one on the device failed
-			if(clEnqueueFillBuffer(commandQueue.get(), remainingEdgesOne.get(), (const cl_uint[]){0}, sizeof(cl_uint), 0, sizeof(cl_uint), 1, unmapEventOne.getAddress(), clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueFillBuffer(commandQueue.get(), remainingEdgesOne.get(), (const cl_uint[]){0}, sizeof(cl_uint), 0, sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2847,7 +2824,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step six on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 2, unmove((const cl_event []){runStepEvents[TRIMMING_ROUNDS].get(), clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 1].get()}), runStepEvents[TRIMMING_ROUNDS + 1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -2857,7 +2834,8 @@ using namespace std;
 			}
 			
 			// Check if queuing map result failed
-			resultOne = reinterpret_cast<uint32_t *>(clEnqueueMapBuffer(commandQueue.get(), remainingEdgesOne.get(), CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), 1, runStepEvents[TRIMMING_ROUNDS + 1].getAddress(), mapEvent.getAddress(), nullptr));
+			mapEvent.free();
+			resultOne = reinterpret_cast<uint32_t *>(clEnqueueMapBuffer(commandQueue.get(), remainingEdgesOne.get(), CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), 0, nullptr, mapEvent.getAddress(), nullptr));
 			if(!resultOne) {
 			
 				// Display message
@@ -2871,7 +2849,7 @@ using namespace std;
 			trimmingFinished(resultTwo, sipHashKeysTwo, heightTwo, idTwo, nonceTwo);
 			
 			// Check if queuing unmap result failed
-			if(clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesTwo.get(), reinterpret_cast<void *>(resultTwo), 0, nullptr, unmapEventTwo.getAddress()) != CL_SUCCESS) {
+			if(clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesTwo.get(), reinterpret_cast<void *>(resultTwo), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Getting result from the GPU failed" << endl;
@@ -2901,7 +2879,7 @@ using namespace std;
 			}
 			
 			// Check if getting trimming time failed
-			if(clGetEventProfilingInfo(clearNumberOfEdgesPerBucketEvents[0].get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
+			if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Getting GPU trimming time failed" << endl;
@@ -2914,8 +2892,8 @@ using namespace std;
 			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
 			
 			// Check if queuing clearing number of edges per bucket one on the device failed
-			clearNumberOfEdgesPerBucketEvents[0].free();
-			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[0].getAddress()) != CL_SUCCESS) {
+			firstCommandEvent.free();
+			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2941,8 +2919,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step one on the device failed
-			runStepEvents[0].free();
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 1, clearNumberOfEdgesPerBucketEvents[0].getAddress(), runStepEvents[0].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -2951,20 +2928,8 @@ using namespace std;
 				return false;
 			}
 			
-			// Free events
-			mapEvent.free();
-			unmapEventOne.free();
-			
-			for(unsigned int i = 1; i < TRIMMING_ROUNDS + 2; ++i) {
-				clearNumberOfEdgesPerBucketEvents[i].free();
-			}
-			
-			for(unsigned int i = 1; i < TRIMMING_ROUNDS + 2; ++i) {
-				runStepEvents[i].free();
-			}
-			
 			// Check if queuing clearing number of edges per bucket two on the device failed
-			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, clearNumberOfEdgesPerBucketEvents[1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -2984,7 +2949,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step two on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 2, unmove((const cl_event []){runStepEvents[0].get(), clearNumberOfEdgesPerBucketEvents[1].get()}), runStepEvents[1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -2997,7 +2962,7 @@ using namespace std;
 			if(TRIMMING_ROUNDS > 1) {
 			
 				// Check if queuing clearing number of edges per bucket one on the device failed
-				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[1].getAddress(), clearNumberOfEdgesPerBucketEvents[2].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -3017,7 +2982,7 @@ using namespace std;
 				}
 				
 				// Check if queuing running step three on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 1, clearNumberOfEdgesPerBucketEvents[2].getAddress(), runStepEvents[2].getAddress()) != CL_SUCCESS) {
+				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Running program on the GPU failed" << endl;
@@ -3030,7 +2995,7 @@ using namespace std;
 				if(TRIMMING_ROUNDS > 2) {
 				
 					// Check if queuing clearing number of edges per bucket two on the device failed
-					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[2].getAddress(), clearNumberOfEdgesPerBucketEvents[3].getAddress()) != CL_SUCCESS) {
+					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -3050,7 +3015,7 @@ using namespace std;
 					}
 					
 					// Check if queuing running step four on the device failed
-					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 1, clearNumberOfEdgesPerBucketEvents[3].getAddress(), runStepEvents[3].getAddress()) != CL_SUCCESS) {
+					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Running program on the GPU failed" << endl;
@@ -3063,7 +3028,7 @@ using namespace std;
 					for(unsigned int i = 3; i < TRIMMING_ROUNDS; ++i) {
 					
 						// Check if queuing clearing number of edges per bucket on the device failed
-						if(clEnqueueFillBuffer(commandQueue.get(), (i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 1, runStepEvents[i].getAddress(), clearNumberOfEdgesPerBucketEvents[i + 1].getAddress()) != CL_SUCCESS) {
+						if(clEnqueueFillBuffer(commandQueue.get(), (i % 2) ? numberOfEdgesPerBucketOne.get() : numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (MEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -3083,7 +3048,7 @@ using namespace std;
 						}
 						
 						// Check if queuing running step five on the device failed
-						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 1, clearNumberOfEdgesPerBucketEvents[i + 1].getAddress(), runStepEvents[i + 1].getAddress()) != CL_SUCCESS) {
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Running program on the GPU failed" << endl;
@@ -3096,7 +3061,7 @@ using namespace std;
 			}
 			
 			// Check if queuing clearing the beginning of remaining edges two on the device failed
-			if(clEnqueueFillBuffer(commandQueue.get(), remainingEdgesTwo.get(), (const cl_uint[]){0}, sizeof(cl_uint), 0, sizeof(cl_uint), 1, unmapEventTwo.getAddress(), clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueFillBuffer(commandQueue.get(), remainingEdgesTwo.get(), (const cl_uint[]){0}, sizeof(cl_uint), 0, sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -3130,7 +3095,7 @@ using namespace std;
 			}
 			
 			// Check if queuing running step six on the device failed
-			if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 2, unmove((const cl_event []){runStepEvents[TRIMMING_ROUNDS].get(), clearNumberOfEdgesPerBucketEvents[TRIMMING_ROUNDS + 1].get()}), runStepEvents[TRIMMING_ROUNDS + 1].getAddress()) != CL_SUCCESS) {
+			if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Running program on the GPU failed" << endl;
@@ -3140,7 +3105,8 @@ using namespace std;
 			}
 			
 			// Check if queuing map result failed
-			resultTwo = reinterpret_cast<uint32_t *>(clEnqueueMapBuffer(commandQueue.get(), remainingEdgesTwo.get(), CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), 1, runStepEvents[TRIMMING_ROUNDS + 1].getAddress(), mapEvent.getAddress(), nullptr));
+			mapEvent.free();
+			resultTwo = reinterpret_cast<uint32_t *>(clEnqueueMapBuffer(commandQueue.get(), remainingEdgesTwo.get(), CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(cl_uint), 0, nullptr, mapEvent.getAddress(), nullptr));
 			if(!resultTwo) {
 			
 				// Display message
@@ -3154,7 +3120,7 @@ using namespace std;
 			trimmingFinished(resultOne, sipHashKeysOne, heightOne, idOne, nonceOne);
 			
 			// Check if queuing unmap result failed
-			if(clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, unmapEventOne.getAddress()) != CL_SUCCESS) {
+			if(clEnqueueUnmapMemObject(commandQueue.get(), remainingEdgesOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Getting result from the GPU failed" << endl;
