@@ -2300,11 +2300,17 @@ int main(int argc, char *argv[]) noexcept {
 	// Set graphs searched to zero
 	static uint64_t graphsProcessed = 0;
 	
+	// Set previously disconnected from server to false
+	static bool previouslyDisconnectedFromServer = false;
+	
 	// Display message
-	cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (graphsProcessed ? "" : ". This is lower for the first graph since it includes the time taken to prime the pipeline") << endl;
+	cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (graphsProcessed ? (previouslyDisconnectedFromServer ? ". This is lower for this graph since it includes the time taken to reconnect to the stratum server" : "") : ". This is lower for the first graph since it includes the time taken to prime the pipeline") << endl;
 	
 	// Update previous graph processed time
 	previousGraphProcessedTime = endTime;
+	
+	// Set previously disconnected from server to false
+	previouslyDisconnectedFromServer = false;
 	
 	// Display message
 	cout << "\tGraphs checked:\t " << ++graphsProcessed << endl;
@@ -2504,14 +2510,14 @@ int main(int argc, char *argv[]) noexcept {
 				#endif
 			}
 			
+			// Set previously disconnected from server to true
+			previouslyDisconnectedFromServer = true;
+			
 			// Set total received to zero
 			totalReceived = 0;
 			
 			// Update last keep alive time
 			lastKeepAliveTime = chrono::high_resolution_clock::now();
-			
-			// Update previous graph processed time
-			previousGraphProcessedTime = lastKeepAliveTime;
 		}
 	#endif
 	

@@ -322,10 +322,10 @@ using namespace std;
 			}).get(),
 			
 			// Number of least significant bits ignored during bucket sorting value
-			unique_ptr<NS::Number, void(*)(NS::Number *)>(NS::Number::alloc()->init(MEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING), [](NS::Number *numberOfBitsForBucketsValue) noexcept {
+			unique_ptr<NS::Number, void(*)(NS::Number *)>(NS::Number::alloc()->init(MEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING), [](NS::Number *numberOfLeastSignificantBitsIgnoredDuringBucketSortingValue) noexcept {
 			
-				// Free number of bits for buckets value
-				numberOfBitsForBucketsValue->release();
+				// Free number of least significant bits ignored during bucket sorting value
+				numberOfLeastSignificantBitsIgnoredDuringBucketSortingValue->release();
 				
 			}).get(),
 			
@@ -378,7 +378,7 @@ using namespace std;
 			// Number of bitmap bytes key
 			MTLSTR("NUMBER_OF_BITMAP_BYTES"),
 			
-			// Number of buckets
+			// Number of buckets key
 			MTLSTR("NUMBER_OF_BUCKETS"),
 			
 			// Max number of edges after trimming key
