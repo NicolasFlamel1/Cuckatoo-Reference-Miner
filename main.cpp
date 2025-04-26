@@ -44,8 +44,11 @@
 
 	// Header files
 	#include <arpa/inet.h>
+	#include <IOKit/pwr_mgt/IOPMLib.h>
 	#include <netdb.h>
 	#include <poll.h>
+	#include <pwd.h>
+	#include <sys/sysctl.h>
 	#include "./metal.h"
 	
 // Otherwise
@@ -54,6 +57,7 @@
 	// Header files
 	#include <arpa/inet.h>
 	#include <CL/cl.h>
+	#include <dbus/dbus.h>
 	#include <netdb.h>
 	#include <poll.h>
 #endif
@@ -88,8 +92,18 @@ using namespace std;
 // Max number of searching threads searching edges
 #define MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES 4
 
-// First searching thread search edges percent
-#define FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT 0.86
+// Check if edge bits is 32
+#if EDGE_BITS == 32
+
+	// First searching thread search edges percent
+	#define FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT 0.86
+	
+// Otherwise
+#else
+
+	// First searching thread search edges percent
+	#define FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT 0.85
+#endif
 
 // Default stratum server address
 #define DEFAULT_STRATUM_SERVER_ADDRESS "localhost"
@@ -118,6 +132,12 @@ using namespace std;
 
 // Constants
 
+// Default total number of instances
+#define DEFAULT_TOTAL_NUMBER_OF_INSTANCES 1
+
+// Default instance index
+#define DEFAULT_INSTANCE_INDEX 1
+
 // Trimming type
 enum TrimmingType {
 
@@ -127,11 +147,14 @@ enum TrimmingType {
 	// Mean trimming type
 	MEAN_TRIMMING_TYPE = 1 << 0,
 	
+	// Slean then mean trimming type
+	SLEAN_THEN_MEAN_TRIMMING_TYPE = 1 << 1,
+	
 	// Slean trimming type
-	SLEAN_TRIMMING_TYPE = 1 << 1,
+	SLEAN_TRIMMING_TYPE = 1 << 2,
 	
 	// Lean trimming type
-	LEAN_TRIMMING_TYPE = 1 << 2
+	LEAN_TRIMMING_TYPE = 1 << 3
 };
 
 
@@ -243,6 +266,7 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 // Header files
 #include "./lean_trimming.h"
 #include "./mean_trimming.h"
+#include "./slean_then_mean_trimming.h"
 #include "./slean_trimming.h"
 
 
@@ -256,7 +280,7 @@ int main(int argc, char *argv[]) noexcept {
 	#if TRIMMING_ROUNDS != 0
 	
 		// Display message
-		cout << ", " TO_STRING(SLEAN_TRIMMING_PARTS) " slean trimming part(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory";
+		cout << ", " TO_STRING(SLEAN_TRIMMING_PARTS) " slean trimming part(s), " TO_STRING(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS) " slean then mean slean trimming round(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory";
 	#endif
 	
 	// Check if tuning
@@ -286,31 +310,76 @@ int main(int argc, char *argv[]) noexcept {
 			// Return failure
 			exit(EXIT_FAILURE);
 		}
-		
-	// Otherwise check if there's trimming rounds
-	#elif TRIMMING_ROUNDS != 0
+	#endif
 	
-		// Check if getting number of platforms failed or no platforms exist
-		cl_uint numberOfPlatforms;
-		if(clGetPlatformIDs(0, nullptr, &numberOfPlatforms) != CL_SUCCESS || !numberOfPlatforms) {
+	// Prevent sleep
+	static const PreventSleep preventSleep;
+	
+	// Set current adjustable GPU memory amount to zero
+	int64_t currentAdjustableGpuMemoryAmount = 0;
+	
+	// Otherwise check there's trimming rounds
+	#if TRIMMING_ROUNDS != 0
+	
+		// Check if using macOS
+		#ifdef __APPLE__
 		
-			// Display message
-			cout << "No OpenCL platforms found" << endl;
+			// Check if getting the current adjustable GPU memory amount was successful, but the current GPU memory amount isn't set
+			size_t currentAdjustableGpuMemoryAmountSize = sizeof(currentAdjustableGpuMemoryAmount);
+			if(!sysctlbyname("iogpu.wired_limit_mb", &currentAdjustableGpuMemoryAmount, &currentAdjustableGpuMemoryAmountSize, nullptr, 0) && !currentAdjustableGpuMemoryAmount) {
 			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
-		
-		// Check if getting platforms failed
-		cl_platform_id platforms[numberOfPlatforms];
-		if(clGetPlatformIDs(numberOfPlatforms, platforms, nullptr) != CL_SUCCESS) {
-		
-			// Display message
-			cout << "Getting OpenCL platforms failed" << endl;
+				// Check if getting all devices was successful
+				const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+				
+					// Free devices
+					devices->release();
+				});
+				if(devices) {
+				
+					// Go through all devices
+					for(NS::UInteger i = 0; i < devices->count(); ++i) {
+					
+						// Get device
+						MTL::Device *device = reinterpret_cast<MTL::Device *>(devices->object(i));
+						
+						// Check if device has unified memory
+						if(device && device->hasUnifiedMemory()) {
+						
+							// Set the current adjustable GPU memory amount to the device's memory size
+							currentAdjustableGpuMemoryAmount = device->recommendedMaxWorkingSetSize() / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE;
+							
+							// Break
+							break;
+						}
+					}
+				}
+			}
 			
-			// Return failure
-			exit(EXIT_FAILURE);
-		}
+		// Otherwise
+		#else
+		
+			// Check if getting number of platforms failed or no platforms exist
+			cl_uint numberOfPlatforms;
+			if(clGetPlatformIDs(0, nullptr, &numberOfPlatforms) != CL_SUCCESS || !numberOfPlatforms) {
+			
+				// Display message
+				cout << "No OpenCL platforms found" << endl;
+				
+				// Return failure
+				exit(EXIT_FAILURE);
+			}
+			
+			// Check if getting platforms failed
+			cl_platform_id platforms[numberOfPlatforms];
+			if(clGetPlatformIDs(numberOfPlatforms, platforms, nullptr) != CL_SUCCESS) {
+			
+				// Display message
+				cout << "Getting OpenCL platforms failed" << endl;
+				
+				// Return failure
+				exit(EXIT_FAILURE);
+			}
+		#endif
 	#endif
 	
 	// Set options
@@ -340,14 +409,26 @@ int main(int argc, char *argv[]) noexcept {
 		// Mean trimming
 		{"mean_trimming", no_argument, nullptr, 'm'},
 		
+		// Slean then mean trimming
+		{"slean_then_mean_trimming", no_argument, nullptr, 'e'},
+		
 		// Slean trimming
 		{"slean_trimming", no_argument, nullptr, 's'},
 		
 		// Lean trimming
 		{"lean_trimming", no_argument, nullptr, 'l'},
 		
+		// Total number of instances
+		{"total_number_of_instances", required_argument, nullptr, 't'},
+		
+		// Instance
+		{"instance", required_argument, nullptr, 'i'},
+		
 		// Help
 		{"help", no_argument, nullptr, 'h'},
+		
+		// GPU RAM
+		{currentAdjustableGpuMemoryAmount ? "gpu_ram" : nullptr, currentAdjustableGpuMemoryAmount ? required_argument : 0, nullptr, currentAdjustableGpuMemoryAmount ? 'r' : 0},
 		
 		// End
 		{}
@@ -375,15 +456,21 @@ int main(int argc, char *argv[]) noexcept {
 		underlying_type_t<TrimmingType> trimmingTypes = ALL_TRIMMING_TYPES;
 	#endif
 	
+	// Set total number of instances to its default value
+	unsigned int totalNumberOfInstances = DEFAULT_TOTAL_NUMBER_OF_INSTANCES;
+	
+	// Set instance index to its default value
+	unsigned int instanceIndex = DEFAULT_INSTANCE_INDEX;
+	
 	// Set display help to false
 	bool displayHelp = false;
 	
 	// Set help requested to false
 	bool helpRequested = false;
 	
-	// Go through all options
+	// Go through all options while not displaying help
 	int option;
-	while((option = getopt_long(argc, argv, "va:p:u:w:dg:mslh", options, nullptr)) != -1) {
+	while((option = getopt_long(argc, argv, (static_cast<string>("va:p:u:w:dg:meslt:i:h") + (currentAdjustableGpuMemoryAmount ? "r:" : "")).c_str(), options, nullptr)) != -1 && !displayHelp) {
 	
 		// Check option
 		switch(option) {
@@ -508,8 +595,8 @@ int main(int argc, char *argv[]) noexcept {
 					// Check if option is invalid
 					char *end;
 					errno = 0;
-					const unsigned long port = optarg ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
-					if(!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !port || port > UINT16_MAX) {
+					const unsigned long optionAsNumber = optarg ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
+					if(!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !optionAsNumber || optionAsNumber > UINT16_MAX) {
 					
 						// Display message
 						cout << argv[0] << ": invalid stratum server port -- '" << (optarg ? optarg : "") << '\'' << endl;
@@ -658,7 +745,7 @@ int main(int argc, char *argv[]) noexcept {
 										if(utf8String) {
 										
 											// Display message
-											cout << ++index << ": " << utf8String << endl;
+											cout << ++index << ": " << utf8String << " (" << (ceil(static_cast<double>(device->recommendedMaxWorkingSetSize()) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE * 100) / 100) << " GB of RAM and " << (device->maxThreadgroupMemoryLength() / BYTES_IN_A_KILOBYTE) << " KB of local memory)" << endl;
 										}
 									}
 								}
@@ -702,8 +789,21 @@ int main(int argc, char *argv[]) noexcept {
 													char name[nameSize];
 													if(clGetDeviceInfo(devices[j], CL_DEVICE_NAME, nameSize, name, nullptr) == CL_SUCCESS) {
 													
-														// Display message
-														cout << ++index << ": " << name << endl;
+														// Check if getting device's memory size and work group memory size was successful
+														cl_ulong memorySize;
+														cl_ulong workGroupMemorySize;
+														if(clGetDeviceInfo(devices[j], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(memorySize), &memorySize, nullptr) == CL_SUCCESS && clGetDeviceInfo(devices[j], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(workGroupMemorySize), &workGroupMemorySize, nullptr) == CL_SUCCESS) {
+														
+															// Display message
+															cout << ++index << ": " << name << " (" << (ceil(static_cast<double>(memorySize) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE * 100) / 100) << " GB of RAM and " << (workGroupMemorySize / BYTES_IN_A_KILOBYTE) << " KB of local memory)" << endl;
+														}
+														
+														// Otherwise
+														else {
+														
+															// Display message
+															cout << ++index << ": " << name << endl;
+														}
 													}
 												}
 											}
@@ -734,8 +834,8 @@ int main(int argc, char *argv[]) noexcept {
 					// Check if option is invalid
 					char *end;
 					errno = 0;
-					const unsigned long index = optarg ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
-					if(!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !index || index > UINT_MAX) {
+					const unsigned long optionAsNumber = optarg ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
+					if(!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !optionAsNumber || optionAsNumber > UINT_MAX) {
 					
 						// Display message
 						cout << argv[0] << ": invalid GPU -- '" << (optarg ? optarg : "") << '\'' << endl;
@@ -748,11 +848,102 @@ int main(int argc, char *argv[]) noexcept {
 					else {
 					
 						// Set device index to the option
-						deviceIndex = index;
+						deviceIndex = optionAsNumber;
 					}
 					
 					// Break
 					break;
+				}
+				
+				// GPU RAM
+				case 'r': {
+				
+					// Check if using macOS
+					#ifdef __APPLE__
+					
+						// Check if option is invalid
+						char *end;
+						errno = 0;
+						const unsigned long optionAsNumber = optarg ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
+						if(!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !optionAsNumber || optionAsNumber > UINT_MAX) {
+						
+							// Display message
+							cout << argv[0] << ": invalid GPU RAM -- '" << (optarg ? optarg : "") << '\'' << endl;
+							
+							// Set display help to true
+							displayHelp = true;
+						}
+						
+						// Otherwise
+						else {
+						
+							// Check if getting the total memory amount failed
+							int64_t totalMemoryAmount;
+							size_t totalMemoryAmountSize = sizeof(totalMemoryAmount);
+							if(sysctlbyname("hw.memsize", &totalMemoryAmount, &totalMemoryAmountSize, nullptr, 0)) {
+							
+								// Display message
+								cout << "Getting your total amount of RAM failed" << endl;
+								
+								// Exit failure
+								exit(EXIT_FAILURE);
+							}
+							
+							// Otherwise check if option is to use all of the total memory for the GPU
+							else if(static_cast<int64_t>(optionAsNumber) >= totalMemoryAmount / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE) {
+							
+								// Display message
+								cout << argv[0] << ": GPU RAM must be less than your total amount of RAM (" << (totalMemoryAmount / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE) << ") -- '" << optarg << '\'' << endl;
+								
+								// Set display help to true
+								displayHelp = true;
+							}
+							
+							// Otherwise check if user isn't root
+							else if(geteuid()) {
+							
+								// Display message
+								cout << argv[0] << ": root privileges are required to change the GPU's RAM -- '" << optarg << '\'' << endl;
+								
+								// Set display help to true
+								displayHelp = true;
+							}
+							
+							// Otherwise
+							else {
+							
+								// Check if setting the current adjustable GPU memory amount failed
+								int64_t newGpuMemoryAmount = static_cast<int64_t>(optionAsNumber) * MEGABYTES_IN_A_GIGABYTE;
+								if(sysctlbyname("iogpu.wired_limit_mb", nullptr, 0, &newGpuMemoryAmount, sizeof(newGpuMemoryAmount))) {
+								
+									// Display message
+									cout << "Changing the GPU's RAM failed" << endl;
+									
+									// Exit failure
+									exit(EXIT_FAILURE);
+								}
+								
+								// Otherwise
+								else {
+								
+									// Display message
+									cout << "Changed the GPU's RAM to " << optionAsNumber << " GB" << endl;
+									
+									// Check if dropping root privileges failed
+									const char *username = getlogin();
+									const passwd *userInfo;
+									if(!username || !(userInfo = getpwnam(username)) || setgid(userInfo->pw_gid) || setuid(userInfo->pw_uid)) {
+									
+										// Display message
+										cout << "Dropping root privileges failed" << endl;
+										
+										// Exit failure
+										exit(EXIT_FAILURE);
+									}
+								}
+							}
+						}
+					#endif
 				}
 				
 				// Mean trimming
@@ -760,6 +951,15 @@ int main(int argc, char *argv[]) noexcept {
 				
 					// Enable mean trimming type
 					trimmingTypes |= MEAN_TRIMMING_TYPE;
+					
+					// Break
+					break;
+				
+				// Slean then mean trimming
+				case 'e':
+				
+					// Enable slean then mean trimming type
+					trimmingTypes |= SLEAN_THEN_MEAN_TRIMMING_TYPE;
 					
 					// Break
 					break;
@@ -783,6 +983,60 @@ int main(int argc, char *argv[]) noexcept {
 					break;
 			#endif
 			
+			// Total number of instances
+			case 't': {
+			
+				// Check if option is invalid
+				char *end;
+				errno = 0;
+				const unsigned long optionAsNumber = optarg ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
+				if(!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !optionAsNumber || optionAsNumber > UINT_MAX) {
+				
+					// Display message
+					cout << argv[0] << ": invalid total number of instances -- '" << (optarg ? optarg : "") << '\'' << endl;
+					
+					// Set display help to true
+					displayHelp = true;
+				}
+				
+				// Otherwise
+				else {
+				
+					// Set total number of instances to the option
+					totalNumberOfInstances = optionAsNumber;
+				}
+				
+				// Break
+				break;
+			}
+			
+			// Instance
+			case 'i': {
+			
+				// Check if option is invalid
+				char *end;
+				errno = 0;
+				const unsigned long optionAsNumber = optarg ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
+				if(!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !optionAsNumber || optionAsNumber > UINT_MAX) {
+				
+					// Display message
+					cout << argv[0] << ": invalid instance -- '" << (optarg ? optarg : "") << '\'' << endl;
+					
+					// Set display help to true
+					displayHelp = true;
+				}
+				
+				// Otherwise
+				else {
+				
+					// Set instance index to the option
+					instanceIndex = optionAsNumber;
+				}
+				
+				// Break
+				break;
+			}
+			
 			// Help
 			case 'h':
 			
@@ -803,23 +1057,33 @@ int main(int argc, char *argv[]) noexcept {
 	// Check if not tuning
 	#ifndef TUNING
 	
-		// Check if stratum server port hasn't been set
-		if(!stratumServerPortSet) {
+		// Check if stratum server port hasn't been set and not displaying help
+		if(!stratumServerPortSet && !displayHelp) {
 		
 			// Check if stratum server port is invalid
 			char *end;
 			errno = 0;
-			const unsigned long port = strtoul(stratumServerPort, &end, DECIMAL_NUMBER_BASE);
-			if(end == stratumServerPort || *end || !isdigit(stratumServerPort[0]) || (stratumServerPort[0] == '0' && isdigit(stratumServerPort[1])) || errno || !port || port > UINT16_MAX) {
+			const unsigned long stratumServerPortAsNumber = strtoul(stratumServerPort, &end, DECIMAL_NUMBER_BASE);
+			if(end == stratumServerPort || *end || !isdigit(stratumServerPort[0]) || (stratumServerPort[0] == '0' && isdigit(stratumServerPort[1])) || errno || !stratumServerPortAsNumber || stratumServerPortAsNumber > UINT16_MAX) {
 			
 				// Display message
-				cout << argv[0] << ": invalid port in stratum server address -- '" << stratumServerPort << '\'' << endl;
+				cout << argv[0] << ": invalid stratum server address -- '" << stratumServerPort << '\'' << endl;
 				
 				// Set display help to true
 				displayHelp = true;
 			}
 		}
 	#endif
+	
+	// Check if instance index is invalid and not displaying help
+	if(instanceIndex > totalNumberOfInstances && !displayHelp) {
+	
+		// Display message
+		cout << argv[0] << ": invalid instance -- '" << instanceIndex << '\'' << endl;
+		
+		// Set display help to true
+		displayHelp = true;
+	}
 	
 	// Check if displaying help
 	if(displayHelp) {
@@ -845,16 +1109,47 @@ int main(int argc, char *argv[]) noexcept {
 			// Display message
 			cout << "\t-d, --display_gpus\t\tDisplay available GPUs and their indices" << endl;
 			cout << "\t-g, --gpu\t\t\tThe optional index of the GPU to use" << endl;
+			
+			// Check if the GPU's memory is adjustable
+			if(currentAdjustableGpuMemoryAmount) {
+			
+				// Display message
+				cout << "\t-r, --gpu_ram\t\t\tThe amount in gigabytes of your total amount of RAM to dedicate to the GPU. This requires root privileges (current: " << (currentAdjustableGpuMemoryAmount / MEGABYTES_IN_A_GIGABYTE) << ')' << endl;
+			}
+			
+			// Display message
 			cout << "\t-m, --mean_trimming\t\tUse only mean trimming" << endl;
+			cout << "\t-e, --slean_then_mean_trimming\tUse only slean then mean trimming" << endl;
 			cout << "\t-s, --slean_trimming\t\tUse only slean trimming" << endl;
 			cout << "\t-l, --lean_trimming\t\tUse only lean trimming" << endl;
 		#endif
 		
 		// Display message
+		cout << "\t-t, --total_number_of_instances\tThe total number of instances of this program that will be running (default: " TO_STRING(DEFAULT_TOTAL_NUMBER_OF_INSTANCES) ")" << endl;
+		cout << "\t-i, --instance\t\t\tThe index of this instance (default: " TO_STRING(DEFAULT_INSTANCE_INDEX) ")" << endl;
 		cout << "\t-h, --help\t\t\tDisplay help information" << endl;
 		
 		// Return success if help was requested otherwise failure
 		exit(helpRequested ? EXIT_SUCCESS : EXIT_FAILURE);
+	}
+	
+	// Get total number of CPU cores
+	const unsigned int totalNumberOfCpuCores = getNumberOfHighPerformanceCpuCores();
+	
+	// Get this instance's number of threads
+	const unsigned int numberOfThreads = (instanceIndex == totalNumberOfInstances) ? (totalNumberOfCpuCores - min((totalNumberOfInstances - 1) * max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1)), totalNumberOfCpuCores - 1)) : max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1));
+	
+	// Get this instance's first thread index
+	const unsigned int firstThreadIndex = (instanceIndex - 1) * max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1)) % totalNumberOfCpuCores;
+	
+	// Check if setting searching thread's priority and affinity failed
+	if(!setThreadPriorityAndAffinity((firstThreadIndex + numberOfThreads - 1) % totalNumberOfCpuCores)) {
+	
+		// Display message
+		cout << "Setting searching thread's priority and affinity failed" << endl;
+		
+		// Return failure
+		exit(EXIT_FAILURE);
 	}
 	
 	// Check if setting interrupt signal handler failed
@@ -877,7 +1172,10 @@ int main(int argc, char *argv[]) noexcept {
 	}
 	
 	// Display message
-	cout << "Using the cuckatoo" TO_STRING(EDGE_BITS) " (C" TO_STRING(EDGE_BITS) ") mining algorithm. Verify that this is the correct algorithm for the cryptocurrency that you are mining. You can change this mining algorithm to a different cuckatoo variation by building this program with a different EDGE_BITS value" << endl;
+	cout << "This is instance " << instanceIndex << " out of " << totalNumberOfInstances << ((totalNumberOfInstances == DEFAULT_TOTAL_NUMBER_OF_INSTANCES) ? ". You should change this if you're planning on running multiple instances of this program at once" : "") << endl;
+	
+	// Display message
+	cout << "Using the cuckatoo" TO_STRING(EDGE_BITS) " (C" TO_STRING(EDGE_BITS) ") mining algorithm. You should verify that this is the correct algorithm for the cryptocurrency that you're trying to mine" << endl;
 	
 	// Check if not tuning
 	#ifndef TUNING
@@ -909,13 +1207,39 @@ int main(int argc, char *argv[]) noexcept {
 	#if TRIMMING_ROUNDS == 0
 	
 		// Get number of searching threads
-		const unsigned int numberOfSearchingThreads = min(min(max(thread::hardware_concurrency(), static_cast<unsigned int>(1)), static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS)), static_cast<unsigned int>(EDGES_BITMAP_SIZE));
+		const unsigned int numberOfSearchingThreads = min(min(numberOfThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS)), static_cast<unsigned int>(EDGES_BITMAP_SIZE));
+		
+		// Display message
+		cout << "Using " << numberOfSearchingThreads << " CPU core(s) for searching: ";
+		
+		// Go through all searching threads
+		for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+		
+			// Check if using Windows
+			#ifdef _WIN32
+			
+				// Display message
+				cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+				
+			// Otherwise check if using macOS
+			#elif defined __APPLE__
+			
+				// Display message
+				cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+				
+			// Otherwise
+			#else
+			
+				// Display message
+				cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+			#endif
+		}
+		
+		// Display new line
+		cout << endl;
 		
 		// Get number of searching threads searching edges
 		const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
-		
-		// Display message
-		cout << "Using " << numberOfSearchingThreadsSearchingEdges << " CPU core(s) for searching" << endl;
 		
 		// Go through all searching threads
 		uint64_t numberOfEdges[numberOfSearchingThreads];
@@ -934,10 +1258,10 @@ int main(int argc, char *argv[]) noexcept {
 			}
 			
 			// Create searching thread
-			thread([numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+			thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 			
 				// Check if setting searching thread's priority and affinity failed
-				if(!setThreadPriorityAndAffinity(searchingThreadIndex)) {
+				if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
 				
 					// Display message
 					cout << "Setting searching thread's priority and affinity failed" << endl;
@@ -1275,6 +1599,16 @@ int main(int argc, char *argv[]) noexcept {
 			trimmingTypeDisplay = true;
 		}
 		
+		// Check if using all trimming types or slean then mean trimming is enabled
+		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_THEN_MEAN_TRIMMING_TYPE) {
+		
+			// Display message
+			cout << (trimmingTypeDisplay ? "," : "") << " slean then mean";
+			
+			// Set trimming type displayed to true
+			trimmingTypeDisplay = true;
+		}
+		
 		// Check if using all trimming types or slean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_TRIMMING_TYPE) {
 		
@@ -1337,10 +1671,36 @@ int main(int argc, char *argv[]) noexcept {
 			if(context) {
 				
 				// Get number of searching threads
-				const unsigned int numberOfSearchingThreads = min(min(max(thread::hardware_concurrency(), static_cast<unsigned int>(1)), static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
+				const unsigned int numberOfSearchingThreads = min(min(numberOfThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
 				
 				// Display message
-				cout << "Using " << numberOfSearchingThreads << " CPU core(s) for searching" << endl;
+				cout << "Using " << numberOfSearchingThreads << " CPU core(s) for searching: ";
+				
+				// Go through all searching threads
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Check if using Windows
+					#ifdef _WIN32
+					
+						// Display message
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+						
+					// Otherwise check if using macOS
+					#elif defined __APPLE__
+					
+						// Display message
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						
+					// Otherwise
+					#else
+					
+						// Display message
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+					#endif
+				}
+				
+				// Display new line
+				cout << endl;
 				
 				// Go through all searching threads
 				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreads];
@@ -1352,10 +1712,10 @@ int main(int argc, char *argv[]) noexcept {
 					nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
 					
 					// Create searching thread
-					thread([numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 					
 						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity(searchingThreadIndex)) {
+						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
 						
 							// Display message
 							cout << "Setting searching thread's priority and affinity failed" << endl;
@@ -1541,6 +1901,274 @@ int main(int argc, char *argv[]) noexcept {
 			}
 		}
 		
+		// Check if using all trimming types or slean then mean trimming is enabled
+		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_THEN_MEAN_TRIMMING_TYPE) {
+		
+			// Check if using macOS
+			#ifdef __APPLE__
+			
+				// Create slean then mean trimming context
+				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createSleanThenMeanTrimmingContext(deviceIndex), [](MTL::Device *context) noexcept {
+				
+					// Free context
+					context->release();
+				});
+				
+			// Otherwise
+			#else
+				
+				// Create slean then mean trimming context
+				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createSleanThenMeanTrimmingContext(platforms, numberOfPlatforms, deviceIndex), clReleaseContext);
+			#endif
+			
+			// Check if creating slean then mean trimming context was successful
+			if(context) {
+				
+				// Get number of searching threads
+				const unsigned int numberOfSearchingThreads = min(min(numberOfThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
+				
+				// Display message
+				cout << "Using " << numberOfSearchingThreads << " CPU core(s) for searching: ";
+				
+				// Go through all searching threads
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Check if using Windows
+					#ifdef _WIN32
+					
+						// Display message
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+						
+					// Otherwise check if using macOS
+					#elif defined __APPLE__
+					
+						// Display message
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						
+					// Otherwise
+					#else
+					
+						// Display message
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+					#endif
+				}
+				
+				// Display new line
+				cout << endl;
+				
+				// Go through all searching threads
+				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreads];
+				unsigned int numberOfSearchingThreadsFinished = 0;
+				
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Create searching thread's node connections
+					nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
+					
+					// Create searching thread
+					thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					
+						// Check if setting searching thread's priority and affinity failed
+						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
+						
+							// Display message
+							cout << "Setting searching thread's priority and affinity failed" << endl;
+							
+							// Return failure
+							exit(EXIT_FAILURE);
+						}
+						
+						// Initialize thread local global variables
+						initializeCuckatooThreadLocalGlobalVariables();
+						
+						// Loop forever
+						unique_lock lock(searchingThreadsMutex, defer_lock);
+						for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
+						
+							// Wait until starting searching threads
+							lock.lock();
+							startSearchingThreadsConditionalVariable->wait(lock, [startTriggerTrue]() noexcept -> bool {
+							
+								// Return if starting searching threads
+								return startSearchingThreadsTriggerToggle == startTriggerTrue;
+							});
+							lock.unlock();
+							
+							// Get number of edges
+							const uint32_t &numberOfEdges = reinterpret_cast<const uint32_t *>(searchingThreadsData)[0];
+							
+							// Get total number of edges
+							const uint32_t totalNumberOfEdges = min(numberOfEdges, MAX_NUMBER_OF_EDGES_AFTER_TRIMMING);
+							
+							// Get edges
+							const uint32_t *edges = &reinterpret_cast<const uint32_t *>(searchingThreadsData)[1];
+							
+							// Check if not the first searching thread
+							if(searchingThreadIndex) {
+							
+								// Set first searching edges
+								const uint64_t firstSearchingEdge = (1 - 1 / pow(2, searchingThreadIndex - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT));
+								
+								// Go through all previous edges
+								for(uint64_t nodeConnectionsIndex = 0, edgesIndex = 0; nodeConnectionsIndex < firstSearchingEdge * 2; nodeConnectionsIndex += 2, edgesIndex += EDGE_NUMBER_OF_COMPONENTS) {
+								
+									// Replace newest node connection for the node on the first partition and add node connection to list
+									nodeConnections[nodeConnectionsIndex] = {cuckatooUNewestNodeConnections.replace(edges[edgesIndex + 1], &nodeConnections[nodeConnectionsIndex]), edges[edgesIndex + 1], edges[edgesIndex]};
+									
+									// Replace newest node connection for the node on the second partition and add node connection to list
+									nodeConnections[nodeConnectionsIndex + 1] = {cuckatooVNewestNodeConnections.replace(edges[edgesIndex + 2], &nodeConnections[nodeConnectionsIndex + 1]), edges[edgesIndex + 2], edges[edgesIndex]};
+								}
+								
+								// Check if getting solution was successful
+								uint32_t solution[SOLUTION_SIZE];
+								if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
+								
+									// Lock
+									lock.lock();
+									
+									// Set searching threads solution to the solution
+									memcpy(searchingThreadsSolution, solution, sizeof(solution));
+									
+									// Unlock
+									lock.unlock();
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Check if too may edges exist
+								if(numberOfEdges > MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
+								
+									// Check if there's too many trimming rounds
+									if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
+									
+										// Display message
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+									}
+									
+									// Otherwise
+									else {
+									
+										// Display message
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+									}
+								}
+								
+								// Check if getting solution was successful
+								uint32_t solution[SOLUTION_SIZE];
+								if(getCuckatooSolution(solution, nodeConnections, edges, ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)))) {
+								
+									// Lock
+									lock.lock();
+									
+									// Set searching threads solution to the solution
+									memcpy(searchingThreadsSolution, solution, sizeof(solution));
+									
+									// Unlock
+									lock.unlock();
+								}
+							}
+							
+							// Reset node connections
+							cuckatooUNewestNodeConnections.clear();
+							cuckatooVNewestNodeConnections.clear();
+							
+							// Check if all searching threads have finished
+							lock.lock();
+							if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
+							
+								// Reset number of searching threads finished
+								numberOfSearchingThreadsFinished = 0;
+								
+								// Notify that searching threads have finished
+								searchingThreadsFinished = true;
+								lock.unlock();
+								searchingThreadsFinishedConditionalVariable->notify_one();
+							}
+							
+							// Otherwise
+							else {
+							
+								// Unlock
+								lock.unlock();
+							}
+						}
+						
+					}).detach();
+				}
+				
+				// Check if performing slean then mean trimming loop failed
+				if(!performSleanThenMeanTrimmingLoop(context.get(), deviceIndex)) {
+				
+					// Return failure
+					exit(EXIT_FAILURE);
+				}
+				
+				// Return success
+				exit(EXIT_SUCCESS);
+			}
+			
+			// Otherwise
+			else {
+			
+				// Display message
+				cout << ((deviceIndex == ALL_DEVICES) ? "No applicable GPU found for slean then mean trimming" : "GPU isn't applicable for slean then mean trimming") << ". Slean then mean trimming requires ";
+				
+				// Check if RAM requirement can be expressed in bytes
+				if(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE / 2) {
+				
+					// Display message
+					cout << SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES << " bytes";
+				}
+				
+				// Otherwise check if RAM requirement can be expressed in kilobytes
+				else if(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE / 2) {
+				
+					// Display message
+					cout << (ceil(static_cast<double>(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE * 100) / 100) << " KB";
+				}
+				
+				// Otherwise check if RAM requirement can be expressed in megabytes
+				else if(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE * MEGABYTES_IN_A_GIGABYTE / 2) {
+				
+					// Display message
+					cout << (ceil(static_cast<double>(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE * 100) / 100) << " MB";
+				}
+				
+				// Otherwise
+				else {
+				
+					// Display message
+					cout << (ceil(static_cast<double>(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE * 100) / 100) << " GB";
+				}
+				
+				// Display message
+				cout << " of RAM and " << (SLEAN_THEN_MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory" << endl;
+				
+				// Check if slean trimming parts is less than its max value
+				if(SLEAN_TRIMMING_PARTS < MAX_SLEAN_TRIMMING_PARTS) {
+				
+					// Display message
+					cout << "Build this program with SLEAN_TRIMMING_PARTS=" << (SLEAN_TRIMMING_PARTS * 2) << " to reduce slean then mean trimming's GPU RAM requirement by about half" << endl;
+				}
+				
+				// Check if slean then mean slean trimming rounds is less than its max value
+				if(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS < TRIMMING_ROUNDS - 1) {
+				
+					// Display message
+					cout << "Build this program with SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=" << (SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS + 1) << " to reduce slean then mean trimming's GPU RAM requirement" << endl;
+				}
+				
+				// Check if local RAM kilobytes is greater than its min value
+				if(LOCAL_RAM_KILOBYTES > MIN_LOCAL_RAM_KILOBYTES) {
+				
+					// Display message
+					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce slean then mean trimming's GPU local memory requirement by half" << endl;
+				}
+			}
+		}
+		
 		// Check if using all trimming types or slean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_TRIMMING_TYPE) {
 		
@@ -1565,13 +2193,39 @@ int main(int argc, char *argv[]) noexcept {
 			if(context) {
 				
 				// Get number of searching threads
-				const unsigned int numberOfSearchingThreads = min(min(max(thread::hardware_concurrency(), static_cast<unsigned int>(1)), static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS)), static_cast<unsigned int>(EDGES_BITMAP_SIZE));
+				const unsigned int numberOfSearchingThreads = min(min(numberOfThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS)), static_cast<unsigned int>(EDGES_BITMAP_SIZE));
+				
+				// Display message
+				cout << "Using " << numberOfSearchingThreads << " CPU core(s) for searching: ";
+				
+				// Go through all searching threads
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Check if using Windows
+					#ifdef _WIN32
+					
+						// Display message
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+						
+					// Otherwise check if using macOS
+					#elif defined __APPLE__
+					
+						// Display message
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						
+					// Otherwise
+					#else
+					
+						// Display message
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+					#endif
+				}
+				
+				// Display new line
+				cout << endl;
 				
 				// Get number of searching threads searching edges
 				const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
-				
-				// Display message
-				cout << "Using " << numberOfSearchingThreadsSearchingEdges << " CPU core(s) for searching" << endl;
 				
 				// Go through all searching threads
 				uint64_t numberOfEdges[numberOfSearchingThreads];
@@ -1590,10 +2244,10 @@ int main(int argc, char *argv[]) noexcept {
 					}
 					
 					// Create searching thread
-					thread([numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 					
 						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity(searchingThreadIndex)) {
+						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
 						
 							// Display message
 							cout << "Setting searching thread's priority and affinity failed" << endl;
@@ -1934,13 +2588,39 @@ int main(int argc, char *argv[]) noexcept {
 			if(context) {
 				
 				// Get number of searching threads
-				const unsigned int numberOfSearchingThreads = min(min(max(thread::hardware_concurrency(), static_cast<unsigned int>(1)), static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS)), static_cast<unsigned int>(EDGES_BITMAP_SIZE));
+				const unsigned int numberOfSearchingThreads = min(min(numberOfThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS)), static_cast<unsigned int>(EDGES_BITMAP_SIZE));
+				
+				// Display message
+				cout << "Using " << numberOfSearchingThreads << " CPU core(s) for searching: ";
+				
+				// Go through all searching threads
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Check if using Windows
+					#ifdef _WIN32
+					
+						// Display message
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+						
+					// Otherwise check if using macOS
+					#elif defined __APPLE__
+					
+						// Display message
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						
+					// Otherwise
+					#else
+					
+						// Display message
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+					#endif
+				}
+				
+				// Display new line
+				cout << endl;
 				
 				// Get number of searching threads searching edges
 				const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
-				
-				// Display message
-				cout << "Using " << numberOfSearchingThreadsSearchingEdges << " CPU core(s) for searching" << endl;
 				
 				// Go through all searching threads
 				uint64_t numberOfEdges[numberOfSearchingThreads];
@@ -1959,10 +2639,10 @@ int main(int argc, char *argv[]) noexcept {
 					}
 					
 					// Create searching thread
-					thread([numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 					
 						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity(searchingThreadIndex)) {
+						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
 						
 							// Display message
 							cout << "Setting searching thread's priority and affinity failed" << endl;

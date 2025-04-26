@@ -9,7 +9,7 @@ Trimming round 4: clear number of edges per bucket one, step five
 Trimming round 5: clear number of edges per bucket two, step five
 ...
 Trimming round n - 1: clear number of edges per bucket one, step five
-Trimming round n: clear number of edges per bucket two, step five, step six
+Trimming round n: clear number of edges per bucket two, step five, clear first remaining edge, step six
 Get result from remaining edges
 */
 

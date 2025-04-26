@@ -48,20 +48,20 @@ using namespace std;
 // Slean trimming number of items per remaining edges bucket
 #define SLEAN_TRIMMING_NUMBER_OF_ITEMS_PER_REMAINING_EDGES_BUCKET ((NUMBER_OF_EDGES / SLEAN_TRIMMING_PARTS) / SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS)
 
-// Slean trimming after trimming round max number of edges per remaining edges bucket
-#define SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET static_cast<uint32_t>(SLEAN_TRIMMING_NUMBER_OF_ITEMS_PER_REMAINING_EDGES_BUCKET * 0.38)
+// Slean trimming after trimming round max number of edges per remaining edges bucket (Divide by slean trimming parts and multiply by slean trimming parts makes the result a product of slean trimming parts)
+#define SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET ((static_cast<uint32_t>(SLEAN_TRIMMING_NUMBER_OF_ITEMS_PER_REMAINING_EDGES_BUCKET * 0.38) / SLEAN_TRIMMING_PARTS) * SLEAN_TRIMMING_PARTS)
 
 // Check if using macOS
 #ifdef __APPLE__
 
 	// Slean trimming required RAM bytes
-	#define SLEAN_TRIMMING_REQUIRED_RAM_BYTES (static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(uint32_t) + SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(uint32_t) + NUMBER_OF_EDGES / BITS_IN_A_BYTE * 3)
+	#define SLEAN_TRIMMING_REQUIRED_RAM_BYTES (static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(uint32_t) + SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * SLEAN_TRIMMING_PARTS * sizeof(uint32_t) + NUMBER_OF_EDGES / BITS_IN_A_BYTE * 3)
 	
 // Otherwise
 #else
 
 	// Slean trimming required RAM bytes
-	#define SLEAN_TRIMMING_REQUIRED_RAM_BYTES (static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint) + static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint) + SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint) + SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint) + NUMBER_OF_EDGES / BITS_IN_A_BYTE * 3)
+	#define SLEAN_TRIMMING_REQUIRED_RAM_BYTES (static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint) + static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint) + SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint) + SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * SLEAN_TRIMMING_PARTS * sizeof(cl_uint) + NUMBER_OF_EDGES / BITS_IN_A_BYTE * 3)
 #endif
 
 // Slean trimming required work group RAM bytes
@@ -69,6 +69,15 @@ using namespace std;
 
 // Slean trimming max local buckets size
 #define SLEAN_TRIMMING_MAX_LOCAL_BUCKETS_SIZE min(static_cast<uint64_t>(4), (SLEAN_TRIMMING_NUMBER_OF_BUCKETS + 256 - 1) / 256)
+
+// Slean trimming trimming rounds before a fourth of edges remain
+#define SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN 5
+
+// Slean trimming trimming rounds before an eighth of edges remain
+#define SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN 8
+
+// Slean trimming trimming rounds before a sixteenth of edges remain
+#define SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN 12
 
 
 // Function prototypes
@@ -247,7 +256,7 @@ using namespace std;
 			if(!name) {
 			
 				// Display message
-				cout << "Getting device's name failed" << endl;
+				cout << "Getting GPU's name failed" << endl;
 				
 				// Return false
 				return false;
@@ -258,7 +267,7 @@ using namespace std;
 			if(!utf8String) {
 			
 				// Display message
-				cout << "Getting device's name failed" << endl;
+				cout << "Getting GPU's name failed" << endl;
 				
 				// Return false
 				return false;
@@ -357,6 +366,14 @@ using namespace std;
 				
 			}).get(),
 			
+			// Number of remaining edges buckets value
+			unique_ptr<NS::Number, void(*)(NS::Number *)>(NS::Number::alloc()->init(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS), [](NS::Number *numberOfRemainingEdgesBucketsValue) noexcept {
+			
+				// Free number of remaining edges buckets value
+				numberOfRemainingEdgesBucketsValue->release();
+				
+			}).get(),
+			
 			// Number of least significant bits ignored during remaining edges bucket sorting value
 			unique_ptr<NS::Number, void(*)(NS::Number *)>(NS::Number::alloc()->init(SLEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING), [](NS::Number *numberOfLeastSignificantBitsIgnoredDuringRemainingEdgesBucketSortingValue) noexcept {
 			
@@ -370,14 +387,6 @@ using namespace std;
 			
 				// Free number of remaining edges bitmap bytes value
 				numberOfRemainingEdgesBitmapBytesValue->release();
-				
-			}).get(),
-			
-			// Number of remaining edges buckets value
-			unique_ptr<NS::Number, void(*)(NS::Number *)>(NS::Number::alloc()->init(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS), [](NS::Number *numberOfRemainingEdgesBucketsValue) noexcept {
-			
-				// Free number of remaining edges buckets value
-				numberOfRemainingEdgesBucketsValue->release();
 				
 			}).get(),
 			
@@ -426,14 +435,14 @@ using namespace std;
 			// After trimming round max number of edges per remaining edges bucket key
 			MTLSTR("AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET"),
 			
+			// Number of remaining edges buckets key
+			MTLSTR("NUMBER_OF_REMAINING_EDGES_BUCKETS"),
+			
 			// Number of least significant bits ignored during remaining edges bucket sorting key
 			MTLSTR("NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING"),
 			
 			// Number of remaining edges bitmap bytes key
 			MTLSTR("NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES"),
-			
-			// Number of remaining edges buckets key
-			MTLSTR("NUMBER_OF_REMAINING_EDGES_BUCKETS"),
 			
 			// Initial buckets number of buckets key
 			MTLSTR("INITIAL_BUCKETS_NUMBER_OF_BUCKETS"),
@@ -601,17 +610,117 @@ using namespace std;
 			// Free step eighteen kernel
 			stepEighteenKernel->release();
 		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepNineteenKernel(library->newFunction(MTLSTR("trimEdgesStepNineteen")), [](MTL::Function *stepNineteenKernel) noexcept {
+		
+			// Free step nineteen kernel
+			stepNineteenKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyKernel(library->newFunction(MTLSTR("trimEdgesStepTwenty")), [](MTL::Function *stepTwentyKernel) noexcept {
+		
+			// Free step twenty kernel
+			stepTwentyKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyOneKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyOne")), [](MTL::Function *stepTwentyOneKernel) noexcept {
+		
+			// Free step twenty-one kernel
+			stepTwentyOneKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyTwoKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyTwo")), [](MTL::Function *stepTwentyTwoKernel) noexcept {
+		
+			// Free step twenty-two kernel
+			stepTwentyTwoKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyThreeKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyThree")), [](MTL::Function *stepTwentyThreeKernel) noexcept {
+		
+			// Free step twenty-three kernel
+			stepTwentyThreeKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyFourKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyFour")), [](MTL::Function *stepTwentyFourKernel) noexcept {
+		
+			// Free step twenty-four kernel
+			stepTwentyFourKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyFiveKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyFive")), [](MTL::Function *stepTwentyFiveKernel) noexcept {
+		
+			// Free step twenty-five kernel
+			stepTwentyFiveKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentySixKernel(library->newFunction(MTLSTR("trimEdgesStepTwentySix")), [](MTL::Function *stepTwentySixKernel) noexcept {
+		
+			// Free step twenty-six kernel
+			stepTwentySixKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentySevenKernel(library->newFunction(MTLSTR("trimEdgesStepTwentySeven")), [](MTL::Function *stepTwentySevenKernel) noexcept {
+		
+			// Free step twenty-seven kernel
+			stepTwentySevenKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyEightKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyEight")), [](MTL::Function *stepTwentyEightKernel) noexcept {
+		
+			// Free step twenty-eight kernel
+			stepTwentyEightKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyNineKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyNine")), [](MTL::Function *stepTwentyNineKernel) noexcept {
+		
+			// Free step twenty-nine kernel
+			stepTwentyNineKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyKernel(library->newFunction(MTLSTR("trimEdgesStepThirty")), [](MTL::Function *stepThirtyKernel) noexcept {
+		
+			// Free step thirty kernel
+			stepThirtyKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyOneKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyOne")), [](MTL::Function *stepThirtyOneKernel) noexcept {
+		
+			// Free step thirty-one kernel
+			stepThirtyOneKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyTwoKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyTwo")), [](MTL::Function *stepThirtyTwoKernel) noexcept {
+		
+			// Free step thirty-two kernel
+			stepThirtyTwoKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyThreeKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyThree")), [](MTL::Function *stepThirtyThreeKernel) noexcept {
+		
+			// Free step thirty-three kernel
+			stepThirtyThreeKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyFourKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyFour")), [](MTL::Function *stepThirtyFourKernel) noexcept {
+		
+			// Free step thirty-four kernel
+			stepThirtyFourKernel->release();
+		});
 		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerSourceBucketKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerSourceBucket")), [](MTL::Function *clearNumberOfEdgesPerSourceBucketKernel) noexcept {
 		
 			// Free clear number of edges per source bucket kernel
 			clearNumberOfEdgesPerSourceBucketKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucket")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketKernel) noexcept {
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketOneKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketOne")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketOneKernel) noexcept {
 		
-			// Free clear number of edges per destination bucket kernel
-			clearNumberOfEdgesPerDestinationBucketKernel->release();
+			// Free clear number of edges per destination bucket one kernel
+			clearNumberOfEdgesPerDestinationBucketOneKernel->release();
 		});
-		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !stepFiveKernel || !stepSixKernel || !stepSevenKernel || !stepEightKernel || !stepNineKernel || !stepTenKernel || !stepElevenKernel || !stepTwelveKernel || !stepThirteenKernel || !stepFourteenKernel || !stepFifteenKernel || !stepSixteenKernel || !stepSeventeenKernel || !stepEighteenKernel || !clearNumberOfEdgesPerSourceBucketKernel || !clearNumberOfEdgesPerDestinationBucketKernel) {
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketTwoKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketTwo")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketTwoKernel) noexcept {
+		
+			// Free clear number of edges per destination bucket two kernel
+			clearNumberOfEdgesPerDestinationBucketTwoKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketFourKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketFour")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketFourKernel) noexcept {
+		
+			// Free clear number of edges per destination bucket four kernel
+			clearNumberOfEdgesPerDestinationBucketFourKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketEightKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketEight")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketEightKernel) noexcept {
+		
+			// Free clear number of edges per destination bucket eight kernel
+			clearNumberOfEdgesPerDestinationBucketEightKernel->release();
+		});
+		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketSixteenKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketSixteen")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketSixteenKernel) noexcept {
+		
+			// Free clear number of edges per destination bucket sixteen kernel
+			clearNumberOfEdgesPerDestinationBucketSixteenKernel->release();
+		});
+		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !stepFiveKernel || !stepSixKernel || !stepSevenKernel || !stepEightKernel || !stepNineKernel || !stepTenKernel || !stepElevenKernel || !stepTwelveKernel || !stepThirteenKernel || !stepFourteenKernel || !stepFifteenKernel || !stepSixteenKernel || !stepSeventeenKernel || !stepEighteenKernel || !stepNineteenKernel || !stepTwentyKernel || !stepTwentyOneKernel || !stepTwentyTwoKernel || !stepTwentyThreeKernel || !stepTwentyFourKernel || !stepTwentyFiveKernel || !stepTwentySixKernel || !stepTwentySevenKernel || !stepTwentyEightKernel || !stepTwentyNineKernel || !stepThirtyKernel || !stepThirtyOneKernel || !stepThirtyTwoKernel || !stepThirtyThreeKernel || !stepThirtyFourKernel || !clearNumberOfEdgesPerSourceBucketKernel || !clearNumberOfEdgesPerDestinationBucketOneKernel || !clearNumberOfEdgesPerDestinationBucketTwoKernel || !clearNumberOfEdgesPerDestinationBucketFourKernel || !clearNumberOfEdgesPerDestinationBucketEightKernel || !clearNumberOfEdgesPerDestinationBucketSixteenKernel) {
 		
 			// Display message
 			cout << "Getting kernels from the library failed" << endl;
@@ -729,19 +838,139 @@ using namespace std;
 			// Free step eighteen pipeline
 			stepEighteenPipeline->release();
 		});
+		NS::Error *createPipelineNineteenError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepNineteenPipeline(device->newComputePipelineState(stepNineteenKernel.get(), &createPipelineNineteenError), [](MTL::ComputePipelineState *stepNineteenPipeline) noexcept {
+		
+			// Free step nineteen pipeline
+			stepNineteenPipeline->release();
+		});
+		NS::Error *createPipelineTwentyError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyPipeline(device->newComputePipelineState(stepTwentyKernel.get(), &createPipelineTwentyError), [](MTL::ComputePipelineState *stepTwentyPipeline) noexcept {
+		
+			// Free step twenty pipeline
+			stepTwentyPipeline->release();
+		});
+		NS::Error *createPipelineTwentyOneError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyOnePipeline(device->newComputePipelineState(stepTwentyOneKernel.get(), &createPipelineTwentyOneError), [](MTL::ComputePipelineState *stepTwentyOnePipeline) noexcept {
+		
+			// Free step twenty-one pipeline
+			stepTwentyOnePipeline->release();
+		});
+		NS::Error *createPipelineTwentyTwoError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyTwoPipeline(device->newComputePipelineState(stepTwentyTwoKernel.get(), &createPipelineTwentyTwoError), [](MTL::ComputePipelineState *stepTwentyTwoPipeline) noexcept {
+		
+			// Free step twenty-two pipeline
+			stepTwentyTwoPipeline->release();
+		});
+		NS::Error *createPipelineTwentyThreeError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyThreePipeline(device->newComputePipelineState(stepTwentyThreeKernel.get(), &createPipelineTwentyThreeError), [](MTL::ComputePipelineState *stepTwentyThreePipeline) noexcept {
+		
+			// Free step twenty-three pipeline
+			stepTwentyThreePipeline->release();
+		});
+		NS::Error *createPipelineTwentyFourError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyFourPipeline(device->newComputePipelineState(stepTwentyFourKernel.get(), &createPipelineTwentyFourError), [](MTL::ComputePipelineState *stepTwentyFourPipeline) noexcept {
+		
+			// Free step twenty-four pipeline
+			stepTwentyFourPipeline->release();
+		});
+		NS::Error *createPipelineTwentyFiveError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyFivePipeline(device->newComputePipelineState(stepTwentyFiveKernel.get(), &createPipelineTwentyFiveError), [](MTL::ComputePipelineState *stepTwentyFivePipeline) noexcept {
+		
+			// Free step twenty-five pipeline
+			stepTwentyFivePipeline->release();
+		});
+		NS::Error *createPipelineTwentySixError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentySixPipeline(device->newComputePipelineState(stepTwentySixKernel.get(), &createPipelineTwentySixError), [](MTL::ComputePipelineState *stepTwentySixPipeline) noexcept {
+		
+			// Free step twenty-six pipeline
+			stepTwentySixPipeline->release();
+		});
+		NS::Error *createPipelineTwentySevenError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentySevenPipeline(device->newComputePipelineState(stepTwentySevenKernel.get(), &createPipelineTwentySevenError), [](MTL::ComputePipelineState *stepTwentySevenPipeline) noexcept {
+		
+			// Free step twenty-seven pipeline
+			stepTwentySevenPipeline->release();
+		});
+		NS::Error *createPipelineTwentyEightError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyEightPipeline(device->newComputePipelineState(stepTwentyEightKernel.get(), &createPipelineTwentyEightError), [](MTL::ComputePipelineState *stepTwentyEightPipeline) noexcept {
+		
+			// Free step twenty-eight pipeline
+			stepTwentyEightPipeline->release();
+		});
+		NS::Error *createPipelineTwentyNineError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyNinePipeline(device->newComputePipelineState(stepTwentyNineKernel.get(), &createPipelineTwentyNineError), [](MTL::ComputePipelineState *stepTwentyNinePipeline) noexcept {
+		
+			// Free step twenty-nine pipeline
+			stepTwentyNinePipeline->release();
+		});
+		NS::Error *createPipelineThirtyError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyPipeline(device->newComputePipelineState(stepThirtyKernel.get(), &createPipelineThirtyError), [](MTL::ComputePipelineState *stepThirtyPipeline) noexcept {
+		
+			// Free step thirty pipeline
+			stepThirtyPipeline->release();
+		});
+		NS::Error *createPipelineThirtyOneError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyOnePipeline(device->newComputePipelineState(stepThirtyOneKernel.get(), &createPipelineThirtyOneError), [](MTL::ComputePipelineState *stepThirtyOnePipeline) noexcept {
+		
+			// Free step thirty-one pipeline
+			stepThirtyOnePipeline->release();
+		});
+		NS::Error *createPipelineThirtyTwoError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyTwoPipeline(device->newComputePipelineState(stepThirtyTwoKernel.get(), &createPipelineThirtyTwoError), [](MTL::ComputePipelineState *stepThirtyTwoPipeline) noexcept {
+		
+			// Free step thirty-two pipeline
+			stepThirtyTwoPipeline->release();
+		});
+		NS::Error *createPipelineThirtyThreeError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyThreePipeline(device->newComputePipelineState(stepThirtyThreeKernel.get(), &createPipelineThirtyThreeError), [](MTL::ComputePipelineState *stepThirtyThreePipeline) noexcept {
+		
+			// Free step thirty-three pipeline
+			stepThirtyThreePipeline->release();
+		});
+		NS::Error *createPipelineThirtyFourError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyFourPipeline(device->newComputePipelineState(stepThirtyFourKernel.get(), &createPipelineThirtyFourError), [](MTL::ComputePipelineState *stepThirtyFourPipeline) noexcept {
+		
+			// Free step thirty-four pipeline
+			stepThirtyFourPipeline->release();
+		});
 		NS::Error *createPipelineClearNumberOfEdgesPerSourceBucketError;
 		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerSourceBucketPipeline(device->newComputePipelineState(clearNumberOfEdgesPerSourceBucketKernel.get(), &createPipelineClearNumberOfEdgesPerSourceBucketError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerSourceBucketPipeline) noexcept {
 		
 			// Free clear number of edges per source bucket pipeline
 			clearNumberOfEdgesPerSourceBucketPipeline->release();
 		});
-		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketPipeline) noexcept {
+		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketOneError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketOnePipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketOneKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketOneError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketOnePipeline) noexcept {
 		
-			// Free clear number of edges per destination bucket pipeline
-			clearNumberOfEdgesPerDestinationBucketPipeline->release();
+			// Free clear number of edges per destination bucket one pipeline
+			clearNumberOfEdgesPerDestinationBucketOnePipeline->release();
 		});
-		if(!stepOnePipeline || !stepTwoPipeline || !stepThreePipeline || !stepFourPipeline || !stepFivePipeline || !stepSixPipeline || !stepSevenPipeline || !stepEightPipeline || !stepNinePipeline || !stepTenPipeline || !stepElevenPipeline || !stepTwelvePipeline || !stepThirteenPipeline || !stepFourteenPipeline || !stepFifteenPipeline || !stepSixteenPipeline || !stepSeventeenPipeline || !stepEighteenPipeline || !clearNumberOfEdgesPerSourceBucketPipeline || !clearNumberOfEdgesPerDestinationBucketPipeline) {
+		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketTwoError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketTwoPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketTwoError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketTwoPipeline) noexcept {
+		
+			// Free clear number of edges per destination bucket two pipeline
+			clearNumberOfEdgesPerDestinationBucketTwoPipeline->release();
+		});
+		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketFourError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketFourPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketFourError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketFourPipeline) noexcept {
+		
+			// Free clear number of edges per destination bucket four pipeline
+			clearNumberOfEdgesPerDestinationBucketFourPipeline->release();
+		});
+		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketEightError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketEightPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketEightError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketEightPipeline) noexcept {
+		
+			// Free clear number of edges per destination bucket eight pipeline
+			clearNumberOfEdgesPerDestinationBucketEightPipeline->release();
+		});
+		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError;
+		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketSixteenPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketSixteenKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketSixteenPipeline) noexcept {
+		
+			// Free clear number of edges per destination bucket sixteen pipeline
+			clearNumberOfEdgesPerDestinationBucketSixteenPipeline->release();
+		});
+		if(!stepOnePipeline || !stepTwoPipeline || !stepThreePipeline || !stepFourPipeline || !stepFivePipeline || !stepSixPipeline || !stepSevenPipeline || !stepEightPipeline || !stepNinePipeline || !stepTenPipeline || !stepElevenPipeline || !stepTwelvePipeline || !stepThirteenPipeline || !stepFourteenPipeline || !stepFifteenPipeline || !stepSixteenPipeline || !stepSeventeenPipeline || !stepEighteenPipeline || !stepNineteenPipeline || !stepTwentyPipeline || !stepTwentyOnePipeline || !stepTwentyTwoPipeline || !stepTwentyThreePipeline || !stepTwentyFourPipeline || !stepTwentyFivePipeline || !stepTwentySixPipeline || !stepTwentySevenPipeline || !stepTwentyEightPipeline || !stepTwentyNinePipeline || !stepThirtyPipeline || !stepThirtyOnePipeline || !stepThirtyTwoPipeline || !stepThirtyThreePipeline || !stepThirtyFourPipeline || !clearNumberOfEdgesPerSourceBucketPipeline || !clearNumberOfEdgesPerDestinationBucketOnePipeline || !clearNumberOfEdgesPerDestinationBucketTwoPipeline || !clearNumberOfEdgesPerDestinationBucketFourPipeline || !clearNumberOfEdgesPerDestinationBucketEightPipeline || !clearNumberOfEdgesPerDestinationBucketSixteenPipeline) {
 		
 			// Display message
 			cout << "Creating pipelines for the GPU failed" << endl;
@@ -1052,6 +1281,278 @@ using namespace std;
 				}
 			}
 			
+			// Check if creating pipeline nineteen failed and an error exists
+			if(!stepNineteenPipeline && createPipelineNineteenError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineNineteenError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty failed and an error exists
+			if(!stepTwentyPipeline && createPipelineTwentyError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty-one failed and an error exists
+			if(!stepTwentyOnePipeline && createPipelineTwentyOneError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyOneError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty-two failed and an error exists
+			if(!stepTwentyTwoPipeline && createPipelineTwentyTwoError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyTwoError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty-three failed and an error exists
+			if(!stepTwentyThreePipeline && createPipelineTwentyThreeError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyThreeError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty-four failed and an error exists
+			if(!stepTwentyFourPipeline && createPipelineTwentyFourError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyFourError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty-five failed and an error exists
+			if(!stepTwentyFivePipeline && createPipelineTwentyFiveError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyFiveError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty-six failed and an error exists
+			if(!stepTwentySixPipeline && createPipelineTwentySixError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentySixError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty-seven failed and an error exists
+			if(!stepTwentySevenPipeline && createPipelineTwentySevenError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentySevenError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty-eight failed and an error exists
+			if(!stepTwentyEightPipeline && createPipelineTwentyEightError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyEightError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline twenty-nine failed and an error exists
+			if(!stepTwentyNinePipeline && createPipelineTwentyNineError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyNineError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline thirty failed and an error exists
+			if(!stepThirtyPipeline && createPipelineThirtyError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline thirty-one failed and an error exists
+			if(!stepThirtyOnePipeline && createPipelineThirtyOneError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyOneError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline thirty-two failed and an error exists
+			if(!stepThirtyTwoPipeline && createPipelineThirtyTwoError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyTwoError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline thirty-three failed and an error exists
+			if(!stepThirtyThreePipeline && createPipelineThirtyThreeError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyThreeError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline thirty-four failed and an error exists
+			if(!stepThirtyFourPipeline && createPipelineThirtyFourError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyFourError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
 			// Check if creating pipeline clear number of edges per source bucket failed and an error exists
 			if(!clearNumberOfEdgesPerSourceBucketPipeline && createPipelineClearNumberOfEdgesPerSourceBucketError) {
 			
@@ -1069,11 +1570,79 @@ using namespace std;
 				}
 			}
 			
-			// Check if creating pipeline clear number of edges per destination bucket failed and an error exists
-			if(!clearNumberOfEdgesPerDestinationBucketPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketError) {
+			// Check if creating pipeline clear number of edges per destination bucket one failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketOnePipeline && createPipelineClearNumberOfEdgesPerDestinationBucketOneError) {
 			
 				// Check if error's localized description exists
-				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketError->localizedDescription();
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketOneError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline clear number of edges per destination bucket two failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketTwoPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketTwoError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketTwoError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline clear number of edges per destination bucket four failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketFourPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketFourError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketFourError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline clear number of edges per destination bucket eight failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketEightPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketEightError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketEightError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if creating pipeline clear number of edges per destination bucket sixteen failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketSixteenPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError->localizedDescription();
 				if(localizedDescription) {
 				
 					// Check if localized description's UTF-8 string exists
@@ -1130,7 +1699,7 @@ using namespace std;
 			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
 			
 			// Trim edges step thirteen kernel
-			{(NUMBER_OF_EDGES / SLEAN_TRIMMING_PARTS) / (sizeof(uint64_t) * BITS_IN_A_BYTE), 1, 1},
+			{(NUMBER_OF_EDGES / (SLEAN_TRIMMING_PARTS / 2)) / (sizeof(uint64_t) * BITS_IN_A_BYTE), 1, 1},
 			
 			// Trim edges step fourteen kernel
 			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
@@ -1142,16 +1711,76 @@ using namespace std;
 			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
 			
 			// Trim edges step seventeen kernel
-			{SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			{SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
 			
 			// Trim edges step eighteen kernel
 			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
 			
-			// Clear number of edges per source bucket kernel
-			{((SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + sizeof(uint64_t) - 1)) / sizeof(uint64_t), 1, 1},
+			// Trim edges step nineteen kernel
+			{(NUMBER_OF_EDGES / (SLEAN_TRIMMING_PARTS / 2)) / (sizeof(uint64_t) * BITS_IN_A_BYTE), 1, 1},
 			
-			// Clear number of edges per destination bucket kernel
-			{((SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(uint32_t) + sizeof(uint64_t) - 1)) / sizeof(uint64_t), 1, 1}
+			// Trim edges step twenty kernel
+			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-one kernel
+			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-two kernel
+			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-three kernel
+			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-four kernel
+			{(NUMBER_OF_EDGES / ((SLEAN_TRIMMING_PARTS + 4 - 1) / 4)) / (sizeof(uint64_t) * BITS_IN_A_BYTE), 1, 1},
+			
+			// Trim edges step twenty-five kernel
+			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-six kernel
+			{SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-seven kernel
+			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-eight kernel
+			{(NUMBER_OF_EDGES / ((SLEAN_TRIMMING_PARTS + 8 - 1) / 8)) / (sizeof(uint64_t) * BITS_IN_A_BYTE), 1, 1},
+			
+			// Trim edges step twenty-nine kernel
+			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step thirty kernel
+			{SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step thirty-one kernel
+			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step thirty-two kernel
+			{(NUMBER_OF_EDGES / ((SLEAN_TRIMMING_PARTS + 16 - 1) / 16)) / (sizeof(uint64_t) * BITS_IN_A_BYTE), 1, 1},
+			
+			// Trim edges step thirty-three kernel
+			{SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step thirty-four kernel
+			{SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Clear number of edges per source bucket kernel
+			{(SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + sizeof(uint64_t) - 1) / sizeof(uint64_t), 1, 1},
+			
+			// Clear number of edges per destination bucket one kernel
+			{(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(uint32_t) + sizeof(uint64_t) - 1) / sizeof(uint64_t), 1, 1},
+			
+			// Clear number of edges per destination bucket two kernel
+			{(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(uint32_t)) / sizeof(uint64_t), 1, 1},
+			
+			// Clear number of edges per destination bucket four kernel
+			{(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(uint32_t)) / sizeof(uint64_t), 1, 1},
+			
+			// Clear number of edges per destination bucket eight kernel
+			{(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(uint32_t)) / sizeof(uint64_t), 1, 1},
+			
+			// Clear number of edges per destination bucket sixteen kernel
+			{(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * sizeof(uint32_t)) / sizeof(uint64_t), 1, 1}
 		};
 		
 		// Set work items per work group based on the total number of work items and max work group size
@@ -1211,11 +1840,71 @@ using namespace std;
 			// Trim edges step eighteen kernel
 			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
 			
-			// Clear number of edges per source bucket kernel
-			{min(bit_floor(device->maxThreadsPerThreadgroup().width), totalNumberOfWorkItems[18].width), 1, 1},
+			// Trim edges step nineteen kernel
+			{min(min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), totalNumberOfWorkItems[18].width), 1, 1},
 			
-			// Clear number of edges per destination bucket kernel
-			{min(bit_floor(device->maxThreadsPerThreadgroup().width), totalNumberOfWorkItems[19].width), 1, 1}
+			// Trim edges step twenty kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-one kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-two kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-three kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-four kernel
+			{min(min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), totalNumberOfWorkItems[23].width), 1, 1},
+			
+			// Trim edges step twenty-five kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-six kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-seven kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step twenty-eight kernel
+			{min(min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), totalNumberOfWorkItems[27].width), 1, 1},
+			
+			// Trim edges step twenty-nine kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step thirty kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step thirty-one kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step thirty-two kernel
+			{min(min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), totalNumberOfWorkItems[31].width), 1, 1},
+			
+			// Trim edges step thirty-three kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Trim edges step thirty-four kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), bit_floor(static_cast<NS::UInteger>(INT16_MAX / 2))), 1, 1},
+			
+			// Clear number of edges per source bucket kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), totalNumberOfWorkItems[34].width), 1, 1},
+			
+			// Clear number of edges per destination bucket one kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), totalNumberOfWorkItems[35].width), 1, 1},
+			
+			// Clear number of edges per destination bucket two kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), totalNumberOfWorkItems[36].width), 1, 1},
+			
+			// Clear number of edges per destination bucket four kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), totalNumberOfWorkItems[37].width), 1, 1},
+			
+			// Clear number of edges per destination bucket eight kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), totalNumberOfWorkItems[38].width), 1, 1},
+			
+			// Clear number of edges per destination bucket sixteen kernel
+			{min(bit_floor(device->maxThreadsPerThreadgroup().width), totalNumberOfWorkItems[39].width), 1, 1}
 		};
 		
 		// Check if creating pipeline descriptors failed
@@ -1309,17 +1998,117 @@ using namespace std;
 			// Free step eighteen pipeline descriptor
 			stepEighteenPipelineDescriptor->release();
 		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepNineteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepNineteenPipelineDescriptor) noexcept {
+		
+			// Free step nineteen pipeline descriptor
+			stepNineteenPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyPipelineDescriptor) noexcept {
+		
+			// Free step twenty pipeline descriptor
+			stepTwentyPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyOnePipelineDescriptor) noexcept {
+		
+			// Free step twenty-one pipeline descriptor
+			stepTwentyOnePipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyTwoPipelineDescriptor) noexcept {
+		
+			// Free step twenty-two pipeline descriptor
+			stepTwentyTwoPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyThreePipelineDescriptor) noexcept {
+		
+			// Free step twenty-three pipeline descriptor
+			stepTwentyThreePipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyFourPipelineDescriptor) noexcept {
+		
+			// Free step twenty-four pipeline descriptor
+			stepTwentyFourPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyFivePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyFivePipelineDescriptor) noexcept {
+		
+			// Free step twenty-five pipeline descriptor
+			stepTwentyFivePipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentySixPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentySixPipelineDescriptor) noexcept {
+		
+			// Free step twenty-six pipeline descriptor
+			stepTwentySixPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentySevenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentySevenPipelineDescriptor) noexcept {
+		
+			// Free step twenty-seven pipeline descriptor
+			stepTwentySevenPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyEightPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyEightPipelineDescriptor) noexcept {
+		
+			// Free step twenty-eight pipeline descriptor
+			stepTwentyEightPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyNinePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyNinePipelineDescriptor) noexcept {
+		
+			// Free step twenty-nine pipeline descriptor
+			stepTwentyNinePipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyPipelineDescriptor) noexcept {
+		
+			// Free step thirty pipeline descriptor
+			stepThirtyPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyOnePipelineDescriptor) noexcept {
+		
+			// Free step thirty-one pipeline descriptor
+			stepThirtyOnePipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyTwoPipelineDescriptor) noexcept {
+		
+			// Free step thirty-two pipeline descriptor
+			stepThirtyTwoPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyThreePipelineDescriptor) noexcept {
+		
+			// Free step thirty-three pipeline descriptor
+			stepThirtyThreePipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyFourPipelineDescriptor) noexcept {
+		
+			// Free step thirty-four pipeline descriptor
+			stepThirtyFourPipelineDescriptor->release();
+		});
 		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerSourceBucketPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerSourceBucketPipelineDescriptor) noexcept {
 		
 			// Free clear number of edges per source bucket pipeline descriptor
 			clearNumberOfEdgesPerSourceBucketPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketPipelineDescriptor) noexcept {
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor) noexcept {
 		
-			// Free clear number of edges per destination bucket pipeline descriptor
-			clearNumberOfEdgesPerDestinationBucketPipelineDescriptor->release();
+			// Free clear number of edges per destination bucket one pipeline descriptor
+			clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor->release();
 		});
-		if(!stepOnePipelineDescriptor || !stepTwoPipelineDescriptor || !stepThreePipelineDescriptor || !stepFourPipelineDescriptor || !stepFivePipelineDescriptor || !stepSixPipelineDescriptor || !stepSevenPipelineDescriptor || !stepEightPipelineDescriptor || !stepNinePipelineDescriptor || !stepTenPipelineDescriptor || !stepElevenPipelineDescriptor || !stepTwelvePipelineDescriptor || !stepThirteenPipelineDescriptor || !stepFourteenPipelineDescriptor || !stepFifteenPipelineDescriptor || !stepSixteenPipelineDescriptor || !stepSeventeenPipelineDescriptor || !stepEighteenPipelineDescriptor || !clearNumberOfEdgesPerSourceBucketPipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketPipelineDescriptor) {
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor) noexcept {
+		
+			// Free clear number of edges per destination bucket two pipeline descriptor
+			clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor) noexcept {
+		
+			// Free clear number of edges per destination bucket four pipeline descriptor
+			clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor) noexcept {
+		
+			// Free clear number of edges per destination bucket eight pipeline descriptor
+			clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor->release();
+		});
+		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor) noexcept {
+		
+			// Free clear number of edges per destination bucket sixteen pipeline descriptor
+			clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor->release();
+		});
+		if(!stepOnePipelineDescriptor || !stepTwoPipelineDescriptor || !stepThreePipelineDescriptor || !stepFourPipelineDescriptor || !stepFivePipelineDescriptor || !stepSixPipelineDescriptor || !stepSevenPipelineDescriptor || !stepEightPipelineDescriptor || !stepNinePipelineDescriptor || !stepTenPipelineDescriptor || !stepElevenPipelineDescriptor || !stepTwelvePipelineDescriptor || !stepThirteenPipelineDescriptor || !stepFourteenPipelineDescriptor || !stepFifteenPipelineDescriptor || !stepSixteenPipelineDescriptor || !stepSeventeenPipelineDescriptor || !stepEighteenPipelineDescriptor || !stepNineteenPipelineDescriptor || !stepTwentyPipelineDescriptor || !stepTwentyOnePipelineDescriptor || !stepTwentyTwoPipelineDescriptor || !stepTwentyThreePipelineDescriptor || !stepTwentyFourPipelineDescriptor || !stepTwentyFivePipelineDescriptor || !stepTwentySixPipelineDescriptor || !stepTwentySevenPipelineDescriptor || !stepTwentyEightPipelineDescriptor || !stepTwentyNinePipelineDescriptor || !stepThirtyPipelineDescriptor || !stepThirtyOnePipelineDescriptor || !stepThirtyTwoPipelineDescriptor || !stepThirtyThreePipelineDescriptor || !stepThirtyFourPipelineDescriptor || !clearNumberOfEdgesPerSourceBucketPipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor) {
 		
 			// Display message
 			cout << "Creating pipeline descriptors failed" << endl;
@@ -1401,13 +2190,93 @@ using namespace std;
 		stepEighteenPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[17].width);
 		stepEighteenPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[17].width % stepEighteenPipeline->threadExecutionWidth() == 0);
 		
-		clearNumberOfEdgesPerSourceBucketPipelineDescriptor->setComputeFunction(clearNumberOfEdgesPerSourceBucketKernel.get());
-		clearNumberOfEdgesPerSourceBucketPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[18].width);
-		clearNumberOfEdgesPerSourceBucketPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[18].width % clearNumberOfEdgesPerSourceBucketPipeline->threadExecutionWidth() == 0);
+		stepNineteenPipelineDescriptor->setComputeFunction(stepNineteenKernel.get());
+		stepNineteenPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[18].width);
+		stepNineteenPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[18].width % stepNineteenPipeline->threadExecutionWidth() == 0);
 		
-		clearNumberOfEdgesPerDestinationBucketPipelineDescriptor->setComputeFunction(clearNumberOfEdgesPerDestinationBucketKernel.get());
-		clearNumberOfEdgesPerDestinationBucketPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[19].width);
-		clearNumberOfEdgesPerDestinationBucketPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[19].width % clearNumberOfEdgesPerDestinationBucketPipeline->threadExecutionWidth() == 0);
+		stepTwentyPipelineDescriptor->setComputeFunction(stepTwentyKernel.get());
+		stepTwentyPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[19].width);
+		stepTwentyPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[19].width % stepTwentyPipeline->threadExecutionWidth() == 0);
+		
+		stepTwentyOnePipelineDescriptor->setComputeFunction(stepTwentyOneKernel.get());
+		stepTwentyOnePipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[20].width);
+		stepTwentyOnePipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[20].width % stepTwentyOnePipeline->threadExecutionWidth() == 0);
+		
+		stepTwentyTwoPipelineDescriptor->setComputeFunction(stepTwentyTwoKernel.get());
+		stepTwentyTwoPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[21].width);
+		stepTwentyTwoPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[21].width % stepTwentyTwoPipeline->threadExecutionWidth() == 0);
+		
+		stepTwentyThreePipelineDescriptor->setComputeFunction(stepTwentyThreeKernel.get());
+		stepTwentyThreePipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[22].width);
+		stepTwentyThreePipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[22].width % stepTwentyThreePipeline->threadExecutionWidth() == 0);
+		
+		stepTwentyFourPipelineDescriptor->setComputeFunction(stepTwentyFourKernel.get());
+		stepTwentyFourPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[23].width);
+		stepTwentyFourPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[23].width % stepTwentyFourPipeline->threadExecutionWidth() == 0);
+		
+		stepTwentyFivePipelineDescriptor->setComputeFunction(stepTwentyFiveKernel.get());
+		stepTwentyFivePipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[24].width);
+		stepTwentyFivePipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[24].width % stepTwentyFivePipeline->threadExecutionWidth() == 0);
+		
+		stepTwentySixPipelineDescriptor->setComputeFunction(stepTwentySixKernel.get());
+		stepTwentySixPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[25].width);
+		stepTwentySixPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[25].width % stepTwentySixPipeline->threadExecutionWidth() == 0);
+		
+		stepTwentySevenPipelineDescriptor->setComputeFunction(stepTwentySevenKernel.get());
+		stepTwentySevenPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[26].width);
+		stepTwentySevenPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[26].width % stepTwentySevenPipeline->threadExecutionWidth() == 0);
+		
+		stepTwentyEightPipelineDescriptor->setComputeFunction(stepTwentyEightKernel.get());
+		stepTwentyEightPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[27].width);
+		stepTwentyEightPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[27].width % stepTwentyEightPipeline->threadExecutionWidth() == 0);
+		
+		stepTwentyNinePipelineDescriptor->setComputeFunction(stepTwentyNineKernel.get());
+		stepTwentyNinePipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[28].width);
+		stepTwentyNinePipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[28].width % stepTwentyNinePipeline->threadExecutionWidth() == 0);
+		
+		stepThirtyPipelineDescriptor->setComputeFunction(stepThirtyKernel.get());
+		stepThirtyPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[29].width);
+		stepThirtyPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[29].width % stepThirtyPipeline->threadExecutionWidth() == 0);
+		
+		stepThirtyOnePipelineDescriptor->setComputeFunction(stepThirtyOneKernel.get());
+		stepThirtyOnePipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[30].width);
+		stepThirtyOnePipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[30].width % stepThirtyOnePipeline->threadExecutionWidth() == 0);
+		
+		stepThirtyTwoPipelineDescriptor->setComputeFunction(stepThirtyTwoKernel.get());
+		stepThirtyTwoPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[31].width);
+		stepThirtyTwoPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[31].width % stepThirtyTwoPipeline->threadExecutionWidth() == 0);
+		
+		stepThirtyThreePipelineDescriptor->setComputeFunction(stepThirtyThreeKernel.get());
+		stepThirtyThreePipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[32].width);
+		stepThirtyThreePipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[32].width % stepThirtyThreePipeline->threadExecutionWidth() == 0);
+		
+		stepThirtyFourPipelineDescriptor->setComputeFunction(stepThirtyFourKernel.get());
+		stepThirtyFourPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[33].width);
+		stepThirtyFourPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[33].width % stepThirtyFourPipeline->threadExecutionWidth() == 0);
+		
+		clearNumberOfEdgesPerSourceBucketPipelineDescriptor->setComputeFunction(clearNumberOfEdgesPerSourceBucketKernel.get());
+		clearNumberOfEdgesPerSourceBucketPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[34].width);
+		clearNumberOfEdgesPerSourceBucketPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[34].width % clearNumberOfEdgesPerSourceBucketPipeline->threadExecutionWidth() == 0);
+		
+		clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor->setComputeFunction(clearNumberOfEdgesPerDestinationBucketOneKernel.get());
+		clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[35].width);
+		clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[35].width % clearNumberOfEdgesPerDestinationBucketOnePipeline->threadExecutionWidth() == 0);
+		
+		clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor->setComputeFunction(clearNumberOfEdgesPerDestinationBucketTwoKernel.get());
+		clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[36].width);
+		clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[36].width % clearNumberOfEdgesPerDestinationBucketTwoPipeline->threadExecutionWidth() == 0);
+		
+		clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor->setComputeFunction(clearNumberOfEdgesPerDestinationBucketFourKernel.get());
+		clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[37].width);
+		clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[37].width % clearNumberOfEdgesPerDestinationBucketFourPipeline->threadExecutionWidth() == 0);
+		
+		clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor->setComputeFunction(clearNumberOfEdgesPerDestinationBucketEightKernel.get());
+		clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[38].width);
+		clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[38].width % clearNumberOfEdgesPerDestinationBucketEightPipeline->threadExecutionWidth() == 0);
+		
+		clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor->setComputeFunction(clearNumberOfEdgesPerDestinationBucketSixteenKernel.get());
+		clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor->setMaxTotalThreadsPerThreadgroup(workItemsPerWorkGroup[39].width);
+		clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor->setThreadGroupSizeIsMultipleOfThreadExecutionWidth(workItemsPerWorkGroup[39].width % clearNumberOfEdgesPerDestinationBucketSixteenPipeline->threadExecutionWidth() == 0);
 		
 		// Check if recreating pipelines for the device with hardcoded work items per work group failed
 		stepOnePipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepOnePipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineOneError), [](MTL::ComputePipelineState *stepOnePipeline) noexcept {
@@ -1500,17 +2369,118 @@ using namespace std;
 			// Free step eighteen pipeline
 			stepEighteenPipeline->release();
 		});
+		
+		stepNineteenPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepNineteenPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineNineteenError), [](MTL::ComputePipelineState *stepNineteenPipeline) noexcept {
+		
+			// Free step nineteen pipeline
+			stepNineteenPipeline->release();
+		});
+		stepTwentyPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentyPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentyError), [](MTL::ComputePipelineState *stepTwentyPipeline) noexcept {
+		
+			// Free step twenty pipeline
+			stepTwentyPipeline->release();
+		});
+		stepTwentyOnePipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentyOnePipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentyOneError), [](MTL::ComputePipelineState *stepTwentyOnePipeline) noexcept {
+		
+			// Free step twenty-one pipeline
+			stepTwentyOnePipeline->release();
+		});
+		stepTwentyTwoPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentyTwoPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentyTwoError), [](MTL::ComputePipelineState *stepTwentyTwoPipeline) noexcept {
+		
+			// Free step twenty-two pipeline
+			stepTwentyTwoPipeline->release();
+		});
+		stepTwentyThreePipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentyThreePipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentyThreeError), [](MTL::ComputePipelineState *stepTwentyThreePipeline) noexcept {
+		
+			// Free step twenty-three pipeline
+			stepTwentyThreePipeline->release();
+		});
+		stepTwentyFourPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentyFourPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentyFourError), [](MTL::ComputePipelineState *stepTwentyFourPipeline) noexcept {
+		
+			// Free step twenty-four pipeline
+			stepTwentyFourPipeline->release();
+		});
+		stepTwentyFivePipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentyFivePipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentyFiveError), [](MTL::ComputePipelineState *stepTwentyFivePipeline) noexcept {
+		
+			// Free step twenty-five pipeline
+			stepTwentyFivePipeline->release();
+		});
+		stepTwentySixPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentySixPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentySixError), [](MTL::ComputePipelineState *stepTwentySixPipeline) noexcept {
+		
+			// Free step twenty-six pipeline
+			stepTwentySixPipeline->release();
+		});
+		stepTwentySevenPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentySevenPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentySevenError), [](MTL::ComputePipelineState *stepTwentySevenPipeline) noexcept {
+		
+			// Free step twenty-seven pipeline
+			stepTwentySevenPipeline->release();
+		});
+		stepTwentyEightPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentyEightPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentyEightError), [](MTL::ComputePipelineState *stepTwentyEightPipeline) noexcept {
+		
+			// Free step twenty-eight pipeline
+			stepTwentyEightPipeline->release();
+		});
+		stepTwentyNinePipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepTwentyNinePipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineTwentyNineError), [](MTL::ComputePipelineState *stepTwentyNinePipeline) noexcept {
+		
+			// Free step twenty-nine pipeline
+			stepTwentyNinePipeline->release();
+		});
+		stepThirtyPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepThirtyPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineThirtyError), [](MTL::ComputePipelineState *stepThirtyPipeline) noexcept {
+		
+			// Free step thirty pipeline
+			stepThirtyPipeline->release();
+		});
+		stepThirtyOnePipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepThirtyOnePipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineThirtyOneError), [](MTL::ComputePipelineState *stepThirtyOnePipeline) noexcept {
+		
+			// Free step thirty-one pipeline
+			stepThirtyOnePipeline->release();
+		});
+		stepThirtyTwoPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepThirtyTwoPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineThirtyTwoError), [](MTL::ComputePipelineState *stepThirtyTwoPipeline) noexcept {
+		
+			// Free step thirty-two pipeline
+			stepThirtyTwoPipeline->release();
+		});
+		stepThirtyThreePipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepThirtyThreePipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineThirtyThreeError), [](MTL::ComputePipelineState *stepThirtyThreePipeline) noexcept {
+		
+			// Free step thirty-three pipeline
+			stepThirtyThreePipeline->release();
+		});
+		stepThirtyFourPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(stepThirtyFourPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineThirtyFourError), [](MTL::ComputePipelineState *stepThirtyFourPipeline) noexcept {
+		
+			// Free step thirty-four pipeline
+			stepThirtyFourPipeline->release();
+		});
 		clearNumberOfEdgesPerSourceBucketPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(clearNumberOfEdgesPerSourceBucketPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineClearNumberOfEdgesPerSourceBucketError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerSourceBucketPipeline) noexcept {
 		
 			// Free clear number of edges per source bucket pipeline
 			clearNumberOfEdgesPerSourceBucketPipeline->release();
 		});
-		clearNumberOfEdgesPerDestinationBucketPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineClearNumberOfEdgesPerDestinationBucketError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketPipeline) noexcept {
+		clearNumberOfEdgesPerDestinationBucketOnePipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineClearNumberOfEdgesPerDestinationBucketOneError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketOnePipeline) noexcept {
 		
-			// Free clear number of edges per destination bucket pipeline
-			clearNumberOfEdgesPerDestinationBucketPipeline->release();
+			// Free clear number of edges per destination bucket one pipeline
+			clearNumberOfEdgesPerDestinationBucketOnePipeline->release();
 		});
-		if(!stepOnePipeline || !stepTwoPipeline || !stepThreePipeline || !stepFourPipeline || !stepFivePipeline || !stepSixPipeline || !stepSevenPipeline || !stepEightPipeline || !stepNinePipeline || !stepTenPipeline || !stepElevenPipeline || !stepTwelvePipeline || !stepThirteenPipeline || !stepFourteenPipeline || !stepFifteenPipeline || !stepSixteenPipeline || !stepSeventeenPipeline || !stepEighteenPipeline || !clearNumberOfEdgesPerSourceBucketPipeline || !clearNumberOfEdgesPerDestinationBucketPipeline) {
+		clearNumberOfEdgesPerDestinationBucketTwoPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineClearNumberOfEdgesPerDestinationBucketTwoError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketTwoPipeline) noexcept {
+		
+			// Free clear number of edges per destination bucket two pipeline
+			clearNumberOfEdgesPerDestinationBucketTwoPipeline->release();
+		});
+		clearNumberOfEdgesPerDestinationBucketFourPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineClearNumberOfEdgesPerDestinationBucketFourError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketFourPipeline) noexcept {
+		
+			// Free clear number of edges per destination bucket four pipeline
+			clearNumberOfEdgesPerDestinationBucketFourPipeline->release();
+		});
+		clearNumberOfEdgesPerDestinationBucketEightPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineClearNumberOfEdgesPerDestinationBucketEightError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketEightPipeline) noexcept {
+		
+			// Free clear number of edges per destination bucket eight pipeline
+			clearNumberOfEdgesPerDestinationBucketEightPipeline->release();
+		});
+		clearNumberOfEdgesPerDestinationBucketSixteenPipeline = unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)>(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor.get(), MTL::PipelineOptionNone, nullptr, &createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketSixteenPipeline) noexcept {
+		
+			// Free clear number of edges per destination bucket sixteen pipeline
+			clearNumberOfEdgesPerDestinationBucketSixteenPipeline->release();
+		});
+		if(!stepOnePipeline || !stepTwoPipeline || !stepThreePipeline || !stepFourPipeline || !stepFivePipeline || !stepSixPipeline || !stepSevenPipeline || !stepEightPipeline || !stepNinePipeline || !stepTenPipeline || !stepElevenPipeline || !stepTwelvePipeline || !stepThirteenPipeline || !stepFourteenPipeline || !stepFifteenPipeline || !stepSixteenPipeline || !stepSeventeenPipeline || !stepEighteenPipeline || !stepNineteenPipeline || !stepTwentyPipeline || !stepTwentyOnePipeline || !stepTwentyTwoPipeline || !stepTwentyThreePipeline || !stepTwentyFourPipeline || !stepTwentyFivePipeline || !stepTwentySixPipeline || !stepTwentySevenPipeline || !stepTwentyEightPipeline || !stepTwentyNinePipeline || !stepThirtyPipeline || !stepThirtyOnePipeline || !stepThirtyTwoPipeline || !stepThirtyThreePipeline || !stepThirtyFourPipeline || !clearNumberOfEdgesPerSourceBucketPipeline || !clearNumberOfEdgesPerDestinationBucketOnePipeline || !clearNumberOfEdgesPerDestinationBucketTwoPipeline || !clearNumberOfEdgesPerDestinationBucketFourPipeline || !clearNumberOfEdgesPerDestinationBucketEightPipeline || !clearNumberOfEdgesPerDestinationBucketSixteenPipeline) {
 		
 			// Display message
 			cout << "Creating pipelines for the GPU failed" << endl;
@@ -1821,6 +2791,278 @@ using namespace std;
 				}
 			}
 			
+			// Check if recreating pipeline nineteen failed and an error exists
+			if(!stepNineteenPipeline && createPipelineNineteenError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineNineteenError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty failed and an error exists
+			if(!stepTwentyPipeline && createPipelineTwentyError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty-one failed and an error exists
+			if(!stepTwentyOnePipeline && createPipelineTwentyOneError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyOneError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty-two failed and an error exists
+			if(!stepTwentyTwoPipeline && createPipelineTwentyTwoError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyTwoError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty-three failed and an error exists
+			if(!stepTwentyThreePipeline && createPipelineTwentyThreeError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyThreeError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty-four failed and an error exists
+			if(!stepTwentyFourPipeline && createPipelineTwentyFourError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyFourError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty-five failed and an error exists
+			if(!stepTwentyFivePipeline && createPipelineTwentyFiveError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyFiveError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty-six failed and an error exists
+			if(!stepTwentySixPipeline && createPipelineTwentySixError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentySixError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty-seven failed and an error exists
+			if(!stepTwentySevenPipeline && createPipelineTwentySevenError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentySevenError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty-eight failed and an error exists
+			if(!stepTwentyEightPipeline && createPipelineTwentyEightError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyEightError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline twenty-nine failed and an error exists
+			if(!stepTwentyNinePipeline && createPipelineTwentyNineError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineTwentyNineError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline thirty failed and an error exists
+			if(!stepThirtyPipeline && createPipelineThirtyError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline thirty-one failed and an error exists
+			if(!stepThirtyOnePipeline && createPipelineThirtyOneError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyOneError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline thirty-two failed and an error exists
+			if(!stepThirtyTwoPipeline && createPipelineThirtyTwoError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyTwoError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline thirty-three failed and an error exists
+			if(!stepThirtyThreePipeline && createPipelineThirtyThreeError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyThreeError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline thirty-four failed and an error exists
+			if(!stepThirtyFourPipeline && createPipelineThirtyFourError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineThirtyFourError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
 			// Check if recreating pipeline clear number of edges per source bucket failed and an error exists
 			if(!clearNumberOfEdgesPerSourceBucketPipeline && createPipelineClearNumberOfEdgesPerSourceBucketError) {
 			
@@ -1838,11 +3080,79 @@ using namespace std;
 				}
 			}
 			
-			// Check if recreating pipeline clear number of edges per destination bucket failed and an error exists
-			if(!clearNumberOfEdgesPerDestinationBucketPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketError) {
+			// Check if recreating pipeline clear number of edges per destination bucket one failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketOnePipeline && createPipelineClearNumberOfEdgesPerDestinationBucketOneError) {
 			
 				// Check if error's localized description exists
-				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketError->localizedDescription();
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketOneError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline clear number of edges per destination bucket two failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketTwoPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketTwoError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketTwoError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline clear number of edges per destination bucket four failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketFourPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketFourError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketFourError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline clear number of edges per destination bucket eight failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketEightPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketEightError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketEightError->localizedDescription();
+				if(localizedDescription) {
+				
+					// Check if localized description's UTF-8 string exists
+					const char *utf8String = localizedDescription->utf8String();
+					if(utf8String) {
+					
+						// Display message
+						cout << utf8String << endl;
+					}
+				}
+			}
+			
+			// Check if recreating pipeline clear number of edges per destination bucket sixteen failed and an error exists
+			if(!clearNumberOfEdgesPerDestinationBucketSixteenPipeline && createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError) {
+			
+				// Check if error's localized description exists
+				const NS::String *localizedDescription = createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError->localizedDescription();
 				if(localizedDescription) {
 				
 					// Check if localized description's UTF-8 string exists
@@ -1880,7 +3190,7 @@ using namespace std;
 			// Free number of edges per bucket one
 			numberOfEdgesPerBucketOne->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> numberOfEdgesPerBucketTwo(device->newBuffer(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *numberOfEdgesPerBucketTwo) noexcept {
+		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> numberOfEdgesPerBucketTwo(device->newBuffer(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * SLEAN_TRIMMING_PARTS * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *numberOfEdgesPerBucketTwo) noexcept {
 		
 			// Free number of edges per bucket two
 			numberOfEdgesPerBucketTwo->release();
@@ -1990,7 +3300,7 @@ using namespace std;
 		// Set compute pass's buckets, number of edges per bucket, SipHash keys, nodes bitmap, destination buckets, number of edges per destination bucket, and edges bitmap arguments
 		computePassEncoder->setBuffer(bucketsOne.get(), 0, 0);
 		computePassEncoder->setBuffer(numberOfEdgesPerBucketOne.get(), 0, 1);
-		computePassEncoder->setBytes(&sipHashKeysOne, sizeof(sipHashKeysOne), 3);
+		computePassEncoder->setBytes(&sipHashKeysOne, sizeof(sipHashKeysOne), 2);
 		computePassEncoder->setBuffer(nodesBitmap.get(), 0, 5);
 		computePassEncoder->setBuffer(bucketsTwo.get(), 0, 6);
 		computePassEncoder->setBuffer(numberOfEdgesPerBucketTwo.get(), 0, 7);
@@ -2005,10 +3315,10 @@ using namespace std;
 		
 		// Add clearing number of edges per bucket one to the compute pass
 		computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-		computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+		computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 		
 		// Set compute pass's part argument
-		computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
+		computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 		
 		// Add running step one to the compute pass
 		computePassEncoder->setComputePipelineState(stepOnePipeline.get());
@@ -2023,10 +3333,10 @@ using namespace std;
 		
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 			
 			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 			
 			// Add running step one to the compute pass
 			computePassEncoder->setComputePipelineState(stepOnePipeline.get());
@@ -2044,8 +3354,8 @@ using namespace std;
 			else {
 			
 				// Add clearing number of edges per bucket two to the compute pass
-				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 				
 				// Add running step four to the compute pass
 				computePassEncoder->setComputePipelineState(stepFourPipeline.get());
@@ -2062,18 +3372,18 @@ using namespace std;
 		
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 			
 			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 			
 			// Add running step one to the compute pass
 			computePassEncoder->setComputePipelineState(stepOnePipeline.get());
 			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[0], workItemsPerWorkGroup[0]);
 			
 			// Add clearing number of edges per bucket two to the compute pass
-			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 			
 			// Add running step six to the compute pass
 			computePassEncoder->setComputePipelineState(stepSixPipeline.get());
@@ -2089,10 +3399,10 @@ using namespace std;
 		
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 			
 			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
+			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 			
 			// Add running step seven to the compute pass
 			computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -2107,10 +3417,10 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 				
 				// Add running step seven to the compute pass
 				computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -2128,8 +3438,8 @@ using namespace std;
 				else {
 				
 					// Add clearing number of edges per bucket two to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 					
 					// Add running step ten to the compute pass
 					computePassEncoder->setComputePipelineState(stepTenPipeline.get());
@@ -2146,18 +3456,18 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 				
 				// Add running step seven to the compute pass
 				computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[6], workItemsPerWorkGroup[6]);
 				
 				// Add clearing number of edges per bucket two to the compute pass
-				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 				
 				// Add running step twelve to the compute pass
 				computePassEncoder->setComputePipelineState(stepTwelvePipeline.get());
@@ -2168,58 +3478,77 @@ using namespace std;
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[10], workItemsPerWorkGroup[10]);
 			}
 			
-			// Go through all remaining trimming rounds
-			for(unsigned int i = 2; i < TRIMMING_ROUNDS; ++i) {
+			// Check if trimming more than two rounds
+			if(TRIMMING_ROUNDS > 2) {
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
-				// Set compute pass's part and nodes in second partition arguments
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
+				
+					// Set compute pass's part argument
+					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+				}
 				
 				// Add running step thirteen to the compute pass
 				computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
 				
-				// Add running step fourteen to the compute pass
-				computePassEncoder->setComputePipelineState(stepFourteenPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[13], workItemsPerWorkGroup[13]);
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
 				
-				// Go through all remaining trimming parts
-				for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS; ++j) {
-				
-					// Add clearing number of edges per bucket one to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					// Add running step fourteen to the compute pass
+					computePassEncoder->setComputePipelineState(stepFourteenPipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[13], workItemsPerWorkGroup[13]);
 					
-					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 2);
+					// Go through all remaining trimming parts
+					for(unsigned int i = 1; i < SLEAN_TRIMMING_PARTS / 2; ++i) {
 					
-					// Add running step thirteen to the compute pass
-					computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
-					
-					// Check if not the last trimming part
-					if(j != SLEAN_TRIMMING_PARTS - 1) {
-					
-						// Add running step fifteen to the compute pass
-						computePassEncoder->setComputePipelineState(stepFifteenPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[14], workItemsPerWorkGroup[14]);
-					}
-					
-					// Otherwise
-					else {
-					
-						// Add clearing number of edges per bucket two to the compute pass
-						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+						// Add clearing number of edges per bucket one to the compute pass
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 						
-						// Add running step sixteen to the compute pass
-						computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
+						// Set compute pass's part argument
+						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
+						
+						// Add running step thirteen to the compute pass
+						computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
+						
+						// Check if not the last trimming part
+						if(i != SLEAN_TRIMMING_PARTS / 2 - 1) {
+						
+							// Add running step fifteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepFifteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[14], workItemsPerWorkGroup[14]);
+						}
+						
+						// Otherwise
+						else {
+						
+							// Add clearing number of edges per bucket two to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+							
+							// Add running step sixteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
+						}
 					}
+				}
+				
+				// Otherwise
+				else {
+				
+					// Add clearing number of edges per bucket two to the compute pass
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+					
+					// Add running step sixteen to the compute pass
+					computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
 				}
 				
 				// Add running step seventeen to the compute pass
@@ -2227,22 +3556,22 @@ using namespace std;
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 				
 				// Go through all remaining trimming parts except the last one
-				for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS - 1; ++j) {
+				for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 					
 					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 2);
+					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 					
 					// Add running step thirteen to the compute pass
 					computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
 					
 					// Add clearing number of edges per bucket two to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
 					
 					// Add running step eighteen to the compute pass
 					computePassEncoder->setComputePipelineState(stepEighteenPipeline.get());
@@ -2251,6 +3580,373 @@ using namespace std;
 					// Add running step seventeen to the compute pass
 					computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+				}
+				
+				// Check if trimming more than three rounds
+				if(TRIMMING_ROUNDS > 3) {
+				
+					// Go through several remaining trimming rounds
+					for(unsigned int i = 3; i < ((SLEAN_TRIMMING_PARTS == 2 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN); ++i) {
+					
+						// Add clearing number of edges per bucket one to the compute pass
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+						
+						// Set compute pass's nodes in second partition argument
+						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Set compute pass's part argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+						}
+						
+						// Add running step nineteen to the compute pass
+						computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Add running step twenty to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+							
+							// Go through all remaining trimming parts
+							for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 2; ++j) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+								
+								// Add running step nineteen to the compute pass
+								computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+								
+								// Check if not the last trimming part
+								if(j != SLEAN_TRIMMING_PARTS / 2 - 1) {
+								
+									// Add running step twenty-one to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+								}
+								
+								// Otherwise
+								else {
+								
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+									
+									// Add running step twenty-two to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyTwoPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[21], workItemsPerWorkGroup[21]);
+								}
+							}
+						}
+						
+						// Otherwise
+						else {
+						
+							// Add clearing number of edges per bucket two to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+							
+							// Add running step twenty-two to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentyTwoPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[21], workItemsPerWorkGroup[21]);
+						}
+						
+						// Add running step seventeen to the compute pass
+						computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+						
+						// Go through all remaining trimming parts except the last one
+						for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+						
+							// Add clearing number of edges per bucket one to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+							
+							// Set compute pass's part argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+							
+							// Add running step nineteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+							
+							// Add clearing number of edges per bucket two to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+							
+							// Add running step twenty-three to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentyThreePipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[22], workItemsPerWorkGroup[22]);
+							
+							// Add running step seventeen to the compute pass
+							computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+						}
+					}
+					
+					// Check if slean trimming parts isn't two and trimming more rounds
+					if(SLEAN_TRIMMING_PARTS != 2 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) {
+					
+						// Go through several remaining trimming rounds
+						for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 4 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN); ++i) {
+						
+							// Add clearing number of edges per bucket one to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+							
+							// Set compute pass's nodes in second partition argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+							}
+							
+							// Add running step twenty-four to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Add running step twenty to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+								
+								// Go through all remaining trimming parts
+								for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 4; ++j) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+									
+									// Add running step twenty-four to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+									
+									// Check if not the last trimming part
+									if(j != (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1) {
+									
+										// Add running step twenty-one to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+									}
+									
+									// Otherwise
+									else {
+									
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+										
+										// Add running step twenty-five to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyFivePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[24], workItemsPerWorkGroup[24]);
+									}
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+								
+								// Add running step twenty-five to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyFivePipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[24], workItemsPerWorkGroup[24]);
+							}
+							
+							// Add running step twenty-six to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentySixPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
+							
+							// Go through all remaining trimming parts except the last one
+							for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+								
+								// Add running step twenty-four to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+								
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+								
+								// Add running step twenty-seven to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentySevenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[26], workItemsPerWorkGroup[26]);
+								
+								// Add running step twenty-six to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentySixPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
+							}
+						}
+						
+						// Check if slean trimming parts isn't four and trimming more rounds
+						if(SLEAN_TRIMMING_PARTS != 4 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) {
+						
+							// Go through several remaining trimming rounds
+							for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 8 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN); ++i) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's nodes in second partition argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+								
+								// Check is slean trimming parts isn't eight
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+								}
+								
+								// Add running step twenty-eight to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+								
+								// Check is slean trimming parts isn't eight
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Add running step twenty to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+									
+									// Go through all remaining trimming parts
+									for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 8; ++j) {
+									
+										// Add clearing number of edges per bucket one to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+										
+										// Set compute pass's part argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+										
+										// Add running step twenty-eight to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+										
+										// Check if not the last trimming part
+										if(j != (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1) {
+										
+											// Add running step twenty-one to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+										}
+										
+										// Otherwise
+										else {
+										
+											// Add clearing number of edges per bucket two to the compute pass
+											computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+											
+											// Add running step twenty-nine to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyNinePipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[28], workItemsPerWorkGroup[28]);
+										}
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+									
+									// Add running step twenty-nine to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyNinePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[28], workItemsPerWorkGroup[28]);
+								}
+								
+								// Add running step thirty to the compute pass
+								computePassEncoder->setComputePipelineState(stepThirtyPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[29], workItemsPerWorkGroup[29]);
+								
+								// Go through all remaining trimming parts except the last one
+								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1; ++j) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+									
+									// Add running step twenty-eight to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+									
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+									
+									// Add running step thirty-one to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyOnePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[30], workItemsPerWorkGroup[30]);
+									
+									// Add running step thirty to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[29], workItemsPerWorkGroup[29]);
+								}
+							}
+							
+							// Check if slean trimming parts isn't eight and trimming more rounds
+							if(SLEAN_TRIMMING_PARTS != 8 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) {
+							
+								// Go through all remaining trimming rounds
+								for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN; i < TRIMMING_ROUNDS; ++i) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's nodes in second partition argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+									
+									// Add running step thirty-two to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyTwoPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[31], workItemsPerWorkGroup[31]);
+									
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketSixteenPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[39], workItemsPerWorkGroup[39]);
+									
+									// Add running step thirty-three to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyThreePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[32], workItemsPerWorkGroup[32]);
+									
+									// Add running step thirty-four to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[33], workItemsPerWorkGroup[33]);
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -2340,7 +4036,7 @@ using namespace std;
 		// Set compute pass's buckets, number of edges per bucket, SipHash keys, nodes bitmap, destination buckets, number of edges per destination bucket, and edges bitmap arguments
 		computePassEncoder->setBuffer(bucketsOne.get(), 0, 0);
 		computePassEncoder->setBuffer(numberOfEdgesPerBucketOne.get(), 0, 1);
-		computePassEncoder->setBytes(&sipHashKeysTwo, sizeof(sipHashKeysTwo), 3);
+		computePassEncoder->setBytes(&sipHashKeysTwo, sizeof(sipHashKeysTwo), 2);
 		computePassEncoder->setBuffer(nodesBitmap.get(), 0, 5);
 		computePassEncoder->setBuffer(bucketsTwo.get(), 0, 6);
 		computePassEncoder->setBuffer(numberOfEdgesPerBucketTwo.get(), 0, 7);
@@ -2355,10 +4051,10 @@ using namespace std;
 		
 		// Add clearing number of edges per bucket one to the compute pass
 		computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-		computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+		computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 		
 		// Set compute pass's part argument
-		computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
+		computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 		
 		// Add running step one to the compute pass
 		computePassEncoder->setComputePipelineState(stepOnePipeline.get());
@@ -2373,10 +4069,10 @@ using namespace std;
 		
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 			
 			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 			
 			// Add running step one to the compute pass
 			computePassEncoder->setComputePipelineState(stepOnePipeline.get());
@@ -2394,8 +4090,8 @@ using namespace std;
 			else {
 			
 				// Add clearing number of edges per bucket two to the compute pass
-				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 				
 				// Add running step four to the compute pass
 				computePassEncoder->setComputePipelineState(stepFourPipeline.get());
@@ -2412,18 +4108,18 @@ using namespace std;
 		
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 			
 			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 			
 			// Add running step one to the compute pass
 			computePassEncoder->setComputePipelineState(stepOnePipeline.get());
 			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[0], workItemsPerWorkGroup[0]);
 			
 			// Add clearing number of edges per bucket two to the compute pass
-			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 			
 			// Add running step six to the compute pass
 			computePassEncoder->setComputePipelineState(stepSixPipeline.get());
@@ -2439,10 +4135,10 @@ using namespace std;
 		
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 			
 			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
+			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 			
 			// Add running step seven to the compute pass
 			computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -2457,10 +4153,10 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 				
 				// Add running step seven to the compute pass
 				computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -2478,8 +4174,8 @@ using namespace std;
 				else {
 				
 					// Add clearing number of edges per bucket two to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 					
 					// Add running step ten to the compute pass
 					computePassEncoder->setComputePipelineState(stepTenPipeline.get());
@@ -2496,18 +4192,18 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 				
 				// Add running step seven to the compute pass
 				computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[6], workItemsPerWorkGroup[6]);
 				
 				// Add clearing number of edges per bucket two to the compute pass
-				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 				
 				// Add running step twelve to the compute pass
 				computePassEncoder->setComputePipelineState(stepTwelvePipeline.get());
@@ -2518,58 +4214,77 @@ using namespace std;
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[10], workItemsPerWorkGroup[10]);
 			}
 			
-			// Go through all remaining trimming rounds
-			for(unsigned int i = 2; i < TRIMMING_ROUNDS; ++i) {
+			// Check if trimming more than two rounds
+			if(TRIMMING_ROUNDS > 2) {
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
-				// Set compute pass's part and nodes in second partition arguments
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
+				
+					// Set compute pass's part argument
+					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+				}
 				
 				// Add running step thirteen to the compute pass
 				computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
 				
-				// Add running step fourteen to the compute pass
-				computePassEncoder->setComputePipelineState(stepFourteenPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[13], workItemsPerWorkGroup[13]);
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
 				
-				// Go through all remaining trimming parts
-				for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS; ++j) {
-				
-					// Add clearing number of edges per bucket one to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					// Add running step fourteen to the compute pass
+					computePassEncoder->setComputePipelineState(stepFourteenPipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[13], workItemsPerWorkGroup[13]);
 					
-					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 2);
+					// Go through all remaining trimming parts
+					for(unsigned int i = 1; i < SLEAN_TRIMMING_PARTS / 2; ++i) {
 					
-					// Add running step thirteen to the compute pass
-					computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
-					
-					// Check if not the last trimming part
-					if(j != SLEAN_TRIMMING_PARTS - 1) {
-					
-						// Add running step fifteen to the compute pass
-						computePassEncoder->setComputePipelineState(stepFifteenPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[14], workItemsPerWorkGroup[14]);
-					}
-					
-					// Otherwise
-					else {
-					
-						// Add clearing number of edges per bucket two to the compute pass
-						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+						// Add clearing number of edges per bucket one to the compute pass
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 						
-						// Add running step sixteen to the compute pass
-						computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
+						// Set compute pass's part argument
+						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
+						
+						// Add running step thirteen to the compute pass
+						computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
+						
+						// Check if not the last trimming part
+						if(i != SLEAN_TRIMMING_PARTS / 2 - 1) {
+						
+							// Add running step fifteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepFifteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[14], workItemsPerWorkGroup[14]);
+						}
+						
+						// Otherwise
+						else {
+						
+							// Add clearing number of edges per bucket two to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+							
+							// Add running step sixteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
+						}
 					}
+				}
+				
+				// Otherwise
+				else {
+				
+					// Add clearing number of edges per bucket two to the compute pass
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+					
+					// Add running step sixteen to the compute pass
+					computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
 				}
 				
 				// Add running step seventeen to the compute pass
@@ -2577,22 +4292,22 @@ using namespace std;
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 				
 				// Go through all remaining trimming parts except the last one
-				for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS - 1; ++j) {
+				for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 					
 					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 2);
+					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 					
 					// Add running step thirteen to the compute pass
 					computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
 					
 					// Add clearing number of edges per bucket two to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
 					
 					// Add running step eighteen to the compute pass
 					computePassEncoder->setComputePipelineState(stepEighteenPipeline.get());
@@ -2601,6 +4316,373 @@ using namespace std;
 					// Add running step seventeen to the compute pass
 					computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+				}
+				
+				// Check if trimming more than three rounds
+				if(TRIMMING_ROUNDS > 3) {
+				
+					// Go through several remaining trimming rounds
+					for(unsigned int i = 3; i < ((SLEAN_TRIMMING_PARTS == 2 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN); ++i) {
+					
+						// Add clearing number of edges per bucket one to the compute pass
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+						
+						// Set compute pass's nodes in second partition argument
+						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Set compute pass's part argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+						}
+						
+						// Add running step nineteen to the compute pass
+						computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Add running step twenty to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+							
+							// Go through all remaining trimming parts
+							for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 2; ++j) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+								
+								// Add running step nineteen to the compute pass
+								computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+								
+								// Check if not the last trimming part
+								if(j != SLEAN_TRIMMING_PARTS / 2 - 1) {
+								
+									// Add running step twenty-one to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+								}
+								
+								// Otherwise
+								else {
+								
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+									
+									// Add running step twenty-two to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyTwoPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[21], workItemsPerWorkGroup[21]);
+								}
+							}
+						}
+						
+						// Otherwise
+						else {
+						
+							// Add clearing number of edges per bucket two to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+							
+							// Add running step twenty-two to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentyTwoPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[21], workItemsPerWorkGroup[21]);
+						}
+						
+						// Add running step seventeen to the compute pass
+						computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+						
+						// Go through all remaining trimming parts except the last one
+						for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+						
+							// Add clearing number of edges per bucket one to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+							
+							// Set compute pass's part argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+							
+							// Add running step nineteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+							
+							// Add clearing number of edges per bucket two to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+							
+							// Add running step twenty-three to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentyThreePipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[22], workItemsPerWorkGroup[22]);
+							
+							// Add running step seventeen to the compute pass
+							computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+						}
+					}
+					
+					// Check if slean trimming parts isn't two and trimming more rounds
+					if(SLEAN_TRIMMING_PARTS != 2 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) {
+					
+						// Go through several remaining trimming rounds
+						for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 4 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN); ++i) {
+						
+							// Add clearing number of edges per bucket one to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+							
+							// Set compute pass's nodes in second partition argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+							}
+							
+							// Add running step twenty-four to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Add running step twenty to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+								
+								// Go through all remaining trimming parts
+								for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 4; ++j) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+									
+									// Add running step twenty-four to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+									
+									// Check if not the last trimming part
+									if(j != (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1) {
+									
+										// Add running step twenty-one to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+									}
+									
+									// Otherwise
+									else {
+									
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+										
+										// Add running step twenty-five to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyFivePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[24], workItemsPerWorkGroup[24]);
+									}
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+								
+								// Add running step twenty-five to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyFivePipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[24], workItemsPerWorkGroup[24]);
+							}
+							
+							// Add running step twenty-six to the compute pass
+							computePassEncoder->setComputePipelineState(stepTwentySixPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
+							
+							// Go through all remaining trimming parts except the last one
+							for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+								
+								// Add running step twenty-four to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+								
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+								
+								// Add running step twenty-seven to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentySevenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[26], workItemsPerWorkGroup[26]);
+								
+								// Add running step twenty-six to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentySixPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
+							}
+						}
+						
+						// Check if slean trimming parts isn't four and trimming more rounds
+						if(SLEAN_TRIMMING_PARTS != 4 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) {
+						
+							// Go through several remaining trimming rounds
+							for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 8 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN); ++i) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's nodes in second partition argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+								
+								// Check is slean trimming parts isn't eight
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+								}
+								
+								// Add running step twenty-eight to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+								
+								// Check is slean trimming parts isn't eight
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Add running step twenty to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+									
+									// Go through all remaining trimming parts
+									for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 8; ++j) {
+									
+										// Add clearing number of edges per bucket one to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+										
+										// Set compute pass's part argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+										
+										// Add running step twenty-eight to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+										
+										// Check if not the last trimming part
+										if(j != (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1) {
+										
+											// Add running step twenty-one to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+										}
+										
+										// Otherwise
+										else {
+										
+											// Add clearing number of edges per bucket two to the compute pass
+											computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+											
+											// Add running step twenty-nine to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyNinePipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[28], workItemsPerWorkGroup[28]);
+										}
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+									
+									// Add running step twenty-nine to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyNinePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[28], workItemsPerWorkGroup[28]);
+								}
+								
+								// Add running step thirty to the compute pass
+								computePassEncoder->setComputePipelineState(stepThirtyPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[29], workItemsPerWorkGroup[29]);
+								
+								// Go through all remaining trimming parts except the last one
+								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1; ++j) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+									
+									// Add running step twenty-eight to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+									
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+									
+									// Add running step thirty-one to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyOnePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[30], workItemsPerWorkGroup[30]);
+									
+									// Add running step thirty to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[29], workItemsPerWorkGroup[29]);
+								}
+							}
+							
+							// Check if slean trimming parts isn't eight and trimming more rounds
+							if(SLEAN_TRIMMING_PARTS != 8 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) {
+							
+								// Go through all remaining trimming rounds
+								for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN; i < TRIMMING_ROUNDS; ++i) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's nodes in second partition argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+									
+									// Add running step thirty-two to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyTwoPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[31], workItemsPerWorkGroup[31]);
+									
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketSixteenPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[39], workItemsPerWorkGroup[39]);
+									
+									// Add running step thirty-three to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyThreePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[32], workItemsPerWorkGroup[32]);
+									
+									// Add running step thirty-four to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[33], workItemsPerWorkGroup[33]);
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -2688,7 +4770,7 @@ using namespace std;
 			// Set compute pass's buckets, number of edges per bucket, SipHash keys, nodes bitmap, destination buckets, number of edges per destination bucket, and edges bitmap arguments
 			computePassEncoder->setBuffer(bucketsOne.get(), 0, 0);
 			computePassEncoder->setBuffer(numberOfEdgesPerBucketOne.get(), 0, 1);
-			computePassEncoder->setBytes(&sipHashKeysOne, sizeof(sipHashKeysOne), 3);
+			computePassEncoder->setBytes(&sipHashKeysOne, sizeof(sipHashKeysOne), 2);
 			computePassEncoder->setBuffer(nodesBitmap.get(), 0, 5);
 			computePassEncoder->setBuffer(bucketsTwo.get(), 0, 6);
 			computePassEncoder->setBuffer(numberOfEdgesPerBucketTwo.get(), 0, 7);
@@ -2703,10 +4785,10 @@ using namespace std;
 			
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 			
 			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
+			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 			
 			// Add running step one to the compute pass
 			computePassEncoder->setComputePipelineState(stepOnePipeline.get());
@@ -2721,10 +4803,10 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 				
 				// Add running step one to the compute pass
 				computePassEncoder->setComputePipelineState(stepOnePipeline.get());
@@ -2742,8 +4824,8 @@ using namespace std;
 				else {
 				
 					// Add clearing number of edges per bucket two to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 					
 					// Add running step four to the compute pass
 					computePassEncoder->setComputePipelineState(stepFourPipeline.get());
@@ -2760,18 +4842,18 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 				
 				// Add running step one to the compute pass
 				computePassEncoder->setComputePipelineState(stepOnePipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[0], workItemsPerWorkGroup[0]);
 				
 				// Add clearing number of edges per bucket two to the compute pass
-				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 				
 				// Add running step six to the compute pass
 				computePassEncoder->setComputePipelineState(stepSixPipeline.get());
@@ -2787,10 +4869,10 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 				
 				// Add running step seven to the compute pass
 				computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -2805,10 +4887,10 @@ using namespace std;
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 					
 					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 					
 					// Add running step seven to the compute pass
 					computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -2826,8 +4908,8 @@ using namespace std;
 					else {
 					
 						// Add clearing number of edges per bucket two to the compute pass
-						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 						
 						// Add running step ten to the compute pass
 						computePassEncoder->setComputePipelineState(stepTenPipeline.get());
@@ -2844,18 +4926,18 @@ using namespace std;
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 					
 					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 					
 					// Add running step seven to the compute pass
 					computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[6], workItemsPerWorkGroup[6]);
 					
 					// Add clearing number of edges per bucket two to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 					
 					// Add running step twelve to the compute pass
 					computePassEncoder->setComputePipelineState(stepTwelvePipeline.get());
@@ -2866,58 +4948,77 @@ using namespace std;
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[10], workItemsPerWorkGroup[10]);
 				}
 				
-				// Go through all remaining trimming rounds
-				for(unsigned int i = 2; i < TRIMMING_ROUNDS; ++i) {
+				// Check if trimming more than two rounds
+				if(TRIMMING_ROUNDS > 2) {
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 					
-					// Set compute pass's part and nodes in second partition arguments
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
+					
+						// Set compute pass's part argument
+						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+					}
 					
 					// Add running step thirteen to the compute pass
 					computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
 					
-					// Add running step fourteen to the compute pass
-					computePassEncoder->setComputePipelineState(stepFourteenPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[13], workItemsPerWorkGroup[13]);
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
 					
-					// Go through all remaining trimming parts
-					for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS; ++j) {
-					
-						// Add clearing number of edges per bucket one to the compute pass
-						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+						// Add running step fourteen to the compute pass
+						computePassEncoder->setComputePipelineState(stepFourteenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[13], workItemsPerWorkGroup[13]);
 						
-						// Set compute pass's part argument
-						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 2);
+						// Go through all remaining trimming parts
+						for(unsigned int i = 1; i < SLEAN_TRIMMING_PARTS / 2; ++i) {
 						
-						// Add running step thirteen to the compute pass
-						computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
-						
-						// Check if not the last trimming part
-						if(j != SLEAN_TRIMMING_PARTS - 1) {
-						
-							// Add running step fifteen to the compute pass
-							computePassEncoder->setComputePipelineState(stepFifteenPipeline.get());
-							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[14], workItemsPerWorkGroup[14]);
-						}
-						
-						// Otherwise
-						else {
-						
-							// Add clearing number of edges per bucket two to the compute pass
-							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+							// Add clearing number of edges per bucket one to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 							
-							// Add running step sixteen to the compute pass
-							computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
-							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
+							// Set compute pass's part argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
+							
+							// Add running step thirteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
+							
+							// Check if not the last trimming part
+							if(i != SLEAN_TRIMMING_PARTS / 2 - 1) {
+							
+								// Add running step fifteen to the compute pass
+								computePassEncoder->setComputePipelineState(stepFifteenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[14], workItemsPerWorkGroup[14]);
+							}
+							
+							// Otherwise
+							else {
+							
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+								
+								// Add running step sixteen to the compute pass
+								computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
+							}
 						}
+					}
+					
+					// Otherwise
+					else {
+					
+						// Add clearing number of edges per bucket two to the compute pass
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+						
+						// Add running step sixteen to the compute pass
+						computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
 					}
 					
 					// Add running step seventeen to the compute pass
@@ -2925,22 +5026,22 @@ using namespace std;
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 					
 					// Go through all remaining trimming parts except the last one
-					for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS - 1; ++j) {
+					for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
 					
 						// Add clearing number of edges per bucket one to the compute pass
 						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 						
 						// Set compute pass's part argument
-						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 2);
+						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 						
 						// Add running step thirteen to the compute pass
 						computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
 						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
 						
 						// Add clearing number of edges per bucket two to the compute pass
-						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
 						
 						// Add running step eighteen to the compute pass
 						computePassEncoder->setComputePipelineState(stepEighteenPipeline.get());
@@ -2949,6 +5050,373 @@ using namespace std;
 						// Add running step seventeen to the compute pass
 						computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
 						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+					}
+					
+					// Check if trimming more than three rounds
+					if(TRIMMING_ROUNDS > 3) {
+					
+						// Go through several remaining trimming rounds
+						for(unsigned int i = 3; i < ((SLEAN_TRIMMING_PARTS == 2 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN); ++i) {
+						
+							// Add clearing number of edges per bucket one to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+							
+							// Set compute pass's nodes in second partition argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+							}
+							
+							// Add running step nineteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Add running step twenty to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+								
+								// Go through all remaining trimming parts
+								for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 2; ++j) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+									
+									// Add running step nineteen to the compute pass
+									computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+									
+									// Check if not the last trimming part
+									if(j != SLEAN_TRIMMING_PARTS / 2 - 1) {
+									
+										// Add running step twenty-one to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+									}
+									
+									// Otherwise
+									else {
+									
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+										
+										// Add running step twenty-two to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyTwoPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[21], workItemsPerWorkGroup[21]);
+									}
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+								
+								// Add running step twenty-two to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyTwoPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[21], workItemsPerWorkGroup[21]);
+							}
+							
+							// Add running step seventeen to the compute pass
+							computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+							
+							// Go through all remaining trimming parts except the last one
+							for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+								
+								// Add running step nineteen to the compute pass
+								computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+								
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+								
+								// Add running step twenty-three to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyThreePipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[22], workItemsPerWorkGroup[22]);
+								
+								// Add running step seventeen to the compute pass
+								computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+							}
+						}
+						
+						// Check if slean trimming parts isn't two and trimming more rounds
+						if(SLEAN_TRIMMING_PARTS != 2 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) {
+						
+							// Go through several remaining trimming rounds
+							for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 4 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN); ++i) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's nodes in second partition argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+								}
+								
+								// Add running step twenty-four to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Add running step twenty to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+									
+									// Go through all remaining trimming parts
+									for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 4; ++j) {
+									
+										// Add clearing number of edges per bucket one to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+										
+										// Set compute pass's part argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+										
+										// Add running step twenty-four to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+										
+										// Check if not the last trimming part
+										if(j != (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1) {
+										
+											// Add running step twenty-one to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+										}
+										
+										// Otherwise
+										else {
+										
+											// Add clearing number of edges per bucket two to the compute pass
+											computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+											
+											// Add running step twenty-five to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyFivePipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[24], workItemsPerWorkGroup[24]);
+										}
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+									
+									// Add running step twenty-five to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyFivePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[24], workItemsPerWorkGroup[24]);
+								}
+								
+								// Add running step twenty-six to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentySixPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
+								
+								// Go through all remaining trimming parts except the last one
+								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+									
+									// Add running step twenty-four to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+									
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+									
+									// Add running step twenty-seven to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentySevenPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[26], workItemsPerWorkGroup[26]);
+									
+									// Add running step twenty-six to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentySixPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
+								}
+							}
+							
+							// Check if slean trimming parts isn't four and trimming more rounds
+							if(SLEAN_TRIMMING_PARTS != 4 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) {
+							
+								// Go through several remaining trimming rounds
+								for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 8 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN); ++i) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's nodes in second partition argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+									
+									// Check is slean trimming parts isn't eight
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Set compute pass's part argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+									}
+									
+									// Add running step twenty-eight to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+									
+									// Check is slean trimming parts isn't eight
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Add running step twenty to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+										
+										// Go through all remaining trimming parts
+										for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 8; ++j) {
+										
+											// Add clearing number of edges per bucket one to the compute pass
+											computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+											
+											// Set compute pass's part argument
+											computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+											
+											// Add running step twenty-eight to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+											
+											// Check if not the last trimming part
+											if(j != (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1) {
+											
+												// Add running step twenty-one to the compute pass
+												computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+												computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+											}
+											
+											// Otherwise
+											else {
+											
+												// Add clearing number of edges per bucket two to the compute pass
+												computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+												computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+												
+												// Add running step twenty-nine to the compute pass
+												computePassEncoder->setComputePipelineState(stepTwentyNinePipeline.get());
+												computePassEncoder->dispatchThreads(totalNumberOfWorkItems[28], workItemsPerWorkGroup[28]);
+											}
+										}
+									}
+									
+									// Otherwise
+									else {
+									
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+										
+										// Add running step twenty-nine to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyNinePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[28], workItemsPerWorkGroup[28]);
+									}
+									
+									// Add running step thirty to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[29], workItemsPerWorkGroup[29]);
+									
+									// Go through all remaining trimming parts except the last one
+									for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1; ++j) {
+									
+										// Add clearing number of edges per bucket one to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+										
+										// Set compute pass's part argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+										
+										// Add running step twenty-eight to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+										
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+										
+										// Add running step thirty-one to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyOnePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[30], workItemsPerWorkGroup[30]);
+										
+										// Add running step thirty to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[29], workItemsPerWorkGroup[29]);
+									}
+								}
+								
+								// Check if slean trimming parts isn't eight and trimming more rounds
+								if(SLEAN_TRIMMING_PARTS != 8 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) {
+								
+									// Go through all remaining trimming rounds
+									for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN; i < TRIMMING_ROUNDS; ++i) {
+									
+										// Add clearing number of edges per bucket one to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+										
+										// Set compute pass's nodes in second partition argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+										
+										// Add running step thirty-two to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyTwoPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[31], workItemsPerWorkGroup[31]);
+										
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketSixteenPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[39], workItemsPerWorkGroup[39]);
+										
+										// Add running step thirty-three to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyThreePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[32], workItemsPerWorkGroup[32]);
+										
+										// Add running step thirty-four to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyFourPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[33], workItemsPerWorkGroup[33]);
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -3040,7 +5508,7 @@ using namespace std;
 			// Set compute pass's buckets, number of edges per bucket, SipHash keys, nodes bitmap, destination buckets, number of edges per destination bucket, and edges bitmap arguments
 			computePassEncoder->setBuffer(bucketsOne.get(), 0, 0);
 			computePassEncoder->setBuffer(numberOfEdgesPerBucketOne.get(), 0, 1);
-			computePassEncoder->setBytes(&sipHashKeysTwo, sizeof(sipHashKeysTwo), 3);
+			computePassEncoder->setBytes(&sipHashKeysTwo, sizeof(sipHashKeysTwo), 2);
 			computePassEncoder->setBuffer(nodesBitmap.get(), 0, 5);
 			computePassEncoder->setBuffer(bucketsTwo.get(), 0, 6);
 			computePassEncoder->setBuffer(numberOfEdgesPerBucketTwo.get(), 0, 7);
@@ -3055,10 +5523,10 @@ using namespace std;
 			
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 			
 			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
+			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 			
 			// Add running step one to the compute pass
 			computePassEncoder->setComputePipelineState(stepOnePipeline.get());
@@ -3073,10 +5541,10 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 				
 				// Add running step one to the compute pass
 				computePassEncoder->setComputePipelineState(stepOnePipeline.get());
@@ -3094,8 +5562,8 @@ using namespace std;
 				else {
 				
 					// Add clearing number of edges per bucket two to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 					
 					// Add running step four to the compute pass
 					computePassEncoder->setComputePipelineState(stepFourPipeline.get());
@@ -3112,18 +5580,18 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 				
 				// Add running step one to the compute pass
 				computePassEncoder->setComputePipelineState(stepOnePipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[0], workItemsPerWorkGroup[0]);
 				
 				// Add clearing number of edges per bucket two to the compute pass
-				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 				
 				// Add running step six to the compute pass
 				computePassEncoder->setComputePipelineState(stepSixPipeline.get());
@@ -3139,10 +5607,10 @@ using namespace std;
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 				
 				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
+				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 				
 				// Add running step seven to the compute pass
 				computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -3157,10 +5625,10 @@ using namespace std;
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 					
 					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 					
 					// Add running step seven to the compute pass
 					computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -3178,8 +5646,8 @@ using namespace std;
 					else {
 					
 						// Add clearing number of edges per bucket two to the compute pass
-						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 						
 						// Add running step ten to the compute pass
 						computePassEncoder->setComputePipelineState(stepTenPipeline.get());
@@ -3196,18 +5664,18 @@ using namespace std;
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 					
 					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 2);
+					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 					
 					// Add running step seven to the compute pass
 					computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[6], workItemsPerWorkGroup[6]);
 					
 					// Add clearing number of edges per bucket two to the compute pass
-					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketOnePipeline.get());
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[35], workItemsPerWorkGroup[35]);
 					
 					// Add running step twelve to the compute pass
 					computePassEncoder->setComputePipelineState(stepTwelvePipeline.get());
@@ -3218,58 +5686,77 @@ using namespace std;
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[10], workItemsPerWorkGroup[10]);
 				}
 				
-				// Go through all remaining trimming rounds
-				for(unsigned int i = 2; i < TRIMMING_ROUNDS; ++i) {
+				// Check if trimming more than two rounds
+				if(TRIMMING_ROUNDS > 2) {
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 					
-					// Set compute pass's part and nodes in second partition arguments
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 2);
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
+					
+						// Set compute pass's part argument
+						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+					}
 					
 					// Add running step thirteen to the compute pass
 					computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
 					
-					// Add running step fourteen to the compute pass
-					computePassEncoder->setComputePipelineState(stepFourteenPipeline.get());
-					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[13], workItemsPerWorkGroup[13]);
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
 					
-					// Go through all remaining trimming parts
-					for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS; ++j) {
-					
-						// Add clearing number of edges per bucket one to the compute pass
-						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+						// Add running step fourteen to the compute pass
+						computePassEncoder->setComputePipelineState(stepFourteenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[13], workItemsPerWorkGroup[13]);
 						
-						// Set compute pass's part argument
-						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 2);
+						// Go through all remaining trimming parts
+						for(unsigned int i = 1; i < SLEAN_TRIMMING_PARTS / 2; ++i) {
 						
-						// Add running step thirteen to the compute pass
-						computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
-						
-						// Check if not the last trimming part
-						if(j != SLEAN_TRIMMING_PARTS - 1) {
-						
-							// Add running step fifteen to the compute pass
-							computePassEncoder->setComputePipelineState(stepFifteenPipeline.get());
-							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[14], workItemsPerWorkGroup[14]);
-						}
-						
-						// Otherwise
-						else {
-						
-							// Add clearing number of edges per bucket two to the compute pass
-							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+							// Add clearing number of edges per bucket one to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 							
-							// Add running step sixteen to the compute pass
-							computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
-							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
+							// Set compute pass's part argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
+							
+							// Add running step thirteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
+							
+							// Check if not the last trimming part
+							if(i != SLEAN_TRIMMING_PARTS / 2 - 1) {
+							
+								// Add running step fifteen to the compute pass
+								computePassEncoder->setComputePipelineState(stepFifteenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[14], workItemsPerWorkGroup[14]);
+							}
+							
+							// Otherwise
+							else {
+							
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+								
+								// Add running step sixteen to the compute pass
+								computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
+							}
 						}
+					}
+					
+					// Otherwise
+					else {
+					
+						// Add clearing number of edges per bucket two to the compute pass
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+						
+						// Add running step sixteen to the compute pass
+						computePassEncoder->setComputePipelineState(stepSixteenPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[15], workItemsPerWorkGroup[15]);
 					}
 					
 					// Add running step seventeen to the compute pass
@@ -3277,22 +5764,22 @@ using namespace std;
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 					
 					// Go through all remaining trimming parts except the last one
-					for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS - 1; ++j) {
+					for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
 					
 						// Add clearing number of edges per bucket one to the compute pass
 						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
 						
 						// Set compute pass's part argument
-						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 2);
+						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i)), sizeof(uint8_t), 3);
 						
 						// Add running step thirteen to the compute pass
 						computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
 						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[12], workItemsPerWorkGroup[12]);
 						
 						// Add clearing number of edges per bucket two to the compute pass
-						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketPipeline.get());
-						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
 						
 						// Add running step eighteen to the compute pass
 						computePassEncoder->setComputePipelineState(stepEighteenPipeline.get());
@@ -3301,6 +5788,373 @@ using namespace std;
 						// Add running step seventeen to the compute pass
 						computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
 						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+					}
+					
+					// Check if trimming more than three rounds
+					if(TRIMMING_ROUNDS > 3) {
+					
+						// Go through several remaining trimming rounds
+						for(unsigned int i = 3; i < ((SLEAN_TRIMMING_PARTS == 2 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN); ++i) {
+						
+							// Add clearing number of edges per bucket one to the compute pass
+							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+							
+							// Set compute pass's nodes in second partition argument
+							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+							}
+							
+							// Add running step nineteen to the compute pass
+							computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Add running step twenty to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+								
+								// Go through all remaining trimming parts
+								for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 2; ++j) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+									
+									// Add running step nineteen to the compute pass
+									computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+									
+									// Check if not the last trimming part
+									if(j != SLEAN_TRIMMING_PARTS / 2 - 1) {
+									
+										// Add running step twenty-one to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+									}
+									
+									// Otherwise
+									else {
+									
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+										
+										// Add running step twenty-two to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyTwoPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[21], workItemsPerWorkGroup[21]);
+									}
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+								
+								// Add running step twenty-two to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyTwoPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[21], workItemsPerWorkGroup[21]);
+							}
+							
+							// Add running step seventeen to the compute pass
+							computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
+							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+							
+							// Go through all remaining trimming parts except the last one
+							for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's part argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+								
+								// Add running step nineteen to the compute pass
+								computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[18], workItemsPerWorkGroup[18]);
+								
+								// Add clearing number of edges per bucket two to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[36], workItemsPerWorkGroup[36]);
+								
+								// Add running step twenty-three to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyThreePipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[22], workItemsPerWorkGroup[22]);
+								
+								// Add running step seventeen to the compute pass
+								computePassEncoder->setComputePipelineState(stepSeventeenPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
+							}
+						}
+						
+						// Check if slean trimming parts isn't two and trimming more rounds
+						if(SLEAN_TRIMMING_PARTS != 2 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) {
+						
+							// Go through several remaining trimming rounds
+							for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 4 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN); ++i) {
+							
+								// Add clearing number of edges per bucket one to the compute pass
+								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+								
+								// Set compute pass's nodes in second partition argument
+								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+								}
+								
+								// Add running step twenty-four to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Add running step twenty to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+									
+									// Go through all remaining trimming parts
+									for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 4; ++j) {
+									
+										// Add clearing number of edges per bucket one to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+										
+										// Set compute pass's part argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+										
+										// Add running step twenty-four to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+										
+										// Check if not the last trimming part
+										if(j != (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1) {
+										
+											// Add running step twenty-one to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+										}
+										
+										// Otherwise
+										else {
+										
+											// Add clearing number of edges per bucket two to the compute pass
+											computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+											
+											// Add running step twenty-five to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyFivePipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[24], workItemsPerWorkGroup[24]);
+										}
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+									
+									// Add running step twenty-five to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyFivePipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[24], workItemsPerWorkGroup[24]);
+								}
+								
+								// Add running step twenty-six to the compute pass
+								computePassEncoder->setComputePipelineState(stepTwentySixPipeline.get());
+								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
+								
+								// Go through all remaining trimming parts except the last one
+								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's part argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+									
+									// Add running step twenty-four to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[23], workItemsPerWorkGroup[23]);
+									
+									// Add clearing number of edges per bucket two to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[37], workItemsPerWorkGroup[37]);
+									
+									// Add running step twenty-seven to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentySevenPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[26], workItemsPerWorkGroup[26]);
+									
+									// Add running step twenty-six to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentySixPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
+								}
+							}
+							
+							// Check if slean trimming parts isn't four and trimming more rounds
+							if(SLEAN_TRIMMING_PARTS != 4 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) {
+							
+								// Go through several remaining trimming rounds
+								for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 8 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN); ++i) {
+								
+									// Add clearing number of edges per bucket one to the compute pass
+									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+									
+									// Set compute pass's nodes in second partition argument
+									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+									
+									// Check is slean trimming parts isn't eight
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Set compute pass's part argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
+									}
+									
+									// Add running step twenty-eight to the compute pass
+									computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+									
+									// Check is slean trimming parts isn't eight
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Add running step twenty to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[19], workItemsPerWorkGroup[19]);
+										
+										// Go through all remaining trimming parts
+										for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 8; ++j) {
+										
+											// Add clearing number of edges per bucket one to the compute pass
+											computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+											
+											// Set compute pass's part argument
+											computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+											
+											// Add running step twenty-eight to the compute pass
+											computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+											computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+											
+											// Check if not the last trimming part
+											if(j != (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1) {
+											
+												// Add running step twenty-one to the compute pass
+												computePassEncoder->setComputePipelineState(stepTwentyOnePipeline.get());
+												computePassEncoder->dispatchThreads(totalNumberOfWorkItems[20], workItemsPerWorkGroup[20]);
+											}
+											
+											// Otherwise
+											else {
+											
+												// Add clearing number of edges per bucket two to the compute pass
+												computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+												computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+												
+												// Add running step twenty-nine to the compute pass
+												computePassEncoder->setComputePipelineState(stepTwentyNinePipeline.get());
+												computePassEncoder->dispatchThreads(totalNumberOfWorkItems[28], workItemsPerWorkGroup[28]);
+											}
+										}
+									}
+									
+									// Otherwise
+									else {
+									
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+										
+										// Add running step twenty-nine to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyNinePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[28], workItemsPerWorkGroup[28]);
+									}
+									
+									// Add running step thirty to the compute pass
+									computePassEncoder->setComputePipelineState(stepThirtyPipeline.get());
+									computePassEncoder->dispatchThreads(totalNumberOfWorkItems[29], workItemsPerWorkGroup[29]);
+									
+									// Go through all remaining trimming parts except the last one
+									for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1; ++j) {
+									
+										// Add clearing number of edges per bucket one to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+										
+										// Set compute pass's part argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(j)), sizeof(uint8_t), 3);
+										
+										// Add running step twenty-eight to the compute pass
+										computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[27], workItemsPerWorkGroup[27]);
+										
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[38], workItemsPerWorkGroup[38]);
+										
+										// Add running step thirty-one to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyOnePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[30], workItemsPerWorkGroup[30]);
+										
+										// Add running step thirty to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[29], workItemsPerWorkGroup[29]);
+									}
+								}
+								
+								// Check if slean trimming parts isn't eight and trimming more rounds
+								if(SLEAN_TRIMMING_PARTS != 8 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) {
+								
+									// Go through all remaining trimming rounds
+									for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN; i < TRIMMING_ROUNDS; ++i) {
+									
+										// Add clearing number of edges per bucket one to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
+										
+										// Set compute pass's nodes in second partition argument
+										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
+										
+										// Add running step thirty-two to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyTwoPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[31], workItemsPerWorkGroup[31]);
+										
+										// Add clearing number of edges per bucket two to the compute pass
+										computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerDestinationBucketSixteenPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[39], workItemsPerWorkGroup[39]);
+										
+										// Add running step thirty-three to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyThreePipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[32], workItemsPerWorkGroup[32]);
+										
+										// Add running step thirty-four to the compute pass
+										computePassEncoder->setComputePipelineState(stepThirtyFourPipeline.get());
+										computePassEncoder->dispatchThreads(totalNumberOfWorkItems[33], workItemsPerWorkGroup[33]);
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -3367,7 +6221,7 @@ using namespace std;
 			if(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &nameSize) != CL_SUCCESS || !nameSize) {
 			
 				// Display message
-				cout << "Getting GPU's info failed" << endl;
+				cout << "Getting GPU's name failed" << endl;
 				
 				// Return false
 				return false;
@@ -3378,7 +6232,7 @@ using namespace std;
 			if(clGetDeviceInfo(device, CL_DEVICE_NAME, nameSize, name, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting GPU's info failed" << endl;
+				cout << "Getting GPU's name failed" << endl;
 				
 				// Return false
 				return false;
@@ -3466,7 +6320,23 @@ using namespace std;
 		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSixteenKernel(clCreateKernel(program.get(), "trimEdgesStepSixteen", nullptr), clReleaseKernel);
 		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSeventeenKernel(clCreateKernel(program.get(), "trimEdgesStepSeventeen", nullptr), clReleaseKernel);
 		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepEighteenKernel(clCreateKernel(program.get(), "trimEdgesStepEighteen", nullptr), clReleaseKernel);
-		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !stepFiveKernel || !stepSixKernel || !stepSevenKernel || !stepEightKernel || !stepNineKernel || !stepTenKernel || !stepElevenKernel || !stepTwelveKernel || !stepThirteenKernel || !stepFourteenKernel || !stepFifteenKernel || !stepSixteenKernel || !stepSeventeenKernel || !stepEighteenKernel) {
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepNineteenKernel(clCreateKernel(program.get(), "trimEdgesStepNineteen", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyKernel(clCreateKernel(program.get(), "trimEdgesStepTwenty", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyOneKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyOne", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyTwoKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyTwo", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyThreeKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyThree", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyFourKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyFour", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyFiveKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyFive", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentySixKernel(clCreateKernel(program.get(), "trimEdgesStepTwentySix", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentySevenKernel(clCreateKernel(program.get(), "trimEdgesStepTwentySeven", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyEightKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyEight", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyNineKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyNine", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyKernel(clCreateKernel(program.get(), "trimEdgesStepThirty", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyOneKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyOne", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyTwoKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyTwo", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyThreeKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyThree", nullptr), clReleaseKernel);
+		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyFourKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyFour", nullptr), clReleaseKernel);
+		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !stepFiveKernel || !stepSixKernel || !stepSevenKernel || !stepEightKernel || !stepNineKernel || !stepTenKernel || !stepElevenKernel || !stepTwelveKernel || !stepThirteenKernel || !stepFourteenKernel || !stepFifteenKernel || !stepSixteenKernel || !stepSeventeenKernel || !stepEighteenKernel || !stepNineteenKernel || !stepTwentyKernel || !stepTwentyOneKernel || !stepTwentyTwoKernel || !stepTwentyThreeKernel || !stepTwentyFourKernel || !stepTwentyFiveKernel || !stepTwentySixKernel || !stepTwentySevenKernel || !stepTwentyEightKernel || !stepTwentyNineKernel || !stepThirtyKernel || !stepThirtyOneKernel || !stepThirtyTwoKernel || !stepThirtyThreeKernel || !stepThirtyFourKernel) {
 		
 			// Display message
 			cout << "Creating kernels for the GPU failed" << endl;
@@ -3515,7 +6385,7 @@ using namespace std;
 			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
 			
 			// Trim edges step thirteen kernel
-			(NUMBER_OF_EDGES / SLEAN_TRIMMING_PARTS) / (sizeof(cl_ulong) * BITS_IN_A_BYTE),
+			(NUMBER_OF_EDGES / (SLEAN_TRIMMING_PARTS / 2)) / (sizeof(cl_ulong) * BITS_IN_A_BYTE),
 			
 			// Trim edges step fourteen kernel
 			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
@@ -3527,10 +6397,58 @@ using namespace std;
 			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
 			
 			// Trim edges step seventeen kernel
-			SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
 			
 			// Trim edges step eighteen kernel
-			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2)))
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step nineteen kernel
+			(NUMBER_OF_EDGES / (SLEAN_TRIMMING_PARTS / 2)) / (sizeof(cl_ulong) * BITS_IN_A_BYTE),
+			
+			// Trim edges step twenty kernel
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-one kernel
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-two kernel
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-three kernel
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-four kernel
+			(NUMBER_OF_EDGES / ((SLEAN_TRIMMING_PARTS + 4 - 1) / 4)) / (sizeof(cl_ulong) * BITS_IN_A_BYTE),
+			
+			// Trim edges step twenty-five kernel
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-six kernel
+			SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-seven kernel
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-eight kernel
+			(NUMBER_OF_EDGES / ((SLEAN_TRIMMING_PARTS + 8 - 1) / 8)) / (sizeof(cl_ulong) * BITS_IN_A_BYTE),
+			
+			// Trim edges step twenty-nine kernel
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step thirty kernel
+			SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step thirty-one kernel
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step thirty-two kernel
+			(NUMBER_OF_EDGES / ((SLEAN_TRIMMING_PARTS + 16 - 1) / 16)) / (sizeof(cl_ulong) * BITS_IN_A_BYTE),
+			
+			// Trim edges step thirty-three kernel
+			SLEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step thirty-four kernel
+			SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2)))
 		};
 		
 		// Set work items per work group based on the total number of work items and max work group size
@@ -3588,6 +6506,54 @@ using namespace std;
 			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
 			
 			// Trim edges step eighteen kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step nineteen kernel
+			min(min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))), totalNumberOfWorkItems[18]),
+			
+			// Trim edges step twenty kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-one kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-two kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-three kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-four kernel
+			min(min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))), totalNumberOfWorkItems[23]),
+			
+			// Trim edges step twenty-five kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-six kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-seven kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step twenty-eight kernel
+			min(min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))), totalNumberOfWorkItems[27]),
+			
+			// Trim edges step twenty-nine kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step thirty kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step thirty-one kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step thirty-two kernel
+			min(min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))), totalNumberOfWorkItems[31]),
+			
+			// Trim edges step thirty-three kernel
+			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2))),
+			
+			// Trim edges step thirty-four kernel
 			min(bit_floor(maxWorkGroupSize), bit_floor(static_cast<size_t>(INT16_MAX / 2)))
 		};
 		
@@ -3610,6 +6576,22 @@ using namespace std;
 		stepSixteenKernel.reset();
 		stepSeventeenKernel.reset();
 		stepEighteenKernel.reset();
+		stepNineteenKernel.reset();
+		stepTwentyKernel.reset();
+		stepTwentyOneKernel.reset();
+		stepTwentyTwoKernel.reset();
+		stepTwentyThreeKernel.reset();
+		stepTwentyFourKernel.reset();
+		stepTwentyFiveKernel.reset();
+		stepTwentySixKernel.reset();
+		stepTwentySevenKernel.reset();
+		stepTwentyEightKernel.reset();
+		stepTwentyNineKernel.reset();
+		stepThirtyKernel.reset();
+		stepThirtyOneKernel.reset();
+		stepThirtyTwoKernel.reset();
+		stepThirtyThreeKernel.reset();
+		stepThirtyFourKernel.reset();
 		
 		// Check if recreating program for the device failed
 		program = unique_ptr<remove_pointer<cl_program>::type, decltype(&clReleaseProgram)>(clCreateProgramWithSource(context, 1, &source, &sourceSize, nullptr), clReleaseProgram);
@@ -3623,7 +6605,7 @@ using namespace std;
 		}
 		
 		// Check if rebuilding program for the device with hardcoded work items per work groups failed
-		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DSLEAN_TRIMMING_PARTS=" TO_STRING(SLEAN_TRIMMING_PARTS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(SLEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) + " -DNUMBER_OF_BITMAP_BYTES=" + to_string(SLEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES) + " -DNUMBER_OF_BUCKETS=" + to_string(SLEAN_TRIMMING_NUMBER_OF_BUCKETS) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING=" + to_string(SLEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING) + " -DINITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET=" + to_string(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING=" + to_string(SLEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING) + " -DNUMBER_OF_REMAINING_EDGES_BITMAP_BYTES=" + to_string(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES) + " -DINITIAL_BUCKETS_NUMBER_OF_BUCKETS=" + to_string(bucketsOneNumberOfBuckets) + " -DLOCAL_BUCKETS_SIZE=" + to_string(localBucketsSize) + " -DTRIM_EDGES_STEP_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[0]) + " -DTRIM_EDGES_STEP_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[1]) + " -DTRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[2]) + " -DTRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[3]) + " -DTRIM_EDGES_STEP_FIVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[4]) + " -DTRIM_EDGES_STEP_SIX_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[5]) + " -DTRIM_EDGES_STEP_SEVEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[6]) + " -DTRIM_EDGES_STEP_EIGHT_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[7]) + " -DTRIM_EDGES_STEP_NINE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[8]) + " -DTRIM_EDGES_STEP_TEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[9]) + " -DTRIM_EDGES_STEP_ELEVEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[10]) + " -DTRIM_EDGES_STEP_TWELVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[11]) + " -DTRIM_EDGES_STEP_THIRTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[12]) + " -DTRIM_EDGES_STEP_FOURTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[13]) + " -DTRIM_EDGES_STEP_FIFTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[14]) + " -DTRIM_EDGES_STEP_SIXTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[15]) + " -DTRIM_EDGES_STEP_SEVENTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[16]) + " -DTRIM_EDGES_STEP_EIGHTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[17])).c_str(), nullptr, nullptr) != CL_SUCCESS) {
+		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DSLEAN_TRIMMING_PARTS=" TO_STRING(SLEAN_TRIMMING_PARTS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(SLEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) + " -DNUMBER_OF_BITMAP_BYTES=" + to_string(SLEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES) + " -DNUMBER_OF_BUCKETS=" + to_string(SLEAN_TRIMMING_NUMBER_OF_BUCKETS) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING=" + to_string(SLEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING) + " -DINITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET=" + to_string(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING=" + to_string(SLEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING) + " -DNUMBER_OF_REMAINING_EDGES_BITMAP_BYTES=" + to_string(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES) + " -DINITIAL_BUCKETS_NUMBER_OF_BUCKETS=" + to_string(bucketsOneNumberOfBuckets) + " -DLOCAL_BUCKETS_SIZE=" + to_string(localBucketsSize) + " -DTRIM_EDGES_STEP_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[0]) + " -DTRIM_EDGES_STEP_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[1]) + " -DTRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[2]) + " -DTRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[3]) + " -DTRIM_EDGES_STEP_FIVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[4]) + " -DTRIM_EDGES_STEP_SIX_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[5]) + " -DTRIM_EDGES_STEP_SEVEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[6]) + " -DTRIM_EDGES_STEP_EIGHT_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[7]) + " -DTRIM_EDGES_STEP_NINE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[8]) + " -DTRIM_EDGES_STEP_TEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[9]) + " -DTRIM_EDGES_STEP_ELEVEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[10]) + " -DTRIM_EDGES_STEP_TWELVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[11]) + " -DTRIM_EDGES_STEP_THIRTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[12]) + " -DTRIM_EDGES_STEP_FOURTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[13]) + " -DTRIM_EDGES_STEP_FIFTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[14]) + " -DTRIM_EDGES_STEP_SIXTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[15]) + " -DTRIM_EDGES_STEP_SEVENTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[16]) + " -DTRIM_EDGES_STEP_EIGHTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[17]) + " -DTRIM_EDGES_STEP_NINETEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[18]) + " -DTRIM_EDGES_STEP_TWENTY_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[19]) + " -DTRIM_EDGES_STEP_TWENTY_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[20]) + " -DTRIM_EDGES_STEP_TWENTY_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[21]) + " -DTRIM_EDGES_STEP_TWENTY_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[22]) + " -DTRIM_EDGES_STEP_TWENTY_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[23]) + " -DTRIM_EDGES_STEP_TWENTY_FIVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[24]) + " -DTRIM_EDGES_STEP_TWENTY_SIX_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[25]) + " -DTRIM_EDGES_STEP_TWENTY_SEVEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[26]) + " -DTRIM_EDGES_STEP_TWENTY_EIGHT_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[27]) + " -DTRIM_EDGES_STEP_TWENTY_NINE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[28]) + " -DTRIM_EDGES_STEP_THIRTY_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[29]) + " -DTRIM_EDGES_STEP_THIRTY_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[30]) + " -DTRIM_EDGES_STEP_THIRTY_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[31]) + " -DTRIM_EDGES_STEP_THIRTY_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[32]) + " -DTRIM_EDGES_STEP_THIRTY_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[33])).c_str(), nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Building program for the GPU failed" << endl;
@@ -3664,7 +6646,23 @@ using namespace std;
 		stepSixteenKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepSixteen", nullptr), clReleaseKernel);
 		stepSeventeenKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepSeventeen", nullptr), clReleaseKernel);
 		stepEighteenKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepEighteen", nullptr), clReleaseKernel);
-		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !stepFiveKernel || !stepSixKernel || !stepSevenKernel || !stepEightKernel || !stepNineKernel || !stepTenKernel || !stepElevenKernel || !stepTwelveKernel || !stepThirteenKernel || !stepFourteenKernel || !stepFifteenKernel || !stepSixteenKernel || !stepSeventeenKernel || !stepEighteenKernel) {
+		stepNineteenKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepNineteen", nullptr), clReleaseKernel);
+		stepTwentyKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwenty", nullptr), clReleaseKernel);
+		stepTwentyOneKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwentyOne", nullptr), clReleaseKernel);
+		stepTwentyTwoKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwentyTwo", nullptr), clReleaseKernel);
+		stepTwentyThreeKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwentyThree", nullptr), clReleaseKernel);
+		stepTwentyFourKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwentyFour", nullptr), clReleaseKernel);
+		stepTwentyFiveKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwentyFive", nullptr), clReleaseKernel);
+		stepTwentySixKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwentySix", nullptr), clReleaseKernel);
+		stepTwentySevenKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwentySeven", nullptr), clReleaseKernel);
+		stepTwentyEightKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwentyEight", nullptr), clReleaseKernel);
+		stepTwentyNineKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepTwentyNine", nullptr), clReleaseKernel);
+		stepThirtyKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepThirty", nullptr), clReleaseKernel);
+		stepThirtyOneKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepThirtyOne", nullptr), clReleaseKernel);
+		stepThirtyTwoKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepThirtyTwo", nullptr), clReleaseKernel);
+		stepThirtyThreeKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepThirtyThree", nullptr), clReleaseKernel);
+		stepThirtyFourKernel = unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)>(clCreateKernel(program.get(), "trimEdgesStepThirtyFour", nullptr), clReleaseKernel);
+		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !stepFiveKernel || !stepSixKernel || !stepSevenKernel || !stepEightKernel || !stepNineKernel || !stepTenKernel || !stepElevenKernel || !stepTwelveKernel || !stepThirteenKernel || !stepFourteenKernel || !stepFifteenKernel || !stepSixteenKernel || !stepSeventeenKernel || !stepEighteenKernel || !stepNineteenKernel || !stepTwentyKernel || !stepTwentyOneKernel || !stepTwentyTwoKernel || !stepTwentyThreeKernel || !stepTwentyFourKernel || !stepTwentyFiveKernel || !stepTwentySixKernel || !stepTwentySevenKernel || !stepTwentyEightKernel || !stepTwentyNineKernel || !stepThirtyKernel || !stepThirtyOneKernel || !stepThirtyTwoKernel || !stepThirtyThreeKernel || !stepThirtyFourKernel) {
 		
 			// Display message
 			cout << "Creating kernels for the GPU failed" << endl;
@@ -3678,7 +6676,7 @@ using namespace std;
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsOneSecondPart(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * (SLEAN_TRIMMING_NUMBER_OF_BUCKETS - bucketsOneNumberOfBuckets) * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
+		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * SLEAN_TRIMMING_PARTS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
 		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> nodesBitmap(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
@@ -3710,7 +6708,7 @@ using namespace std;
 		}
 		
 		// Check if setting program's unchanging arguments failed
-		if(clSetKernelArg(stepOneKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepEightKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepEightKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepEightKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepNineKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFifteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFifteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFifteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS) {
+		if(clSetKernelArg(stepOneKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepEightKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepEightKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepEightKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepNineKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFifteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFifteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFifteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyOneKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyOneKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyOneKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFiveKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFiveKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFiveKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFiveKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyNineKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyNineKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyNineKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyNineKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyThreeKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyThreeKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyThreeKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyThreeKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Setting program's arguments on the GPU failed" << endl;
@@ -3724,6 +6722,48 @@ using namespace std;
 		
 			// Check if setting program's unchanging arguments failed
 			if(clSetKernelArg(stepOneKernel.get(), 4, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 4, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 4, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 6, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 7, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS) {
+			
+				// Display message
+				cout << "Setting program's arguments on the GPU failed" << endl;
+				
+				// Return false
+				return false;
+			}
+		}
+		
+		// Check if slean trimming parts isn't two
+		if(SLEAN_TRIMMING_PARTS != 2) {
+		
+			// Check if setting program's unchanging arguments failed
+			if(clSetKernelArg(stepSixteenKernel.get(), 5, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 4, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS) {
+			
+				// Display message
+				cout << "Setting program's arguments on the GPU failed" << endl;
+				
+				// Return false
+				return false;
+			}
+		}
+		
+		// Check if slean trimming parts isn't four
+		if(SLEAN_TRIMMING_PARTS != 4) {
+		
+			// Check if setting program's unchanging arguments failed
+			if(clSetKernelArg(stepTwentyFiveKernel.get(), 4, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS) {
+			
+				// Display message
+				cout << "Setting program's arguments on the GPU failed" << endl;
+				
+				// Return false
+				return false;
+			}
+		}
+		
+		// Check if slean trimming parts isn't eight
+		if(SLEAN_TRIMMING_PARTS != 8) {
+		
+			// Check if setting program's unchanging arguments failed
+			if(clSetKernelArg(stepTwentyNineKernel.get(), 4, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -3767,8 +6807,8 @@ using namespace std;
 		uint64_t nonceOne = jobNonce++;
 		blake2b(sipHashKeysOne, jobHeader, nonceOne);
 		
-		// Check if setting program's part or SipHash keys arguments failed
-		if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+		// Check if setting program's SipHash keys or part arguments failed
+		if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Setting program's arguments on the GPU failed" << endl;
@@ -3807,14 +6847,18 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if setting program's SipHash keys argument failed
-		if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+		// Check is slean trimming parts isn't two
+		if(SLEAN_TRIMMING_PARTS != 2) {
 		
-			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			// Check if setting program's SipHash keys argument failed
+			if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
-			// Return false
-			return false;
+				// Display message
+				cout << "Setting program's arguments on the GPU failed" << endl;
+				
+				// Return false
+				return false;
+			}
 		}
 		
 		// Go through all remaining trimming parts
@@ -3831,7 +6875,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's part argument failed
-			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+			if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -3920,7 +6964,7 @@ using namespace std;
 		}
 		
 		// Check if setting program's SipHash keys argument failed
-		if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+		if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Setting program's arguments on the GPU failed" << endl;
@@ -3943,7 +6987,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's part argument failed
-			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+			if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -3973,7 +7017,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's part argument failed
-			if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+			if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4026,8 +7070,8 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's edges bitmap, part, or SipHash keys arguments failed
-			if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+			// Check if setting program's edges bitmap, SipHash keys, or part arguments failed
+			if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4066,14 +7110,18 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's SipHash keys argument failed
-			if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+			// Check is slean trimming parts isn't two
+			if(SLEAN_TRIMMING_PARTS != 2) {
 			
-				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				// Check if setting program's SipHash keys argument failed
+				if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
-				// Return false
-				return false;
+					// Display message
+					cout << "Setting program's arguments on the GPU failed" << endl;
+					
+					// Return false
+					return false;
+				}
 			}
 			
 			// Go through all remaining trimming parts
@@ -4090,7 +7138,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4179,7 +7227,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's SipHash keys argument failed
-			if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+			if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4202,7 +7250,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4232,7 +7280,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4272,8 +7320,8 @@ using namespace std;
 				}
 			}
 			
-			// Go through all remaining trimming rounds
-			for(unsigned int i = 2; i < TRIMMING_ROUNDS; ++i) {
+			// Check if trimming more than two rounds
+			if(TRIMMING_ROUNDS > 2) {
 			
 				// Check if queuing clearing number of edges per bucket one on the device failed
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
@@ -4285,14 +7333,28 @@ using namespace std;
 					return false;
 				}
 				
-				// Check if setting program's edges bitmap, part, nodes in second partition, or SipHash keys arguments failed
-				if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+				// Check if setting program's edges bitmap or SipHash keys arguments failed
+				if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
 					
 					// Return false
 					return false;
+				}
+				
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
+				
+					// Check if setting program's part argument failed
+					if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
 				}
 				
 				// Check if queuing running step thirteen on the device failed
@@ -4305,31 +7367,11 @@ using namespace std;
 					return false;
 				}
 				
-				// Check if queuing running step fourteen on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
 				
-					// Display message
-					cout << "Running program on the GPU failed" << endl;
-					
-					// Return false
-					return false;
-				}
-				
-				// Go through all remaining trimming parts
-				for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS; ++j) {
-				
-					// Check if queuing clearing number of edges per bucket one on the device failed
-					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
-					
-						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
-						
-						// Return false
-						return false;
-					}
-					
-					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+					// Check if setting program's SipHash keys argument failed
+					if(clSetKernelArg(stepFourteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4338,8 +7380,8 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if queuing running step thirteen on the device failed
-					if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
+					// Check if queuing running step fourteen on the device failed
+					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Running program on the GPU failed" << endl;
@@ -4348,25 +7390,21 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if not the last trimming part
-					if(j != SLEAN_TRIMMING_PARTS - 1) {
+					// Check if setting program's SipHash keys argument failed
+					if(clSetKernelArg(stepFifteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
-						// Check if queuing running step fifteen on the device failed
-						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
 						
-							// Display message
-							cout << "Running program on the GPU failed" << endl;
-							
-							// Return false
-							return false;
-						}
+						// Return false
+						return false;
 					}
 					
-					// Otherwise
-					else {
+					// Go through all remaining trimming parts
+					for(unsigned int i = 1; i < SLEAN_TRIMMING_PARTS / 2; ++i) {
 					
-						// Check if queuing clearing number of edges per bucket two on the device failed
-						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+						// Check if queuing clearing number of edges per bucket one on the device failed
+						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -4375,8 +7413,18 @@ using namespace std;
 							return false;
 						}
 						
-						// Check if queuing running step sixteen on the device failed
-						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+						// Check if setting program's part argument failed
+						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check if queuing running step thirteen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Running program on the GPU failed" << endl;
@@ -4384,17 +7432,113 @@ using namespace std;
 							// Return false
 							return false;
 						}
+						
+						// Check if not the last trimming part
+						if(i != SLEAN_TRIMMING_PARTS / 2 - 1) {
+						
+							// Check if queuing running step fifteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+						
+						// Otherwise
+						else {
+						
+							// Check if queuing clearing number of edges per bucket two on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's SipHash keys argument failed
+							if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step sixteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
 					}
 				}
 				
-				// Check if setting program's edges bitmap or part arguments failed
-				if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
+				// Otherwise
+				else {
+				
+					// Check if queuing clearing number of edges per bucket two on the device failed
+					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Preparing program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+					
+					// Check if setting program's SipHash keys argument failed
+					if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+					
+					// Check if queuing running step sixteen on the device failed
+					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Running program on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+				}
+				
+				// Check if setting program's edges bitmap argument failed
+				if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
 					
 					// Return false
 					return false;
+				}
+				
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
+				
+					// Check if setting program's part argument failed
+					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
 				}
 				
 				// Check if queuing running step seventeen on the device failed
@@ -4407,8 +7551,22 @@ using namespace std;
 					return false;
 				}
 				
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
+				
+					// Check if setting program's SipHash keys argument failed
+					if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+				}
+				
 				// Go through all remaining trimming parts except the last one
-				for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS - 1; ++j) {
+				for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
 				
 					// Check if queuing clearing number of edges per bucket one on the device failed
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
@@ -4421,7 +7579,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4441,7 +7599,7 @@ using namespace std;
 					}
 					
 					// Check if queuing clearing number of edges per bucket two on the device failed
-					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -4451,7 +7609,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepEighteenKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4471,7 +7629,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4488,6 +7646,924 @@ using namespace std;
 						
 						// Return false
 						return false;
+					}
+				}
+				
+				// Check if trimming more than three rounds
+				if(TRIMMING_ROUNDS > 3) {
+				
+					// Check if setting program's edges bitmap or SipHash keys arguments failed
+					if(clSetKernelArg(stepNineteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+					
+					// Go through several remaining trimming rounds
+					for(unsigned int i = 3; i < ((SLEAN_TRIMMING_PARTS == 2 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN); ++i) {
+					
+						// Check if queuing clearing number of edges per bucket one on the device failed
+						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Preparing program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check if setting program's nodes in second partition argument failed
+						if(clSetKernelArg(stepNineteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+						
+						// Check if queuing running step nineteen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Running program on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Check if queuing running step twenty on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through all remaining trimming parts
+							for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 2; ++j) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step nineteen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if not the last trimming part
+								if(j != SLEAN_TRIMMING_PARTS / 2 - 1) {
+								
+									// Check if queuing running step twenty-one on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-two on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+							}
+						}
+						
+						// Otherwise
+						else {
+						
+							// Check if queuing clearing number of edges per bucket two on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step twenty-two on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+						
+						// Check if queuing running step seventeen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Running program on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Go through all remaining trimming parts except the last one
+						for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+						
+							// Check if queuing clearing number of edges per bucket one on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step nineteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing clearing number of edges per bucket two on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepTwentyThreeKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step twenty-three on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[22], &workItemsPerWorkGroup[22], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step seventeen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+					}
+					
+					// Check if slean trimming parts isn't two and trimming more rounds
+					if(SLEAN_TRIMMING_PARTS != 2 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) {
+					
+						// Check if setting program's edges bitmap or SipHash keys arguments failed
+						if(clSetKernelArg(stepTwentyFourKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Go through several remaining trimming rounds
+						for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 4 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN); ++i) {
+						
+							// Check if queuing clearing number of edges per bucket one on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's nodes in second partition argument failed
+							if(clSetKernelArg(stepTwentyFourKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check if queuing running step twenty-four on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Check if queuing running step twenty on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming parts
+								for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 4; ++j) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-four on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if not the last trimming part
+									if(j != (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1) {
+									
+										// Check if queuing running step twenty-one on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Otherwise
+									else {
+									
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-five on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-five on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 4 - 1))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check if queuing running step twenty-six on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through all remaining trimming parts except the last one
+							for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-four on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentySevenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-seven on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[26], &workItemsPerWorkGroup[26], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-six on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+						}
+						
+						// Check if slean trimming parts isn't four and trimming more rounds
+						if(SLEAN_TRIMMING_PARTS != 4 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) {
+						
+							// Check if setting program's edges bitmap or SipHash keys arguments failed
+							if(clSetKernelArg(stepTwentyEightKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through several remaining trimming rounds
+							for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 8 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN); ++i) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's nodes in second partition argument failed
+								if(clSetKernelArg(stepTwentyEightKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check is slean trimming parts isn't eight
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check if queuing running step twenty-eight on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check is slean trimming parts isn't eight
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Check if queuing running step twenty on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Go through all remaining trimming parts
+									for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 8; ++j) {
+									
+										// Check if queuing clearing number of edges per bucket one on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-eight on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if not the last trimming part
+										if(j != (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1) {
+										
+											// Check if queuing running step twenty-one on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+										}
+										
+										// Otherwise
+										else {
+										
+											// Check if queuing clearing number of edges per bucket two on the device failed
+											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Preparing program's arguments on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if queuing running step twenty-nine on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+										}
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-nine on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 8 - 1))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check if queuing running step thirty on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming parts except the last one
+								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1; ++j) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-eight on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepThirtyOneKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty-one on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[30], &workItemsPerWorkGroup[30], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+							}
+							
+							// Check if slean trimming parts isn't eight and trimming more rounds
+							if(SLEAN_TRIMMING_PARTS != 8 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) {
+							
+								// Check if setting program's edges bitmap or SipHash keys arguments failed
+								if(clSetKernelArg(stepThirtyTwoKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming rounds
+								for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN; i < TRIMMING_ROUNDS; ++i) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's nodes in second partition argument failed
+									if(clSetKernelArg(stepThirtyTwoKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty-two on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[31], &workItemsPerWorkGroup[31], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty-three on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[32], &workItemsPerWorkGroup[32], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty-four on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[33], &workItemsPerWorkGroup[33], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -4566,8 +8642,8 @@ using namespace std;
 		uint64_t nonceTwo = jobNonce++;
 		blake2b(sipHashKeysTwo, jobHeader, nonceTwo);
 		
-		// Check if setting program's part or SipHash keys arguments failed
-		if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+		// Check if setting program's SipHash keys or part arguments failed
+		if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4606,14 +8682,18 @@ using namespace std;
 			return false;
 		}
 		
-		// Check if setting program's SipHash keys argument failed
-		if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+		// Check is slean trimming parts isn't two
+		if(SLEAN_TRIMMING_PARTS != 2) {
 		
-			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			// Check if setting program's SipHash keys argument failed
+			if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
-			// Return false
-			return false;
+				// Display message
+				cout << "Setting program's arguments on the GPU failed" << endl;
+				
+				// Return false
+				return false;
+			}
 		}
 		
 		// Go through all remaining trimming parts
@@ -4630,7 +8710,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's part argument failed
-			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+			if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4719,7 +8799,7 @@ using namespace std;
 		}
 		
 		// Check if setting program's SipHash keys argument failed
-		if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+		if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 		
 			// Display message
 			cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4742,7 +8822,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's part argument failed
-			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+			if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4772,7 +8852,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's part argument failed
-			if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+			if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4825,8 +8905,8 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's edges bitmap, part, or SipHash keys arguments failed
-			if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+			// Check if setting program's edges bitmap, SipHash keys, or part arguments failed
+			if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4865,14 +8945,18 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's SipHash keys argument failed
-			if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+			// Check is slean trimming parts isn't two
+			if(SLEAN_TRIMMING_PARTS != 2) {
 			
-				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				// Check if setting program's SipHash keys argument failed
+				if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
-				// Return false
-				return false;
+					// Display message
+					cout << "Setting program's arguments on the GPU failed" << endl;
+					
+					// Return false
+					return false;
+				}
 			}
 			
 			// Go through all remaining trimming parts
@@ -4889,7 +8973,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -4978,7 +9062,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's SipHash keys argument failed
-			if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+			if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5001,7 +9085,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5031,7 +9115,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5071,8 +9155,8 @@ using namespace std;
 				}
 			}
 			
-			// Go through all remaining trimming rounds
-			for(unsigned int i = 2; i < TRIMMING_ROUNDS; ++i) {
+			// Check if trimming more than two rounds
+			if(TRIMMING_ROUNDS > 2) {
 			
 				// Check if queuing clearing number of edges per bucket one on the device failed
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
@@ -5084,14 +9168,28 @@ using namespace std;
 					return false;
 				}
 				
-				// Check if setting program's edges bitmap, part, nodes in second partition, or SipHash keys arguments failed
-				if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+				// Check if setting program's edges bitmap or SipHash keys arguments failed
+				if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
 					
 					// Return false
 					return false;
+				}
+				
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
+				
+					// Check if setting program's part argument failed
+					if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
 				}
 				
 				// Check if queuing running step thirteen on the device failed
@@ -5104,31 +9202,11 @@ using namespace std;
 					return false;
 				}
 				
-				// Check if queuing running step fourteen on the device failed
-				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
 				
-					// Display message
-					cout << "Running program on the GPU failed" << endl;
-					
-					// Return false
-					return false;
-				}
-				
-				// Go through all remaining trimming parts
-				for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS; ++j) {
-				
-					// Check if queuing clearing number of edges per bucket one on the device failed
-					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
-					
-						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
-						
-						// Return false
-						return false;
-					}
-					
-					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+					// Check if setting program's SipHash keys argument failed
+					if(clSetKernelArg(stepFourteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5137,8 +9215,8 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if queuing running step thirteen on the device failed
-					if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
+					// Check if queuing running step fourteen on the device failed
+					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Running program on the GPU failed" << endl;
@@ -5147,25 +9225,25 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if not the last trimming part
-					if(j != SLEAN_TRIMMING_PARTS - 1) {
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
 					
-						// Check if queuing running step fifteen on the device failed
-						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
+						// Check if setting program's SipHash keys argument failed
+						if(clSetKernelArg(stepFifteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed" << endl;
 							
 							// Return false
 							return false;
 						}
 					}
 					
-					// Otherwise
-					else {
+					// Go through all remaining trimming parts
+					for(unsigned int i = 1; i < SLEAN_TRIMMING_PARTS / 2; ++i) {
 					
-						// Check if queuing clearing number of edges per bucket two on the device failed
-						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+						// Check if queuing clearing number of edges per bucket one on the device failed
+						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -5174,8 +9252,18 @@ using namespace std;
 							return false;
 						}
 						
-						// Check if queuing running step sixteen on the device failed
-						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+						// Check if setting program's part argument failed
+						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check if queuing running step thirteen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Running program on the GPU failed" << endl;
@@ -5183,17 +9271,113 @@ using namespace std;
 							// Return false
 							return false;
 						}
+						
+						// Check if not the last trimming part
+						if(i != SLEAN_TRIMMING_PARTS / 2 - 1) {
+						
+							// Check if queuing running step fifteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+						
+						// Otherwise
+						else {
+						
+							// Check if queuing clearing number of edges per bucket two on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's SipHash keys argument failed
+							if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step sixteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
 					}
 				}
 				
-				// Check if setting program's edges bitmap or part arguments failed
-				if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
+				// Otherwise
+				else {
+				
+					// Check if queuing clearing number of edges per bucket two on the device failed
+					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Preparing program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+					
+					// Check if setting program's SipHash keys argument failed
+					if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+					
+					// Check if queuing running step sixteen on the device failed
+					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Running program on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+				}
+				
+				// Check if setting program's edges bitmap argument failed
+				if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
 					
 					// Return false
 					return false;
+				}
+				
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
+				
+					// Check if setting program's part argument failed
+					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
 				}
 				
 				// Check if queuing running step seventeen on the device failed
@@ -5206,8 +9390,22 @@ using namespace std;
 					return false;
 				}
 				
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
+				
+					// Check if setting program's SipHash keys argument failed
+					if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+				}
+				
 				// Go through all remaining trimming parts except the last one
-				for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS - 1; ++j) {
+				for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
 				
 					// Check if queuing clearing number of edges per bucket one on the device failed
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
@@ -5220,7 +9418,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5240,7 +9438,7 @@ using namespace std;
 					}
 					
 					// Check if queuing clearing number of edges per bucket two on the device failed
-					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -5250,7 +9448,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepEighteenKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5270,7 +9468,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5287,6 +9485,924 @@ using namespace std;
 						
 						// Return false
 						return false;
+					}
+				}
+				
+				// Check if trimming more than three rounds
+				if(TRIMMING_ROUNDS > 3) {
+				
+					// Check if setting program's edges bitmap or SipHash keys arguments failed
+					if(clSetKernelArg(stepNineteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+					
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
+					
+					// Go through several remaining trimming rounds
+					for(unsigned int i = 3; i < ((SLEAN_TRIMMING_PARTS == 2 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN); ++i) {
+					
+						// Check if queuing clearing number of edges per bucket one on the device failed
+						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Preparing program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check if setting program's nodes in second partition argument failed
+						if(clSetKernelArg(stepNineteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+						
+						// Check if queuing running step nineteen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Running program on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Check if queuing running step twenty on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through all remaining trimming parts
+							for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 2; ++j) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step nineteen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if not the last trimming part
+								if(j != SLEAN_TRIMMING_PARTS / 2 - 1) {
+								
+									// Check if queuing running step twenty-one on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-two on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+							}
+						}
+						
+						// Otherwise
+						else {
+						
+							// Check if queuing clearing number of edges per bucket two on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step twenty-two on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+						
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
+						
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+						
+						// Check if queuing running step seventeen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Running program on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Go through all remaining trimming parts except the last one
+						for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+						
+							// Check if queuing clearing number of edges per bucket one on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step nineteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing clearing number of edges per bucket two on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepTwentyThreeKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step twenty-three on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[22], &workItemsPerWorkGroup[22], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step seventeen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+						}
+					}
+					
+					// Check if slean trimming parts isn't two and trimming more rounds
+					if(SLEAN_TRIMMING_PARTS != 2 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) {
+					
+						// Check if setting program's edges bitmap or SipHash keys arguments failed
+						if(clSetKernelArg(stepTwentyFourKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Go through several remaining trimming rounds
+						for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 4 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN); ++i) {
+						
+							// Check if queuing clearing number of edges per bucket one on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's nodes in second partition argument failed
+							if(clSetKernelArg(stepTwentyFourKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check if queuing running step twenty-four on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Check if queuing running step twenty on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming parts
+								for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 4; ++j) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-four on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if not the last trimming part
+									if(j != (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1) {
+									
+										// Check if queuing running step twenty-one on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Otherwise
+									else {
+									
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-five on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-five on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check is slean trimming parts isn't four
+							if(SLEAN_TRIMMING_PARTS != 4) {
+							
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 4 - 1))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check if queuing running step twenty-six on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through all remaining trimming parts except the last one
+							for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-four on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentySevenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-seven on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[26], &workItemsPerWorkGroup[26], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-six on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+						}
+						
+						// Check if slean trimming parts isn't four and trimming more rounds
+						if(SLEAN_TRIMMING_PARTS != 4 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) {
+						
+							// Check if setting program's edges bitmap or SipHash keys arguments failed
+							if(clSetKernelArg(stepTwentyEightKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through several remaining trimming rounds
+							for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 8 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN); ++i) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's nodes in second partition argument failed
+								if(clSetKernelArg(stepTwentyEightKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check is slean trimming parts isn't eight
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check if queuing running step twenty-eight on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check is slean trimming parts isn't eight
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Check if queuing running step twenty on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Go through all remaining trimming parts
+									for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 8; ++j) {
+									
+										// Check if queuing clearing number of edges per bucket one on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-eight on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if not the last trimming part
+										if(j != (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1) {
+										
+											// Check if queuing running step twenty-one on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+										}
+										
+										// Otherwise
+										else {
+										
+											// Check if queuing clearing number of edges per bucket two on the device failed
+											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Preparing program's arguments on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if queuing running step twenty-nine on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+										}
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-nine on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 8) {
+								
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 8 - 1))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check if queuing running step thirty on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming parts except the last one
+								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1; ++j) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-eight on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepThirtyOneKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty-one on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[30], &workItemsPerWorkGroup[30], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+							}
+							
+							// Check if slean trimming parts isn't eight and trimming more rounds
+							if(SLEAN_TRIMMING_PARTS != 8 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) {
+							
+								// Check if setting program's edges bitmap or SipHash keys arguments failed
+								if(clSetKernelArg(stepThirtyTwoKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming rounds
+								for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN; i < TRIMMING_ROUNDS; ++i) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's nodes in second partition argument failed
+									if(clSetKernelArg(stepThirtyTwoKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty-two on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[31], &workItemsPerWorkGroup[31], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty-three on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[32], &workItemsPerWorkGroup[32], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step thirty-four on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[33], &workItemsPerWorkGroup[33], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -5374,8 +10490,8 @@ using namespace std;
 			nonceOne = jobNonce++;
 			blake2b(sipHashKeysOne, jobHeader, nonceOne);
 			
-			// Check if setting program's part or SipHash keys arguments failed
-			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+			// Check if setting program's SipHash keys or part arguments failed
+			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5414,14 +10530,18 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's SipHash keys argument failed
-			if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+			// Check is slean trimming parts isn't two
+			if(SLEAN_TRIMMING_PARTS != 2) {
 			
-				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				// Check if setting program's SipHash keys argument failed
+				if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
-				// Return false
-				return false;
+					// Display message
+					cout << "Setting program's arguments on the GPU failed" << endl;
+					
+					// Return false
+					return false;
+				}
 			}
 			
 			// Go through all remaining trimming parts
@@ -5438,7 +10558,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5527,7 +10647,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's SipHash keys argument failed
-			if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+			if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5550,7 +10670,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5580,7 +10700,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5633,8 +10753,8 @@ using namespace std;
 					return false;
 				}
 				
-				// Check if setting program's edges bitmap, part, or SipHash keys arguments failed
-				if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+				// Check if setting program's edges bitmap, SipHash keys, or part arguments failed
+				if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5673,14 +10793,18 @@ using namespace std;
 					return false;
 				}
 				
-				// Check if setting program's SipHash keys argument failed
-				if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
 				
-					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					// Check if setting program's SipHash keys argument failed
+					if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
-					// Return false
-					return false;
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
 				}
 				
 				// Go through all remaining trimming parts
@@ -5697,7 +10821,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5786,7 +10910,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's SipHash keys argument failed
-				if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+				if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5809,7 +10933,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5839,7 +10963,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5879,8 +11003,8 @@ using namespace std;
 					}
 				}
 				
-				// Go through all remaining trimming rounds
-				for(unsigned int i = 2; i < TRIMMING_ROUNDS; ++i) {
+				// Check if trimming more than two rounds
+				if(TRIMMING_ROUNDS > 2) {
 				
 					// Check if queuing clearing number of edges per bucket one on the device failed
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
@@ -5892,14 +11016,28 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if setting program's edges bitmap, part, nodes in second partition, or SipHash keys arguments failed
-					if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+					// Check if setting program's edges bitmap or SipHash keys arguments failed
+					if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
 						
 						// Return false
 						return false;
+					}
+					
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
+					
+						// Check if setting program's part argument failed
+						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
 					}
 					
 					// Check if queuing running step thirteen on the device failed
@@ -5912,31 +11050,11 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if queuing running step fourteen on the device failed
-					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
 					
-						// Display message
-						cout << "Running program on the GPU failed" << endl;
-						
-						// Return false
-						return false;
-					}
-					
-					// Go through all remaining trimming parts
-					for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS; ++j) {
-					
-						// Check if queuing clearing number of edges per bucket one on the device failed
-						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
-						
-							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
-							
-							// Return false
-							return false;
-						}
-						
-						// Check if setting program's part argument failed
-						if(clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+						// Check if setting program's SipHash keys argument failed
+						if(clSetKernelArg(stepFourteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Setting program's arguments on the GPU failed" << endl;
@@ -5945,8 +11063,8 @@ using namespace std;
 							return false;
 						}
 						
-						// Check if queuing running step thirteen on the device failed
-						if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
+						// Check if queuing running step fourteen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Running program on the GPU failed" << endl;
@@ -5955,25 +11073,25 @@ using namespace std;
 							return false;
 						}
 						
-						// Check if not the last trimming part
-						if(j != SLEAN_TRIMMING_PARTS - 1) {
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
 						
-							// Check if queuing running step fifteen on the device failed
-							if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
+							// Check if setting program's SipHash keys argument failed
+							if(clSetKernelArg(stepFifteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed" << endl;
 								
 								// Return false
 								return false;
 							}
 						}
 						
-						// Otherwise
-						else {
+						// Go through all remaining trimming parts
+						for(unsigned int i = 1; i < SLEAN_TRIMMING_PARTS / 2; ++i) {
 						
-							// Check if queuing clearing number of edges per bucket two on the device failed
-							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							// Check if queuing clearing number of edges per bucket one on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
 								cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -5982,8 +11100,18 @@ using namespace std;
 								return false;
 							}
 							
-							// Check if queuing running step sixteen on the device failed
-							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step thirteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
 								cout << "Running program on the GPU failed" << endl;
@@ -5991,17 +11119,113 @@ using namespace std;
 								// Return false
 								return false;
 							}
+							
+							// Check if not the last trimming part
+							if(i != SLEAN_TRIMMING_PARTS / 2 - 1) {
+							
+								// Check if queuing running step fifteen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's SipHash keys argument failed
+								if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step sixteen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
 						}
 					}
 					
-					// Check if setting program's edges bitmap or part arguments failed
-					if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
+					// Otherwise
+					else {
+					
+						// Check if queuing clearing number of edges per bucket two on the device failed
+						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Preparing program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check if setting program's SipHash keys argument failed
+						if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check if queuing running step sixteen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Running program on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+					}
+					
+					// Check if setting program's edges bitmap argument failed
+					if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
 						
 						// Return false
 						return false;
+					}
+					
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
+					
+						// Check if setting program's part argument failed
+						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
 					}
 					
 					// Check if queuing running step seventeen on the device failed
@@ -6014,8 +11238,22 @@ using namespace std;
 						return false;
 					}
 					
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
+					
+						// Check if setting program's SipHash keys argument failed
+						if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+					}
+					
 					// Go through all remaining trimming parts except the last one
-					for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS - 1; ++j) {
+					for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
 					
 						// Check if queuing clearing number of edges per bucket one on the device failed
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
@@ -6028,7 +11266,7 @@ using namespace std;
 						}
 						
 						// Check if setting program's part argument failed
-						if(clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6048,7 +11286,7 @@ using namespace std;
 						}
 						
 						// Check if queuing clearing number of edges per bucket two on the device failed
-						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -6058,7 +11296,7 @@ using namespace std;
 						}
 						
 						// Check if setting program's part argument failed
-						if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+						if(clSetKernelArg(stepEighteenKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6078,7 +11316,7 @@ using namespace std;
 						}
 						
 						// Check if setting program's part argument failed
-						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6095,6 +11333,924 @@ using namespace std;
 							
 							// Return false
 							return false;
+						}
+					}
+					
+					// Check if trimming more than three rounds
+					if(TRIMMING_ROUNDS > 3) {
+					
+						// Check if setting program's edges bitmap or SipHash keys arguments failed
+						if(clSetKernelArg(stepNineteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Go through several remaining trimming rounds
+						for(unsigned int i = 3; i < ((SLEAN_TRIMMING_PARTS == 2 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN); ++i) {
+						
+							// Check if queuing clearing number of edges per bucket one on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's nodes in second partition argument failed
+							if(clSetKernelArg(stepNineteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check if queuing running step nineteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Check if queuing running step twenty on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming parts
+								for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 2; ++j) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step nineteen on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if not the last trimming part
+									if(j != SLEAN_TRIMMING_PARTS / 2 - 1) {
+									
+										// Check if queuing running step twenty-one on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Otherwise
+									else {
+									
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-two on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-two on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check if queuing running step seventeen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through all remaining trimming parts except the last one
+							for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step nineteen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentyThreeKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-three on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[22], &workItemsPerWorkGroup[22], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step seventeen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+						}
+						
+						// Check if slean trimming parts isn't two and trimming more rounds
+						if(SLEAN_TRIMMING_PARTS != 2 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) {
+						
+							// Check if setting program's edges bitmap or SipHash keys arguments failed
+							if(clSetKernelArg(stepTwentyFourKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through several remaining trimming rounds
+							for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 4 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN); ++i) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's nodes in second partition argument failed
+								if(clSetKernelArg(stepTwentyFourKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check if queuing running step twenty-four on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Check if queuing running step twenty on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Go through all remaining trimming parts
+									for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 4; ++j) {
+									
+										// Check if queuing clearing number of edges per bucket one on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-four on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if not the last trimming part
+										if(j != (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1) {
+										
+											// Check if queuing running step twenty-one on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+										}
+										
+										// Otherwise
+										else {
+										
+											// Check if queuing clearing number of edges per bucket two on the device failed
+											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Preparing program's arguments on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if queuing running step twenty-five on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+										}
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-five on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 4 - 1))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check if queuing running step twenty-six on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming parts except the last one
+								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-four on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentySevenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-seven on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[26], &workItemsPerWorkGroup[26], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-six on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+							}
+							
+							// Check if slean trimming parts isn't four and trimming more rounds
+							if(SLEAN_TRIMMING_PARTS != 4 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) {
+							
+								// Check if setting program's edges bitmap or SipHash keys arguments failed
+								if(clSetKernelArg(stepTwentyEightKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through several remaining trimming rounds
+								for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 8 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN); ++i) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's nodes in second partition argument failed
+									if(clSetKernelArg(stepTwentyEightKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check is slean trimming parts isn't eight
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Check if queuing running step twenty-eight on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check is slean trimming parts isn't eight
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Check if queuing running step twenty on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Go through all remaining trimming parts
+										for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 8; ++j) {
+										
+											// Check if queuing clearing number of edges per bucket one on the device failed
+											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Preparing program's arguments on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if setting program's part argument failed
+											if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Setting program's arguments on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if queuing running step twenty-eight on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if not the last trimming part
+											if(j != (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1) {
+											
+												// Check if queuing running step twenty-one on the device failed
+												if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+												
+													// Display message
+													cout << "Running program on the GPU failed" << endl;
+													
+													// Return false
+													return false;
+												}
+											}
+											
+											// Otherwise
+											else {
+											
+												// Check if queuing clearing number of edges per bucket two on the device failed
+												if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+												
+													// Display message
+													cout << "Preparing program's arguments on the GPU failed" << endl;
+													
+													// Return false
+													return false;
+												}
+												
+												// Check if queuing running step twenty-nine on the device failed
+												if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
+												
+													// Display message
+													cout << "Running program on the GPU failed" << endl;
+													
+													// Return false
+													return false;
+												}
+											}
+										}
+									}
+									
+									// Otherwise
+									else {
+									
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-nine on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Check is slean trimming parts isn't four
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 8 - 1))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Check if queuing running step thirty on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Go through all remaining trimming parts except the last one
+									for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1; ++j) {
+									
+										// Check if queuing clearing number of edges per bucket one on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-eight on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepThirtyOneKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty-one on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[30], &workItemsPerWorkGroup[30], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+								}
+								
+								// Check if slean trimming parts isn't eight and trimming more rounds
+								if(SLEAN_TRIMMING_PARTS != 8 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) {
+								
+									// Check if setting program's edges bitmap or SipHash keys arguments failed
+									if(clSetKernelArg(stepThirtyTwoKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Go through all remaining trimming rounds
+									for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN; i < TRIMMING_ROUNDS; ++i) {
+									
+										// Check if queuing clearing number of edges per bucket one on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's nodes in second partition argument failed
+										if(clSetKernelArg(stepThirtyTwoKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty-two on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[31], &workItemsPerWorkGroup[31], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty-three on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[32], &workItemsPerWorkGroup[32], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty-four on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[33], &workItemsPerWorkGroup[33], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+								}
+							}
 						}
 					}
 				}
@@ -6175,8 +12331,8 @@ using namespace std;
 			nonceTwo = jobNonce++;
 			blake2b(sipHashKeysTwo, jobHeader, nonceTwo);
 			
-			// Check if setting program's part or SipHash keys arguments failed
-			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+			// Check if setting program's SipHash keys or part arguments failed
+			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6215,14 +12371,18 @@ using namespace std;
 				return false;
 			}
 			
-			// Check if setting program's SipHash keys argument failed
-			if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+			// Check is slean trimming parts isn't two
+			if(SLEAN_TRIMMING_PARTS != 2) {
 			
-				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				// Check if setting program's SipHash keys argument failed
+				if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
-				// Return false
-				return false;
+					// Display message
+					cout << "Setting program's arguments on the GPU failed" << endl;
+					
+					// Return false
+					return false;
+				}
 			}
 			
 			// Go through all remaining trimming parts
@@ -6239,7 +12399,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6328,7 +12488,7 @@ using namespace std;
 			}
 			
 			// Check if setting program's SipHash keys argument failed
-			if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+			if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
 				cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6351,7 +12511,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6381,7 +12541,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's part argument failed
-				if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+				if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6434,8 +12594,8 @@ using namespace std;
 					return false;
 				}
 				
-				// Check if setting program's edges bitmap, part, or SipHash keys arguments failed
-				if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+				// Check if setting program's edges bitmap, SipHash keys, or part arguments failed
+				if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6474,14 +12634,18 @@ using namespace std;
 					return false;
 				}
 				
-				// Check if setting program's SipHash keys argument failed
-				if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+				// Check is slean trimming parts isn't two
+				if(SLEAN_TRIMMING_PARTS != 2) {
 				
-					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					// Check if setting program's SipHash keys argument failed
+					if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
-					// Return false
-					return false;
+						// Display message
+						cout << "Setting program's arguments on the GPU failed" << endl;
+						
+						// Return false
+						return false;
+					}
 				}
 				
 				// Go through all remaining trimming parts
@@ -6498,7 +12662,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6587,7 +12751,7 @@ using namespace std;
 				}
 				
 				// Check if setting program's SipHash keys argument failed
-				if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+				if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
 					// Display message
 					cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6610,7 +12774,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepSevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6640,7 +12804,7 @@ using namespace std;
 					}
 					
 					// Check if setting program's part argument failed
-					if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+					if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6680,8 +12844,8 @@ using namespace std;
 					}
 				}
 				
-				// Go through all remaining trimming rounds
-				for(unsigned int i = 2; i < TRIMMING_ROUNDS; ++i) {
+				// Check if trimming more than two rounds
+				if(TRIMMING_ROUNDS > 2) {
 				
 					// Check if queuing clearing number of edges per bucket one on the device failed
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
@@ -6693,14 +12857,28 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if setting program's edges bitmap, part, nodes in second partition, or SipHash keys arguments failed
-					if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+					// Check if setting program's edges bitmap or SipHash keys arguments failed
+					if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
 						
 						// Return false
 						return false;
+					}
+					
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
+					
+						// Check if setting program's part argument failed
+						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
 					}
 					
 					// Check if queuing running step thirteen on the device failed
@@ -6713,31 +12891,11 @@ using namespace std;
 						return false;
 					}
 					
-					// Check if queuing running step fourteen on the device failed
-					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
 					
-						// Display message
-						cout << "Running program on the GPU failed" << endl;
-						
-						// Return false
-						return false;
-					}
-					
-					// Go through all remaining trimming parts
-					for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS; ++j) {
-					
-						// Check if queuing clearing number of edges per bucket one on the device failed
-						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
-						
-							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
-							
-							// Return false
-							return false;
-						}
-						
-						// Check if setting program's part argument failed
-						if(clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+						// Check if setting program's SipHash keys argument failed
+						if(clSetKernelArg(stepFourteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6746,8 +12904,8 @@ using namespace std;
 							return false;
 						}
 						
-						// Check if queuing running step thirteen on the device failed
-						if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
+						// Check if queuing running step fourteen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Running program on the GPU failed" << endl;
@@ -6756,25 +12914,25 @@ using namespace std;
 							return false;
 						}
 						
-						// Check if not the last trimming part
-						if(j != SLEAN_TRIMMING_PARTS - 1) {
+						// Check is slean trimming parts isn't two
+						if(SLEAN_TRIMMING_PARTS != 2) {
 						
-							// Check if queuing running step fifteen on the device failed
-							if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
+							// Check if setting program's SipHash keys argument failed
+							if(clSetKernelArg(stepFifteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed" << endl;
 								
 								// Return false
 								return false;
 							}
 						}
 						
-						// Otherwise
-						else {
+						// Go through all remaining trimming parts
+						for(unsigned int i = 1; i < SLEAN_TRIMMING_PARTS / 2; ++i) {
 						
-							// Check if queuing clearing number of edges per bucket two on the device failed
-							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							// Check if queuing clearing number of edges per bucket one on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
 								cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -6783,8 +12941,18 @@ using namespace std;
 								return false;
 							}
 							
-							// Check if queuing running step sixteen on the device failed
-							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+							// Check if setting program's part argument failed
+							if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if queuing running step thirteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
 								cout << "Running program on the GPU failed" << endl;
@@ -6792,17 +12960,113 @@ using namespace std;
 								// Return false
 								return false;
 							}
+							
+							// Check if not the last trimming part
+							if(i != SLEAN_TRIMMING_PARTS / 2 - 1) {
+							
+								// Check if queuing running step fifteen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's SipHash keys argument failed
+								if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step sixteen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
 						}
 					}
 					
-					// Check if setting program's edges bitmap or part arguments failed
-					if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
+					// Otherwise
+					else {
+					
+						// Check if queuing clearing number of edges per bucket two on the device failed
+						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Preparing program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check if setting program's SipHash keys argument failed
+						if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check if queuing running step sixteen on the device failed
+						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Running program on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+					}
+					
+					// Check if setting program's edges bitmap argument failed
+					if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 					
 						// Display message
 						cout << "Setting program's arguments on the GPU failed" << endl;
 						
 						// Return false
 						return false;
+					}
+					
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
+					
+						// Check if setting program's part argument failed
+						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
 					}
 					
 					// Check if queuing running step seventeen on the device failed
@@ -6815,8 +13079,22 @@ using namespace std;
 						return false;
 					}
 					
+					// Check is slean trimming parts isn't two
+					if(SLEAN_TRIMMING_PARTS != 2) {
+					
+						// Check if setting program's SipHash keys argument failed
+						if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+					}
+					
 					// Go through all remaining trimming parts except the last one
-					for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS - 1; ++j) {
+					for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
 					
 						// Check if queuing clearing number of edges per bucket one on the device failed
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
@@ -6829,7 +13107,7 @@ using namespace std;
 						}
 						
 						// Check if setting program's part argument failed
-						if(clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6849,7 +13127,7 @@ using namespace std;
 						}
 						
 						// Check if queuing clearing number of edges per bucket two on the device failed
-						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Preparing program's arguments on the GPU failed" << endl;
@@ -6859,7 +13137,7 @@ using namespace std;
 						}
 						
 						// Check if setting program's part argument failed
-						if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+						if(clSetKernelArg(stepEighteenKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6879,7 +13157,7 @@ using namespace std;
 						}
 						
 						// Check if setting program's part argument failed
-						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
 							cout << "Setting program's arguments on the GPU failed" << endl;
@@ -6896,6 +13174,924 @@ using namespace std;
 							
 							// Return false
 							return false;
+						}
+					}
+					
+					// Check if trimming more than three rounds
+					if(TRIMMING_ROUNDS > 3) {
+					
+						// Check if setting program's edges bitmap or SipHash keys arguments failed
+						if(clSetKernelArg(stepNineteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
+						
+							// Display message
+							cout << "Setting program's arguments on the GPU failed" << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Go through several remaining trimming rounds
+						for(unsigned int i = 3; i < ((SLEAN_TRIMMING_PARTS == 2 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN); ++i) {
+						
+							// Check if queuing clearing number of edges per bucket one on the device failed
+							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Preparing program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if setting program's nodes in second partition argument failed
+							if(clSetKernelArg(stepNineteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check if queuing running step nineteen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Check if queuing running step twenty on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming parts
+								for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 2; ++j) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step nineteen on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if not the last trimming part
+									if(j != SLEAN_TRIMMING_PARTS / 2 - 1) {
+									
+										// Check if queuing running step twenty-one on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Otherwise
+									else {
+									
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-two on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-two on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check is slean trimming parts isn't two
+							if(SLEAN_TRIMMING_PARTS != 2) {
+							
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+							
+							// Check if queuing running step seventeen on the device failed
+							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Running program on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through all remaining trimming parts except the last one
+							for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step nineteen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing clearing number of edges per bucket two on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepTwentyThreeKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step twenty-three on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[22], &workItemsPerWorkGroup[22], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's part argument failed
+								if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if queuing running step seventeen on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+							}
+						}
+						
+						// Check if slean trimming parts isn't two and trimming more rounds
+						if(SLEAN_TRIMMING_PARTS != 2 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN) {
+						
+							// Check if setting program's edges bitmap or SipHash keys arguments failed
+							if(clSetKernelArg(stepTwentyFourKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
+							
+								// Display message
+								cout << "Setting program's arguments on the GPU failed" << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Go through several remaining trimming rounds
+							for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_FOURTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 4 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN); ++i) {
+							
+								// Check if queuing clearing number of edges per bucket one on the device failed
+								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Preparing program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check if setting program's nodes in second partition argument failed
+								if(clSetKernelArg(stepTwentyFourKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check if queuing running step twenty-four on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Check if queuing running step twenty on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Go through all remaining trimming parts
+									for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 4; ++j) {
+									
+										// Check if queuing clearing number of edges per bucket one on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-four on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if not the last trimming part
+										if(j != (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1) {
+										
+											// Check if queuing running step twenty-one on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+										}
+										
+										// Otherwise
+										else {
+										
+											// Check if queuing clearing number of edges per bucket two on the device failed
+											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Preparing program's arguments on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if queuing running step twenty-five on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+										}
+									}
+								}
+								
+								// Otherwise
+								else {
+								
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-five on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check is slean trimming parts isn't four
+								if(SLEAN_TRIMMING_PARTS != 4) {
+								
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 4 - 1))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+								
+								// Check if queuing running step twenty-six on the device failed
+								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Running program on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through all remaining trimming parts except the last one
+								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-four on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing clearing number of edges per bucket two on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentySevenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-seven on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[26], &workItemsPerWorkGroup[26], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's part argument failed
+									if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if queuing running step twenty-six on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+								}
+							}
+							
+							// Check if slean trimming parts isn't four and trimming more rounds
+							if(SLEAN_TRIMMING_PARTS != 4 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN) {
+							
+								// Check if setting program's edges bitmap or SipHash keys arguments failed
+								if(clSetKernelArg(stepTwentyEightKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
+								
+									// Display message
+									cout << "Setting program's arguments on the GPU failed" << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Go through several remaining trimming rounds
+								for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_AN_EIGHTH_OF_EDGES_REMAIN; i < ((SLEAN_TRIMMING_PARTS == 8 || TRIMMING_ROUNDS < SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) ? TRIMMING_ROUNDS : SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN); ++i) {
+								
+									// Check if queuing clearing number of edges per bucket one on the device failed
+									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Preparing program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check if setting program's nodes in second partition argument failed
+									if(clSetKernelArg(stepTwentyEightKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check is slean trimming parts isn't eight
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Check if queuing running step twenty-eight on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Check is slean trimming parts isn't eight
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Check if queuing running step twenty on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Go through all remaining trimming parts
+										for(unsigned int j = 1; j < SLEAN_TRIMMING_PARTS / 8; ++j) {
+										
+											// Check if queuing clearing number of edges per bucket one on the device failed
+											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Preparing program's arguments on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if setting program's part argument failed
+											if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Setting program's arguments on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if queuing running step twenty-eight on the device failed
+											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+											
+												// Display message
+												cout << "Running program on the GPU failed" << endl;
+												
+												// Return false
+												return false;
+											}
+											
+											// Check if not the last trimming part
+											if(j != (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1) {
+											
+												// Check if queuing running step twenty-one on the device failed
+												if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
+												
+													// Display message
+													cout << "Running program on the GPU failed" << endl;
+													
+													// Return false
+													return false;
+												}
+											}
+											
+											// Otherwise
+											else {
+											
+												// Check if queuing clearing number of edges per bucket two on the device failed
+												if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+												
+													// Display message
+													cout << "Preparing program's arguments on the GPU failed" << endl;
+													
+													// Return false
+													return false;
+												}
+												
+												// Check if queuing running step twenty-nine on the device failed
+												if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
+												
+													// Display message
+													cout << "Running program on the GPU failed" << endl;
+													
+													// Return false
+													return false;
+												}
+											}
+										}
+									}
+									
+									// Otherwise
+									else {
+									
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-nine on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Check is slean trimming parts isn't four
+									if(SLEAN_TRIMMING_PARTS != 8) {
+									
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 8 - 1))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+									
+									// Check if queuing running step thirty on the device failed
+									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Running program on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Go through all remaining trimming parts except the last one
+									for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 8 - 1) / 8 - 1; ++j) {
+									
+										// Check if queuing clearing number of edges per bucket one on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step twenty-eight on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepThirtyOneKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty-one on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[30], &workItemsPerWorkGroup[30], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's part argument failed
+										if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+								}
+								
+								// Check if slean trimming parts isn't eight and trimming more rounds
+								if(SLEAN_TRIMMING_PARTS != 8 && TRIMMING_ROUNDS > SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN) {
+								
+									// Check if setting program's edges bitmap or SipHash keys arguments failed
+									if(clSetKernelArg(stepThirtyTwoKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
+									
+										// Display message
+										cout << "Setting program's arguments on the GPU failed" << endl;
+										
+										// Return false
+										return false;
+									}
+									
+									// Go through all remaining trimming rounds
+									for(unsigned int i = SLEAN_TRIMMING_TRIMMING_ROUNDS_BEFORE_A_SIXTEENTH_OF_EDGES_REMAIN; i < TRIMMING_ROUNDS; ++i) {
+									
+										// Check if queuing clearing number of edges per bucket one on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if setting program's nodes in second partition argument failed
+										if(clSetKernelArg(stepThirtyTwoKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Setting program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty-two on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[31], &workItemsPerWorkGroup[31], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing clearing number of edges per bucket two on the device failed
+										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Preparing program's arguments on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty-three on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[32], &workItemsPerWorkGroup[32], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+										
+										// Check if queuing running step thirty-four on the device failed
+										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[33], &workItemsPerWorkGroup[33], 0, nullptr, nullptr) != CL_SUCCESS) {
+										
+											// Display message
+											cout << "Running program on the GPU failed" << endl;
+											
+											// Return false
+											return false;
+										}
+									}
+								}
+							}
 						}
 					}
 				}

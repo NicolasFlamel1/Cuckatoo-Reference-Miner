@@ -232,7 +232,7 @@ using namespace std;
 			if(!name) {
 			
 				// Display message
-				cout << "Getting device's name failed" << endl;
+				cout << "Getting GPU's name failed" << endl;
 				
 				// Return false
 				return false;
@@ -243,7 +243,7 @@ using namespace std;
 			if(!utf8String) {
 			
 				// Display message
-				cout << "Getting device's name failed" << endl;
+				cout << "Getting GPU's name failed" << endl;
 				
 				// Return false
 				return false;
@@ -1799,7 +1799,7 @@ using namespace std;
 			if(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &nameSize) != CL_SUCCESS || !nameSize) {
 			
 				// Display message
-				cout << "Getting GPU's info failed" << endl;
+				cout << "Getting GPU's name failed" << endl;
 				
 				// Return false
 				return false;
@@ -1810,7 +1810,7 @@ using namespace std;
 			if(clGetDeviceInfo(device, CL_DEVICE_NAME, nameSize, name, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting GPU's info failed" << endl;
+				cout << "Getting GPU's name failed" << endl;
 				
 				// Return false
 				return false;
