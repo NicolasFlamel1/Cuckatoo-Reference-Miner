@@ -318,6 +318,9 @@ int main(int argc, char *argv[]) noexcept {
 	// Set current adjustable GPU memory amount to zero
 	int64_t currentAdjustableGpuMemoryAmount = 0;
 	
+	// Set current adjustable GPU memory amount is default to false
+	bool currentAdjustableGpuMemoryAmountIsDefault = false;
+	
 	// Otherwise check there's trimming rounds
 	#if TRIMMING_ROUNDS != 0
 	
@@ -328,6 +331,9 @@ int main(int argc, char *argv[]) noexcept {
 			size_t currentAdjustableGpuMemoryAmountSize = sizeof(currentAdjustableGpuMemoryAmount);
 			if(!sysctlbyname("iogpu.wired_limit_mb", &currentAdjustableGpuMemoryAmount, &currentAdjustableGpuMemoryAmountSize, nullptr, 0) && !currentAdjustableGpuMemoryAmount) {
 			
+				// Set current adjustable GPU memory amount is default to true
+				currentAdjustableGpuMemoryAmountIsDefault = true;
+				
 				// Check if getting all devices was successful
 				const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 				
@@ -876,11 +882,14 @@ int main(int argc, char *argv[]) noexcept {
 					// Check if using macOS
 					#ifdef __APPLE__
 					
+						// Set restore default RAM to if the option is default
+						const bool restoreDefaultRam = optarg ? !strcmp(optarg, "default") : false;
+						
 						// Check if option is invalid
 						char *end;
 						errno = 0;
-						const unsigned long optionAsNumber = optarg ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
-						if(!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !optionAsNumber || optionAsNumber > UINT_MAX) {
+						const unsigned long optionAsNumber = (optarg && !restoreDefaultRam) ? strtoul(optarg, &end, DECIMAL_NUMBER_BASE) : 0;
+						if(!restoreDefaultRam && (!optarg || end == optarg || *end || !isdigit(optarg[0]) || (optarg[0] == '0' && isdigit(optarg[1])) || errno || !optionAsNumber || optionAsNumber > UINT_MAX)) {
 						
 							// Display message
 							cout << argv[0] << ": invalid GPU RAM -- '" << (optarg ? optarg : "") << '\'' << endl;
@@ -941,8 +950,19 @@ int main(int argc, char *argv[]) noexcept {
 								// Otherwise
 								else {
 								
-									// Display message
-									cout << "Changed the GPU's RAM to " << optionAsNumber << " GB" << endl;
+									// Check if default RAM was restored
+									if(restoreDefaultRam) {
+									
+										// Display message
+										cout << "Changed the GPU's RAM to its default amount" << endl;
+									}
+									
+									// Otherwise
+									else {
+									
+										// Display message
+										cout << "Changed the GPU's RAM to " << optionAsNumber << " GB" << endl;
+									}
 									
 									// Check if dropping root privileges failed
 									const char *username = getlogin();
@@ -1154,7 +1174,7 @@ int main(int argc, char *argv[]) noexcept {
 			if(currentAdjustableGpuMemoryAmount) {
 			
 				// Display message
-				cout << "\t-r, --gpu_ram\t\t\tThe amount in gigabytes of your total amount of RAM to dedicate to the GPU. This requires root privileges (current: " << (currentAdjustableGpuMemoryAmount / MEGABYTES_IN_A_GIGABYTE) << ')' << endl;
+				cout << "\t-r, --gpu_ram\t\t\tThe amount in gigabytes of your total amount of RAM to dedicate to the GPU or 'default' to restore the GPU's initial amount of dedicated RAM. This requires root privileges (current: " << (currentAdjustableGpuMemoryAmountIsDefault ? "default" : to_string(currentAdjustableGpuMemoryAmount / MEGABYTES_IN_A_GIGABYTE)) << ')' << endl;
 			}
 			
 			// Display message
