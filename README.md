@@ -9,7 +9,7 @@ It's recommended that you build this program on the same system that you'll be r
 #### Linux
 This program can be built and ran with Linux with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
 ```
-sudo apt install make g++ opencl-headers ocl-icd-opencl-dev
+sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev
 make EDGE_BITS=30
 make run
 ```
@@ -52,7 +52,7 @@ This program will attempt to use the first applicable GPU that it finds. However
 ```
 If you're running this program on a system with a configurable amount of GPU RAM, then you can set your GPU's RAM to a specified amount by running this program with the `--gpu_ram` command line argument with the amount of RAM in gigabytes to use. For example, the following command will configure your system to dedicate `16` GB of RAM to your GPU.
 ```
-"./Cuckatoo Reference Miner" --gpu_ram 16
+sudo "./Cuckatoo Reference Miner" --gpu_ram 16
 ```
 This program can use only one GPU at a time, so if you want to mine with multiple GPUs then you'll need to run multiple instances of this program while specifying which GPU each instance should use with the `--gpu` command line argument. You should also specify the total number of instances that you are going to run with the `--total_number_of_instances` command line argument and the index of the current instance with the `--instance` command line argument. These command line arguments allow this program to avoid using the CPU cores that other instances are using which results in better performance. For example, the following command would be used if you're running `4` instances in total and this is instance `3` that you are running.
 ```

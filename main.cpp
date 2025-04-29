@@ -468,6 +468,9 @@ int main(int argc, char *argv[]) noexcept {
 	// Set help requested to false
 	bool helpRequested = false;
 	
+	// Set exit after options to true
+	bool exitAfterOptions = true;
+	
 	// Go through all options while not displaying help
 	int option;
 	while((option = getopt_long(argc, argv, (static_cast<string>("va:p:u:w:dg:meslt:i:h") + (currentAdjustableGpuMemoryAmount ? "r:" : "")).c_str(), options, nullptr)) != -1 && !displayHelp) {
@@ -478,9 +481,6 @@ int main(int argc, char *argv[]) noexcept {
 			// Version
 			case 'v':
 			
-				// Return success
-				exit(EXIT_SUCCESS);
-				
 				// Break
 				break;
 			
@@ -490,6 +490,9 @@ int main(int argc, char *argv[]) noexcept {
 				// Stratum server address
 				case 'a':
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Check if option is invalid
 					if(!optarg || !*optarg) {
 					
@@ -589,6 +592,9 @@ int main(int argc, char *argv[]) noexcept {
 				// Stratum server port
 				case 'p': {
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Set stratum server port set to true
 					stratumServerPortSet = true;
 					
@@ -619,6 +625,9 @@ int main(int argc, char *argv[]) noexcept {
 				// Stratum server username
 				case 'u':
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Check if option is invalid
 					if(!optarg || !*optarg) {
 					
@@ -659,6 +668,9 @@ int main(int argc, char *argv[]) noexcept {
 				// Stratum server password
 				case 'w':
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Check if option is invalid
 					if(!optarg || !*optarg) {
 					
@@ -821,9 +833,6 @@ int main(int argc, char *argv[]) noexcept {
 						cout << "None" << endl;
 					}
 					
-					// Return success
-					exit(EXIT_SUCCESS);
-					
 					// Break
 					break;
 				}
@@ -831,6 +840,9 @@ int main(int argc, char *argv[]) noexcept {
 				// GPU
 				case 'g': {
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Check if option is invalid
 					char *end;
 					errno = 0;
@@ -858,6 +870,9 @@ int main(int argc, char *argv[]) noexcept {
 				// GPU RAM
 				case 'r': {
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Check if using macOS
 					#ifdef __APPLE__
 					
@@ -949,6 +964,9 @@ int main(int argc, char *argv[]) noexcept {
 				// Mean trimming
 				case 'm':
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Enable mean trimming type
 					trimmingTypes |= MEAN_TRIMMING_TYPE;
 					
@@ -958,6 +976,9 @@ int main(int argc, char *argv[]) noexcept {
 				// Slean then mean trimming
 				case 'e':
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Enable slean then mean trimming type
 					trimmingTypes |= SLEAN_THEN_MEAN_TRIMMING_TYPE;
 					
@@ -967,6 +988,9 @@ int main(int argc, char *argv[]) noexcept {
 				// Slean trimming
 				case 's':
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Enable slean trimming type
 					trimmingTypes |= SLEAN_TRIMMING_TYPE;
 					
@@ -976,6 +1000,9 @@ int main(int argc, char *argv[]) noexcept {
 				// Lean trimming
 				case 'l':
 				
+					// Set exit after options to false
+					exitAfterOptions = false;
+					
 					// Enable lean trimming type
 					trimmingTypes |= LEAN_TRIMMING_TYPE;
 					
@@ -986,6 +1013,9 @@ int main(int argc, char *argv[]) noexcept {
 			// Total number of instances
 			case 't': {
 			
+				// Set exit after options to false
+				exitAfterOptions = false;
+				
 				// Check if option is invalid
 				char *end;
 				errno = 0;
@@ -1013,6 +1043,9 @@ int main(int argc, char *argv[]) noexcept {
 			// Instance
 			case 'i': {
 			
+				// Set exit after options to false
+				exitAfterOptions = false;
+				
 				// Check if option is invalid
 				char *end;
 				errno = 0;
@@ -1052,6 +1085,13 @@ int main(int argc, char *argv[]) noexcept {
 				// Break
 				break;
 		}
+	}
+	
+	// Check if exiting after options and not displaying help
+	if(exitAfterOptions && !displayHelp) {
+	
+		// Return success
+		exit(EXIT_SUCCESS);
 	}
 	
 	// Check if not tuning
