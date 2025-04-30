@@ -318,12 +318,12 @@ int main(int argc, char *argv[]) noexcept {
 	// Set current adjustable GPU memory amount to zero
 	int64_t currentAdjustableGpuMemoryAmount = 0;
 	
-	// Set current adjustable GPU memory amount is default to false
-	bool currentAdjustableGpuMemoryAmountIsDefault = false;
-	
 	// Otherwise check there's trimming rounds
 	#if TRIMMING_ROUNDS != 0
 	
+		// Set current adjustable GPU memory amount is default to false
+		bool currentAdjustableGpuMemoryAmountIsDefault = false;
+		
 		// Check if using macOS
 		#ifdef __APPLE__
 		
@@ -1193,8 +1193,11 @@ int main(int argc, char *argv[]) noexcept {
 		exit(helpRequested ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
 	
-	// Get total number of CPU cores
+	// Get number of applicable CPU cores
 	const unsigned int totalNumberOfCpuCores = getNumberOfHighPerformanceCpuCores();
+	
+	// Get CPU cores name offset
+	const unsigned int cpuCoresNameOffset = totalNumberOfCpuCores - getNumberOfCpuCores();
 	
 	// Get this instance's number of threads
 	const unsigned int numberOfThreads = (instanceIndex == totalNumberOfInstances) ? (totalNumberOfCpuCores - min((totalNumberOfInstances - 1) * max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1)), totalNumberOfCpuCores - 1)) : max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1));
@@ -1279,19 +1282,19 @@ int main(int argc, char *argv[]) noexcept {
 			#ifdef _WIN32
 			
 				// Display message
-				cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+				cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
 				
 			// Otherwise check if using macOS
 			#elif defined __APPLE__
 			
 				// Display message
-				cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+				cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 				
 			// Otherwise
 			#else
 			
 				// Display message
-				cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+				cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 			#endif
 		}
 		
@@ -1743,19 +1746,19 @@ int main(int argc, char *argv[]) noexcept {
 					#ifdef _WIN32
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
 						
 					// Otherwise check if using macOS
 					#elif defined __APPLE__
 					
 						// Display message
-						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 						
 					// Otherwise
 					#else
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 					#endif
 				}
 				
@@ -1997,19 +2000,19 @@ int main(int argc, char *argv[]) noexcept {
 					#ifdef _WIN32
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
 						
 					// Otherwise check if using macOS
 					#elif defined __APPLE__
 					
 						// Display message
-						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 						
 					// Otherwise
 					#else
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 					#endif
 				}
 				
@@ -2265,19 +2268,19 @@ int main(int argc, char *argv[]) noexcept {
 					#ifdef _WIN32
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
 						
 					// Otherwise check if using macOS
 					#elif defined __APPLE__
 					
 						// Display message
-						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 						
 					// Otherwise
 					#else
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 					#endif
 				}
 				
@@ -2660,19 +2663,19 @@ int main(int argc, char *argv[]) noexcept {
 					#ifdef _WIN32
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores);
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
 						
 					// Otherwise check if using macOS
 					#elif defined __APPLE__
 					
 						// Display message
-						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 						
 					// Otherwise
 					#else
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1);
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
 					#endif
 				}
 				

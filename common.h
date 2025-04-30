@@ -253,6 +253,9 @@ static inline bool setThreadPriorityAndAffinity(const unsigned int threadIndex) 
 // Securely clear
 static inline void securelyClear(void *data, const size_t length) noexcept;
 
+// Get number of CPU cores
+static inline unsigned int getNumberOfCpuCores() noexcept;
+
 // Get number of high performance CPU cores
 static inline unsigned int getNumberOfHighPerformanceCpuCores() noexcept;
 
@@ -636,6 +639,26 @@ void securelyClear(void *data, const size_t length) noexcept {
 		// Securely clear data
 		explicit_bzero(data, length);
 	#endif
+}
+
+// Get number of CPU cores
+unsigned int getNumberOfCpuCores() noexcept {
+
+	// Check if using macOS
+	#if __APPLE__
+	
+		// Check if getting the number of CPU cores was successful
+		int32_t numberOfCpuCores;
+		size_t numberOfCpuCoresSize = sizeof(numberOfCpuCores);
+		if(!sysctlbyname("hw.logicalcpu", &numberOfCpuCores, &numberOfCpuCoresSize, nullptr, 0)) {
+		
+			// Return number of CPU cores
+			return max(numberOfCpuCores, 1);
+		}
+	#endif
+	
+	// Return number of CPU cores
+	return max(thread::hardware_concurrency(), static_cast<unsigned int>(1));
 }
 
 // Get number of high performance CPU cores
