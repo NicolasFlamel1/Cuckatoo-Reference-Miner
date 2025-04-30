@@ -1197,7 +1197,7 @@ int main(int argc, char *argv[]) noexcept {
 	const unsigned int totalNumberOfCpuCores = getNumberOfHighPerformanceCpuCores();
 	
 	// Get CPU cores name offset
-	const unsigned int cpuCoresNameOffset = totalNumberOfCpuCores - getNumberOfCpuCores();
+	const unsigned int cpuCoresNameOffset = getNumberOfCpuCores() - totalNumberOfCpuCores;
 	
 	// Get this instance's number of threads
 	const unsigned int numberOfThreads = (instanceIndex == totalNumberOfInstances) ? (totalNumberOfCpuCores - min((totalNumberOfInstances - 1) * max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1)), totalNumberOfCpuCores - 1)) : max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1));
