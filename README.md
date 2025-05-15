@@ -24,7 +24,6 @@ make run
 #### Windows
 After installing [MinGW-w64](https://winlibs.com), this program can be built and ran with Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
 ```
-mingw32-make windowsDependencies
 mingw32-make EDGE_BITS=30
 mingw32-make run
 ```

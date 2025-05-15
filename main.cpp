@@ -474,8 +474,8 @@ int main(int argc, char *argv[]) noexcept {
 	// Set help requested to false
 	bool helpRequested = false;
 	
-	// Set exit after options to true
-	bool exitAfterOptions = true;
+	// Set exit after options to true if options are provided
+	bool exitAfterOptions = argc > 1;
 	
 	// Go through all options while not displaying help
 	int option;
@@ -979,6 +979,9 @@ int main(int argc, char *argv[]) noexcept {
 							}
 						}
 					#endif
+					
+					// Break
+					break;
 				}
 				
 				// Mean trimming

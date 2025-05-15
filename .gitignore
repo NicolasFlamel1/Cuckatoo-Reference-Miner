@@ -2,7 +2,7 @@ Cuckatoo Reference Miner
 Cuckatoo Reference Miner.exe
 v2024.10.24.tar.gz
 OpenCL-Headers-2024.10.24
-opencl_headers
+opencl_headers_cross_compiling
 OpenCL-ICD-Loader-2024.10.24
 opencl_icd_loader
 metal-cpp_macOS15.2_iOS18.2.zip
