@@ -51,8 +51,8 @@ using namespace std;
 // Slean trimming after trimming round max number of edges per remaining edges bucket (Divide by slean trimming parts and multiply by slean trimming parts makes the result a product of slean trimming parts)
 #define SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET ((static_cast<uint32_t>(SLEAN_TRIMMING_NUMBER_OF_ITEMS_PER_REMAINING_EDGES_BUCKET * 0.38) / SLEAN_TRIMMING_PARTS) * SLEAN_TRIMMING_PARTS)
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Slean trimming required RAM bytes
 	#define SLEAN_TRIMMING_REQUIRED_RAM_BYTES (static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(uint32_t) + SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * SLEAN_TRIMMING_PARTS * sizeof(uint32_t) + NUMBER_OF_EDGES / BITS_IN_A_BYTE * 3)
@@ -82,8 +82,8 @@ using namespace std;
 
 // Function prototypes
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create slean trimming context
 	static inline MTL::Device *createSleanTrimmingContext(const unsigned int deviceIndex) noexcept;
@@ -104,8 +104,8 @@ using namespace std;
 
 // Supporting function implementation
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create slean trimming context
 	MTL::Device *createSleanTrimmingContext(const unsigned int deviceIndex) noexcept {
@@ -235,8 +235,8 @@ using namespace std;
 	}
 #endif
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Perform slean trimming loop
 	bool performSleanTrimmingLoop(MTL::Device *device, const unsigned int deviceIndex) noexcept {

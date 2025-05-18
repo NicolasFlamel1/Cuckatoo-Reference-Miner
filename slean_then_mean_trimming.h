@@ -18,8 +18,8 @@ using namespace std;
 
 // Function prototypes
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create slean then mean trimming context
 	static inline MTL::Device *createSleanThenMeanTrimmingContext(const unsigned int deviceIndex) noexcept;
@@ -40,8 +40,8 @@ using namespace std;
 
 // Supporting function implementation
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create slean then mean trimming context
 	MTL::Device *createSleanThenMeanTrimmingContext(const unsigned int deviceIndex) noexcept {
@@ -177,8 +177,8 @@ using namespace std;
 	}
 #endif
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Perform slean then mean trimming loop
 	bool performSleanThenMeanTrimmingLoop(__attribute__((unused)) MTL::Device *device, __attribute__((unused)) const unsigned int deviceIndex) noexcept {

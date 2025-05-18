@@ -15,9 +15,6 @@ using namespace std;
 // Number of edges
 #define NUMBER_OF_EDGES (static_cast<uint64_t>(1) << EDGE_BITS)
 
-// Edges bitmap size
-#define EDGES_BITMAP_SIZE (NUMBER_OF_EDGES / BITMAP_UNIT_WIDTH)
-
 // Max slean trimming parts
 #define MAX_SLEAN_TRIMMING_PARTS 16
 
@@ -50,8 +47,8 @@ static_assert(has_single_bit(static_cast<unsigned int>(LOCAL_RAM_KILOBYTES)), "L
 // Throw error if the size of a vector of a type isn't the same as the size of an array of that type
 static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_t[1]), "Vector vs array size mismatch");
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Throw error if the size of a vector of a type isn't the same as the size of a Metal vector of that type
 	static_assert(sizeof(uint64_t __attribute__((vector_size(8 * 4)))) == sizeof(uint64_t[4]), "Vector vs Metal vector size mismatch");
@@ -86,6 +83,9 @@ static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_
 
 // Decimal number base
 #define DECIMAL_NUMBER_BASE 10
+
+// Edges bitmap size
+#define EDGES_BITMAP_SIZE (NUMBER_OF_EDGES / BITMAP_UNIT_WIDTH)
 
 // Node mask
 #define NODE_MASK (NUMBER_OF_EDGES - 1)
@@ -164,8 +164,8 @@ class PreventSleep final {
 		#endif
 };
 
-// Check if not using macOS
-#ifndef __APPLE__
+// Check if not using macOS or using OpenCL
+#if !defined __APPLE__ || defined USE_OPENCL
 
 	// Event class
 	class Event final {
@@ -426,8 +426,8 @@ PreventSleep::~PreventSleep() noexcept {
 	#endif
 }
 
-// Check if not using macOS
-#ifndef __APPLE__
+// Check if not using macOS or using OpenCL
+#if !defined __APPLE__ || defined USE_OPENCL
 
 	// Event constructor
 	Event::Event() noexcept :

@@ -11,11 +11,18 @@ CFLAGS = -march=native -mtune=native -Ofast -Wall -Wextra -Wno-vla -Wno-type-lim
 LIBS = -lm
 SRCS = "./main.cpp"
 
+# Check if using OpenCL
+ifeq ($(USE_OPENCL),1)
+
+	# Use OpenCL
+	CFLAGS += -DUSE_OPENCL
+endif
+
 # Check if tuning
 ifeq ($(TUNING),1)
 
 	# Build for tuning
-	CFLAGS += -D TUNING
+	CFLAGS += -DTUNING
 endif
 
 # Check if compiling for Windows
@@ -62,6 +69,13 @@ else ifeq ($(shell uname),Darwin)
 	# Link Foundation, Metal, and IOKit
 	LIBS += -framework Foundation -framework Metal -framework IOKit
 	
+	# Check if using OpenCL
+	ifeq ($(USE_OPENCL),1)
+
+		# Link OpenCL
+		LIBS += -framework OpenCL
+	endif
+	
 	# Program name
 	PROGRAM_NAME = $(subst $\",,$(NAME))
 	
@@ -100,7 +114,7 @@ run:
 clean:
 	$(DELETE_COMMAND) "./$(subst $\",,$(NAME))" "./$(subst $\",,$(NAME)).exe" "./v2024.10.24.tar.gz" "./OpenCL-Headers-2024.10.24" "./opencl_headers_cross_compiling" "./OpenCL-ICD-Loader-2024.10.24" "./opencl_loader" "./metal-cpp_macOS15.2_iOS18.2.zip" "./metal-cpp" >$(NULL_LOCATION) 2>&1
 
-# Make cross-compiling dependencies (This command works with Linux)
+# Make cross-compiling dependencies (This command works when using Linux)
 crossCompilingDependencies:
 	
 	# OpenCL headers
@@ -119,7 +133,7 @@ crossCompilingDependencies:
 	mv "./OpenCL-ICD-Loader-2024.10.24" "./opencl_loader"
 	cd "./opencl_loader" && cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/opencl_loader/dist" -DCMAKE_BUILD_TYPE=Release -DOPENCL_ICD_LOADER_HEADERS_DIR="$(CURDIR)/opencl_headers_cross_compiling/dist/include" $(DEPENDENCIES_FLAGS) "./CMakeLists.txt" && make && make install
 
-# Make macOS dependencies (This command works with macOS)
+# Make macOS dependencies (This command works when using macOS)
 macOSDependencies:
 	
 	# Metal-cpp
@@ -130,7 +144,7 @@ macOSDependencies:
 	cd "./metal-cpp" && "./SingleHeader/MakeSingleHeader.py" -o "../metal.h" "./Metal/Metal.hpp"
 	rm -r "./metal-cpp"
 
-# Make Windows dependencies (This command works with Windows)
+# Make Windows dependencies (This command works when using Windows)
 windowsDependencies:
 	del /q "./v2024.10.24.tar.gz" >nul 2>&1
 	if exist "./OpenCL-Headers-2024.10.24" rd /q /s "./OpenCL-Headers-2024.10.24" >nul 2>&1

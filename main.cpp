@@ -51,6 +51,13 @@
 	#include <sys/sysctl.h>
 	#include "./metal.h"
 	
+	// Check if using OpenCL
+	#ifdef USE_OPENCL
+	
+		// Header files
+		#include <OpenCL/opencl.h>
+	#endif
+	
 // Otherwise
 #else
 
@@ -283,6 +290,19 @@ int main(int argc, char *argv[]) noexcept {
 		cout << ", " TO_STRING(SLEAN_TRIMMING_PARTS) " slean trimming part(s), " TO_STRING(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS) " slean then mean slean trimming round(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory";
 	#endif
 	
+	// Check if using macOS and not using OpenCL
+	#if defined __APPLE__ && !defined USE_OPENCL
+	
+		// Display message
+		cout << ", Metal GPU backend";
+	
+	// Otherwise
+	#else
+	
+		// Display message
+		cout << ", OpenCL GPU backend";
+	#endif
+	
 	// Check if tuning
 	#ifdef TUNING
 	
@@ -360,9 +380,10 @@ int main(int argc, char *argv[]) noexcept {
 					}
 				}
 			}
-			
-		// Otherwise
-		#else
+		#endif
+		
+		// Check if not using macOS or using OpenCL
+		#if !defined __APPLE__ || defined USE_OPENCL
 		
 			// Check if getting number of platforms failed or no platforms exist
 			cl_uint numberOfPlatforms;
@@ -734,8 +755,8 @@ int main(int argc, char *argv[]) noexcept {
 					// Set index to zero
 					unsigned int index = 0;
 					
-					// Check if using macOS
-					#ifdef __APPLE__
+					// Check if using macOS and not using OpenCL
+					#if defined __APPLE__ && !defined USE_OPENCL
 					
 						// Check if getting all devices was successful
 						const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
@@ -1539,8 +1560,8 @@ int main(int argc, char *argv[]) noexcept {
 			// Set index to zero
 			unsigned int index = 0;
 			
-			// Check if using macOS
-			#ifdef __APPLE__
+			// Check if using macOS and not using OpenCL
+			#if defined __APPLE__ && !defined USE_OPENCL
 			
 				// Check if getting all devices was successful
 				const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
@@ -1698,8 +1719,8 @@ int main(int argc, char *argv[]) noexcept {
 		// Display new line
 		cout << endl;
 		
-		// Check if using macOS
-		#ifdef __APPLE__
+		// Check if using macOS and not using OpenCL
+		#if defined __APPLE__ && !defined USE_OPENCL
 		
 			// Create context
 			static unique_ptr<MTL::Device, void(*)(MTL::Device *)> context(nullptr, [](__attribute__((unused)) MTL::Device *context) noexcept {
@@ -1716,8 +1737,8 @@ int main(int argc, char *argv[]) noexcept {
 		// Check if using all trimming types or mean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & MEAN_TRIMMING_TYPE) {
 		
-			// Check if using macOS
-			#ifdef __APPLE__
+			// Check if using macOS and not using OpenCL
+			#if defined __APPLE__ && !defined USE_OPENCL
 			
 				// Create mean trimming context
 				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createMeanTrimmingContext(deviceIndex), [](MTL::Device *context) noexcept {
@@ -1970,8 +1991,8 @@ int main(int argc, char *argv[]) noexcept {
 		// Check if using all trimming types or slean then mean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_THEN_MEAN_TRIMMING_TYPE) {
 		
-			// Check if using macOS
-			#ifdef __APPLE__
+			// Check if using macOS and not using OpenCL
+			#if defined __APPLE__ && !defined USE_OPENCL
 			
 				// Create slean then mean trimming context
 				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createSleanThenMeanTrimmingContext(deviceIndex), [](MTL::Device *context) noexcept {
@@ -2238,8 +2259,8 @@ int main(int argc, char *argv[]) noexcept {
 		// Check if using all trimming types or slean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_TRIMMING_TYPE) {
 		
-			// Check if using macOS
-			#ifdef __APPLE__
+			// Check if using macOS and not using OpenCL
+			#if defined __APPLE__ && !defined USE_OPENCL
 			
 				// Create slean trimming context
 				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createSleanTrimmingContext(deviceIndex), [](MTL::Device *context) noexcept {
@@ -2633,8 +2654,8 @@ int main(int argc, char *argv[]) noexcept {
 		// Check if using all trimming types or lean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & LEAN_TRIMMING_TYPE) {
 		
-			// Check if using macOS
-			#ifdef __APPLE__
+			// Check if using macOS and not using OpenCL
+			#if defined __APPLE__ && !defined USE_OPENCL
 			
 				// Create lean trimming context
 				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createLeanTrimmingContext(deviceIndex), [](MTL::Device *context) noexcept {

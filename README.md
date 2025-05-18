@@ -20,6 +20,10 @@ After installing [Xcode](https://developer.apple.com/xcode), this program can be
 make EDGE_BITS=30
 make run
 ```
+This program will use Metal as the GPU backend on macOS by default, however it can be configured to use OpenCL as the GPU backend instead by providing a `USE_OPENCL=1` setting when building it. Keep in mind that Apple has deprecated OpenCL on macOS and their OpenCL implementation may not conform to the standard, so this program may not function correctly under macOS when using OpenCL as the GPU backend.
+```
+make EDGE_BITS=30 USE_OPENCL=1
+```
 
 #### Windows
 After installing [MinGW-w64](https://winlibs.com), this program can be built and ran with Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):

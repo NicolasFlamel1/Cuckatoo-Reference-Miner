@@ -21,8 +21,8 @@ using namespace std;
 
 // Function prototypes
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create lean trimming context
 	static inline MTL::Device *createLeanTrimmingContext(const unsigned int deviceIndex) noexcept;
@@ -43,8 +43,8 @@ using namespace std;
 
 // Supporting function implementation
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create lean trimming context
 	MTL::Device *createLeanTrimmingContext(const unsigned int deviceIndex) noexcept {
@@ -173,8 +173,8 @@ using namespace std;
 	}
 #endif
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Perform lean trimming loop
 	bool performLeanTrimmingLoop(MTL::Device *device, const unsigned int deviceIndex) noexcept {

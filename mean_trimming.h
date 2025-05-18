@@ -36,8 +36,8 @@ using namespace std;
 // Mean trimming after trimming round max number of edges per bucket (Divide by 4 and multiply by 4 makes the result a product of 4)
 #define MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET ((static_cast<uint32_t>(MEAN_TRIMMING_NUMBER_OF_ITEMS_PER_BUCKET * 0.73) / 4) * 4)
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Mean trimming required RAM bytes
 	#define MEAN_TRIMMING_REQUIRED_RAM_BYTES (static_cast<uint64_t>(MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + static_cast<uint64_t>(MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) * MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) * 2 + (sizeof(uint32_t) + static_cast<uint64_t>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) * EDGE_NUMBER_OF_COMPONENTS * sizeof(uint32_t)) * 2)
@@ -58,8 +58,8 @@ using namespace std;
 
 // Function prototypes
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create mean trimming context
 	static inline MTL::Device *createMeanTrimmingContext(const unsigned int deviceIndex) noexcept;
@@ -80,8 +80,8 @@ using namespace std;
 
 // Supporting function implementation
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create mean trimming context
 	MTL::Device *createMeanTrimmingContext(const unsigned int deviceIndex) noexcept {
@@ -211,8 +211,8 @@ using namespace std;
 	}
 #endif
 
-// Check if using macOS
-#ifdef __APPLE__
+// Check if using macOS and not using OpenCL
+#if defined __APPLE__ && !defined USE_OPENCL
 
 	// Perform mean trimming loop
 	bool performMeanTrimmingLoop(MTL::Device *device, const unsigned int deviceIndex) noexcept {
