@@ -7,7 +7,7 @@ SLEAN_TRIMMING_PARTS = 2
 SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS = 1
 LOCAL_RAM_KILOBYTES = 32
 CC = g++
-CFLAGS = -march=native -mtune=native -Ofast -Wall -Wextra -Wno-vla -Wno-type-limits -Wno-missing-field-initializers -Wno-implicit-fallthrough -Wno-write-strings -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME=$(NAME) -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS) -DSLEAN_TRIMMING_PARTS=$(SLEAN_TRIMMING_PARTS) -DSLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=$(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS) -DLOCAL_RAM_KILOBYTES=$(LOCAL_RAM_KILOBYTES)
+CFLAGS = -march=native -mtune=native -Ofast -Wall -Wextra -Wno-type-limits -Wno-missing-field-initializers -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME=$(NAME) -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS) -DSLEAN_TRIMMING_PARTS=$(SLEAN_TRIMMING_PARTS) -DSLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=$(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS) -DLOCAL_RAM_KILOBYTES=$(LOCAL_RAM_KILOBYTES)
 LIBS = -lm
 SRCS = "./main.cpp"
 
@@ -146,6 +146,8 @@ macOSDependencies:
 
 # Make Windows dependencies (This command works when using Windows)
 windowsDependencies:
+	
+	rem OpenCL headers
 	del /q "./v2024.10.24.tar.gz" >nul 2>&1
 	if exist "./OpenCL-Headers-2024.10.24" rd /q /s "./OpenCL-Headers-2024.10.24" >nul 2>&1
 	if exist "./opencl_headers" rd /q /s "./opencl_headers" >nul 2>&1

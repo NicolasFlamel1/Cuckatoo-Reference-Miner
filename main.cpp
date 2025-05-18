@@ -203,8 +203,8 @@ static condition_variable *searchingThreadsFinishedConditionalVariable;
 // Check if not tuning
 #ifndef TUNING
 
-	// Set stratum server address to the default stratum server address
-	static char *stratumServerAddress = DEFAULT_STRATUM_SERVER_ADDRESS;
+	// Set stratum server address to nothing
+	static char *stratumServerAddress = nullptr;
 	
 	// Set stratum server port to the default stratum server port
 	static const char *stratumServerPort = DEFAULT_STRATUM_SERVER_PORT;
@@ -288,19 +288,19 @@ int main(int argc, char *argv[]) noexcept {
 	
 		// Display message
 		cout << ", " TO_STRING(SLEAN_TRIMMING_PARTS) " slean trimming part(s), " TO_STRING(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS) " slean then mean slean trimming round(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory";
-	#endif
-	
-	// Check if using macOS and not using OpenCL
-	#if defined __APPLE__ && !defined USE_OPENCL
-	
-		// Display message
-		cout << ", Metal GPU backend";
-	
-	// Otherwise
-	#else
-	
-		// Display message
-		cout << ", OpenCL GPU backend";
+		
+		// Check if using macOS and not using OpenCL
+		#if defined __APPLE__ && !defined USE_OPENCL
+		
+			// Display message
+			cout << ", Metal GPU backend";
+		
+		// Otherwise
+		#else
+		
+			// Display message
+			cout << ", OpenCL GPU backend";
+		#endif
 	#endif
 	
 	// Check if tuning
@@ -338,7 +338,7 @@ int main(int argc, char *argv[]) noexcept {
 	// Set current adjustable GPU memory amount to zero
 	int64_t currentAdjustableGpuMemoryAmount = 0;
 	
-	// Otherwise check there's trimming rounds
+	// Check there's trimming rounds
 	#if TRIMMING_ROUNDS != 0
 	
 		// Set current adjustable GPU memory amount is default to false
@@ -546,7 +546,7 @@ int main(int argc, char *argv[]) noexcept {
 						// Set stratum server address to the option
 						stratumServerAddress = optarg;
 						
-						// Otherwise check if stratum server address has a protocol
+						// Check if stratum server address has a protocol
 						if(!strncmp(stratumServerAddress, "stratum+tcp://", sizeof("stratum+tcp://") - sizeof('\0'))) {
 						
 							// Remove stratum server address's protocol
@@ -1119,6 +1119,12 @@ int main(int argc, char *argv[]) noexcept {
 			
 				// Set help requested to true
 				helpRequested = true;
+				
+				// Set display help to true
+				displayHelp = true;
+				
+				// Break
+				break;
 			
 			// Default
 			default:
@@ -3316,19 +3322,22 @@ int main(int argc, char *argv[]) noexcept {
 		// Display message
 		cout << "Connecting to the stratum server at: stratum+tcp://";
 		
-		// Check if stratum server address is an IPv6 address
+		// Get server address as the stratum server address if provided otherwise the default stratum server address
+		const char *serverAddress = stratumServerAddress ? stratumServerAddress : DEFAULT_STRATUM_SERVER_ADDRESS;
+		
+		// Check if the server address is an IPv6 address
 		in6_addr temp;
-		if(inet_pton(AF_INET6, stratumServerAddress, &temp) == 1) {
+		if(inet_pton(AF_INET6, serverAddress, &temp) == 1) {
 		
 			// Display message
-			cout << '[' << stratumServerAddress << ']';
+			cout << '[' << serverAddress << ']';
 		}
 		
 		// Otherwise
 		else {
 		
 			// Display message
-			cout << stratumServerAddress;
+			cout << serverAddress;
 		}
 		
 		// Display message
@@ -3355,7 +3364,7 @@ int main(int argc, char *argv[]) noexcept {
 			.ai_socktype = SOCK_STREAM,
 		};
 		addrinfo *addressInfo;
-		if(getaddrinfo(stratumServerAddress, stratumServerPort, &addressInfoHints, &addressInfo)) {
+		if(getaddrinfo(serverAddress, stratumServerPort, &addressInfoHints, &addressInfo)) {
 		
 			// Display message
 			cout << "Getting address info for the stratum server failed" << endl;
