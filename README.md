@@ -79,7 +79,7 @@ You can provide a `SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS` setting when building 
 ```
 make EDGE_BITS=30 SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=2
 ```
-You can provide a `LOCAL_RAM_KILOBYTES` setting when building this program to adjust the targeted GPU local RAM size in kilobytes used by mean trimming, slean then mean trimming, and slean trimming. This value must be a power of two, and it should match your GPU's local RAM size for potentially better performance.
+You can provide a `LOCAL_RAM_KILOBYTES` setting when building this program to adjust the targeted GPU local RAM size in kilobytes used by mean trimming, slean then mean trimming, and slean trimming. This value must be a power of two, and it should be as close to your GPU's local RAM size for potentially better performance.
 ```
 make EDGE_BITS=30 LOCAL_RAM_KILOBYTES=64
 ```

@@ -1204,7 +1204,7 @@ int main(int argc, char *argv[]) noexcept {
 			if(currentAdjustableGpuMemoryAmount) {
 			
 				// Display message
-				cout << "\t-r, --gpu_ram\t\t\tThe amount in gigabytes of your total amount of RAM to dedicate to the GPU or 'default' to restore the GPU's initial amount of dedicated RAM. This requires root privileges (current: " << (currentAdjustableGpuMemoryAmountIsDefault ? "default" : to_string(currentAdjustableGpuMemoryAmount / MEGABYTES_IN_A_GIGABYTE)) << ')' << endl;
+				cout << "\t-r, --gpu_ram\t\t\tThe amount in gigabytes of your total amount of RAM to dedicate to the GPU or 'default' to restore the GPU's initial amount of dedicated RAM. This requires root privileges and doesn't persist across system reboots (current: " << (currentAdjustableGpuMemoryAmountIsDefault ? "default" : to_string(currentAdjustableGpuMemoryAmount / MEGABYTES_IN_A_GIGABYTE)) << ')' << endl;
 			}
 			
 			// Display message
@@ -1224,19 +1224,19 @@ int main(int argc, char *argv[]) noexcept {
 	}
 	
 	// Get number of applicable CPU cores
-	const unsigned int totalNumberOfCpuCores = getNumberOfHighPerformanceCpuCores();
+	const unsigned int numberOfApplicableCpuCores = getNumberOfHighPerformanceCpuCores();
 	
 	// Get CPU cores name offset
-	const unsigned int cpuCoresNameOffset = getNumberOfCpuCores() - totalNumberOfCpuCores;
+	const unsigned int cpuCoresNameOffset = getNumberOfCpuCores() - numberOfApplicableCpuCores;
 	
 	// Get this instance's number of threads
-	const unsigned int numberOfThreads = (instanceIndex == totalNumberOfInstances) ? (totalNumberOfCpuCores - min((totalNumberOfInstances - 1) * max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1)), totalNumberOfCpuCores - 1)) : max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1));
+	const unsigned int numberOfThreads = (instanceIndex == totalNumberOfInstances) ? (numberOfApplicableCpuCores - min((totalNumberOfInstances - 1) * max(numberOfApplicableCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1)), numberOfApplicableCpuCores - 1)) : max(numberOfApplicableCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1));
 	
 	// Get this instance's first thread index
-	const unsigned int firstThreadIndex = (instanceIndex - 1) * max(totalNumberOfCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1)) % totalNumberOfCpuCores;
+	const unsigned int firstThreadIndex = (instanceIndex - 1) * max(numberOfApplicableCpuCores / totalNumberOfInstances, static_cast<unsigned int>(1)) % numberOfApplicableCpuCores;
 	
-	// Check if setting searching thread's priority and affinity failed
-	if(!setThreadPriorityAndAffinity((firstThreadIndex + numberOfThreads - 1) % totalNumberOfCpuCores)) {
+	// Check if setting thread's priority and affinity failed
+	if(!setThreadPriorityAndAffinity((firstThreadIndex + numberOfThreads - 1) % numberOfApplicableCpuCores)) {
 	
 		// Display message
 		cout << "Setting searching thread's priority and affinity failed" << endl;
@@ -1312,19 +1312,19 @@ int main(int argc, char *argv[]) noexcept {
 			#ifdef _WIN32
 			
 				// Display message
-				cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
+				cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 				
 			// Otherwise check if using macOS
 			#elif defined __APPLE__
 			
 				// Display message
-				cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+				cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 				
 			// Otherwise
 			#else
 			
 				// Display message
-				cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+				cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 			#endif
 		}
 		
@@ -1351,10 +1351,10 @@ int main(int argc, char *argv[]) noexcept {
 			}
 			
 			// Create searching thread
-			thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+			thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 			
 				// Check if setting searching thread's priority and affinity failed
-				if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
+				if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
 				
 					// Display message
 					cout << "Setting searching thread's priority and affinity failed" << endl;
@@ -1776,19 +1776,19 @@ int main(int argc, char *argv[]) noexcept {
 					#ifdef _WIN32
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 						
 					// Otherwise check if using macOS
 					#elif defined __APPLE__
 					
 						// Display message
-						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 						
 					// Otherwise
 					#else
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 					#endif
 				}
 				
@@ -1805,10 +1805,10 @@ int main(int argc, char *argv[]) noexcept {
 					nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
 					
 					// Create searching thread
-					thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 					
 						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
+						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
 						
 							// Display message
 							cout << "Setting searching thread's priority and affinity failed" << endl;
@@ -2030,19 +2030,19 @@ int main(int argc, char *argv[]) noexcept {
 					#ifdef _WIN32
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 						
 					// Otherwise check if using macOS
 					#elif defined __APPLE__
 					
 						// Display message
-						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 						
 					// Otherwise
 					#else
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 					#endif
 				}
 				
@@ -2059,10 +2059,10 @@ int main(int argc, char *argv[]) noexcept {
 					nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
 					
 					// Create searching thread
-					thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 					
 						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
+						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
 						
 							// Display message
 							cout << "Setting searching thread's priority and affinity failed" << endl;
@@ -2284,7 +2284,7 @@ int main(int argc, char *argv[]) noexcept {
 			
 			// Check if creating slean trimming context was successful
 			if(context) {
-				
+			
 				// Get number of searching threads
 				const unsigned int numberOfSearchingThreads = min(min(numberOfThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS)), static_cast<unsigned int>(EDGES_BITMAP_SIZE));
 				
@@ -2298,19 +2298,19 @@ int main(int argc, char *argv[]) noexcept {
 					#ifdef _WIN32
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 						
 					// Otherwise check if using macOS
 					#elif defined __APPLE__
 					
 						// Display message
-						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 						
 					// Otherwise
 					#else
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 					#endif
 				}
 				
@@ -2337,10 +2337,10 @@ int main(int argc, char *argv[]) noexcept {
 					}
 					
 					// Create searching thread
-					thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 					
 						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
+						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
 						
 							// Display message
 							cout << "Setting searching thread's priority and affinity failed" << endl;
@@ -2693,19 +2693,19 @@ int main(int argc, char *argv[]) noexcept {
 					#ifdef _WIN32
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % totalNumberOfCpuCores + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 						
 					// Otherwise check if using macOS
 					#elif defined __APPLE__
 					
 						// Display message
-						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 						
 					// Otherwise
 					#else
 					
 						// Display message
-						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % totalNumberOfCpuCores + 1 + cpuCoresNameOffset);
+						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
 					#endif
 				}
 				
@@ -2732,10 +2732,10 @@ int main(int argc, char *argv[]) noexcept {
 					}
 					
 					// Create searching thread
-					thread([totalNumberOfCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
 					
 						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % totalNumberOfCpuCores)) {
+						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
 						
 							// Display message
 							cout << "Setting searching thread's priority and affinity failed" << endl;
