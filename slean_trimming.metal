@@ -2115,7 +2115,7 @@ static inline bool isBitSetInBitmap(threadgroup const uint *bitmap, const uint i
 #else
 
 	// Trim edges step twenty-two
-	[[kernel]] void trimEdgesStepTwentyTwo(device const uint2 *sourceBuckets [[buffer(0)]], device const uint *numberOfEdgesPerSourceBucket [[buffer(2)]], device uint *destinationBuckets [[buffer(6)]], device atomic_uint *numberOfEdgesPerDestinationBucket [[buffer(7)]], device uint *nodesBitmap [[buffer(5)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
+	[[kernel]] void trimEdgesStepTwentyTwo(device const uint2 *sourceBuckets [[buffer(0)]], device const uint *numberOfEdgesPerSourceBucket [[buffer(1)]], device uint *destinationBuckets [[buffer(6)]], device atomic_uint *numberOfEdgesPerDestinationBucket [[buffer(7)]], device uint *nodesBitmap [[buffer(5)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
 #endif
 
 	// Declare bitmap
