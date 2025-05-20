@@ -3368,7 +3368,7 @@ using namespace std;
 		computePassEncoder->dispatchThreads(totalNumberOfWorkItems[4], workItemsPerWorkGroup[4]);
 		
 		// Go through all remaining trimming parts except the last one
-		for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS - 1; ++i) {
+		for(int i = SLEAN_TRIMMING_PARTS - 2; i >= 0; --i) {
 		
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -3400,9 +3400,6 @@ using namespace std;
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
 			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
-			
-			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 			
 			// Add running step seven to the compute pass
 			computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -3452,7 +3449,7 @@ using namespace std;
 			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[10], workItemsPerWorkGroup[10]);
 			
 			// Go through all remaining trimming parts except the last one
-			for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS - 1; ++i) {
+			for(int i = SLEAN_TRIMMING_PARTS - 2; i >= 0; --i) {
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -3484,13 +3481,6 @@ using namespace std;
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
-				
-				// Check is slean trimming parts isn't two
-				if(SLEAN_TRIMMING_PARTS != 2) {
-				
-					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-				}
 				
 				// Add running step thirteen to the compute pass
 				computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
@@ -3556,7 +3546,7 @@ using namespace std;
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 				
 				// Go through all remaining trimming parts except the last one
-				for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
+				for(int i = SLEAN_TRIMMING_PARTS / 2 - 2; i >= 0; --i) {
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -3594,13 +3584,6 @@ using namespace std;
 						
 						// Set compute pass's nodes in second partition argument
 						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-						
-						// Check is slean trimming parts isn't two
-						if(SLEAN_TRIMMING_PARTS != 2) {
-						
-							// Set compute pass's part argument
-							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-						}
 						
 						// Add running step nineteen to the compute pass
 						computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
@@ -3666,7 +3649,7 @@ using namespace std;
 						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 						
 						// Go through all remaining trimming parts except the last one
-						for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+						for(int j = SLEAN_TRIMMING_PARTS / 2 - 2; j >= 0; --j) {
 						
 							// Add clearing number of edges per bucket one to the compute pass
 							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -3705,13 +3688,6 @@ using namespace std;
 							
 							// Set compute pass's nodes in second partition argument
 							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-							
-							// Check is slean trimming parts isn't four
-							if(SLEAN_TRIMMING_PARTS != 4) {
-							
-								// Set compute pass's part argument
-								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-							}
 							
 							// Add running step twenty-four to the compute pass
 							computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
@@ -3777,7 +3753,7 @@ using namespace std;
 							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
 							
 							// Go through all remaining trimming parts except the last one
-							for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+							for(int j = (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 2; j >= 0; --j) {
 							
 								// Add clearing number of edges per bucket one to the compute pass
 								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -3816,13 +3792,6 @@ using namespace std;
 								
 								// Set compute pass's nodes in second partition argument
 								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-								
-								// Check is slean trimming parts isn't eight
-								if(SLEAN_TRIMMING_PARTS != 8) {
-								
-									// Set compute pass's part argument
-									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-								}
 								
 								// Add running step twenty-eight to the compute pass
 								computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
@@ -4104,7 +4073,7 @@ using namespace std;
 		computePassEncoder->dispatchThreads(totalNumberOfWorkItems[4], workItemsPerWorkGroup[4]);
 		
 		// Go through all remaining trimming parts except the last one
-		for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS - 1; ++i) {
+		for(int i = SLEAN_TRIMMING_PARTS - 2; i >= 0; --i) {
 		
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -4136,9 +4105,6 @@ using namespace std;
 			// Add clearing number of edges per bucket one to the compute pass
 			computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
 			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
-			
-			// Set compute pass's part argument
-			computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 			
 			// Add running step seven to the compute pass
 			computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -4188,7 +4154,7 @@ using namespace std;
 			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[10], workItemsPerWorkGroup[10]);
 			
 			// Go through all remaining trimming parts except the last one
-			for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS - 1; ++i) {
+			for(int i = SLEAN_TRIMMING_PARTS - 2; i >= 0; --i) {
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -4220,13 +4186,6 @@ using namespace std;
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
-				
-				// Check is slean trimming parts isn't two
-				if(SLEAN_TRIMMING_PARTS != 2) {
-				
-					// Set compute pass's part argument
-					computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-				}
 				
 				// Add running step thirteen to the compute pass
 				computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
@@ -4292,7 +4251,7 @@ using namespace std;
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 				
 				// Go through all remaining trimming parts except the last one
-				for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
+				for(int i = SLEAN_TRIMMING_PARTS / 2 - 2; i >= 0; --i) {
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -4330,13 +4289,6 @@ using namespace std;
 						
 						// Set compute pass's nodes in second partition argument
 						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-						
-						// Check is slean trimming parts isn't two
-						if(SLEAN_TRIMMING_PARTS != 2) {
-						
-							// Set compute pass's part argument
-							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-						}
 						
 						// Add running step nineteen to the compute pass
 						computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
@@ -4402,7 +4354,7 @@ using namespace std;
 						computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 						
 						// Go through all remaining trimming parts except the last one
-						for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+						for(int j = SLEAN_TRIMMING_PARTS / 2 - 2; j >= 0; --j) {
 						
 							// Add clearing number of edges per bucket one to the compute pass
 							computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -4441,13 +4393,6 @@ using namespace std;
 							
 							// Set compute pass's nodes in second partition argument
 							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-							
-							// Check is slean trimming parts isn't four
-							if(SLEAN_TRIMMING_PARTS != 4) {
-							
-								// Set compute pass's part argument
-								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-							}
 							
 							// Add running step twenty-four to the compute pass
 							computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
@@ -4513,7 +4458,7 @@ using namespace std;
 							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
 							
 							// Go through all remaining trimming parts except the last one
-							for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+							for(int j = (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 2; j >= 0; --j) {
 							
 								// Add clearing number of edges per bucket one to the compute pass
 								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -4552,13 +4497,6 @@ using namespace std;
 								
 								// Set compute pass's nodes in second partition argument
 								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-								
-								// Check is slean trimming parts isn't eight
-								if(SLEAN_TRIMMING_PARTS != 8) {
-								
-									// Set compute pass's part argument
-									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-								}
 								
 								// Add running step twenty-eight to the compute pass
 								computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
@@ -4838,7 +4776,7 @@ using namespace std;
 			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[4], workItemsPerWorkGroup[4]);
 			
 			// Go through all remaining trimming parts except the last one
-			for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS - 1; ++i) {
+			for(int i = SLEAN_TRIMMING_PARTS - 2; i >= 0; --i) {
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -4870,9 +4808,6 @@ using namespace std;
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
-				
-				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 				
 				// Add running step seven to the compute pass
 				computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -4922,7 +4857,7 @@ using namespace std;
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[10], workItemsPerWorkGroup[10]);
 				
 				// Go through all remaining trimming parts except the last one
-				for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS - 1; ++i) {
+				for(int i = SLEAN_TRIMMING_PARTS - 2; i >= 0; --i) {
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -4954,13 +4889,6 @@ using namespace std;
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
-					
-					// Check is slean trimming parts isn't two
-					if(SLEAN_TRIMMING_PARTS != 2) {
-					
-						// Set compute pass's part argument
-						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-					}
 					
 					// Add running step thirteen to the compute pass
 					computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
@@ -5026,7 +4954,7 @@ using namespace std;
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 					
 					// Go through all remaining trimming parts except the last one
-					for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
+					for(int i = SLEAN_TRIMMING_PARTS / 2 - 2; i >= 0; --i) {
 					
 						// Add clearing number of edges per bucket one to the compute pass
 						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -5064,13 +4992,6 @@ using namespace std;
 							
 							// Set compute pass's nodes in second partition argument
 							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-							
-							// Check is slean trimming parts isn't two
-							if(SLEAN_TRIMMING_PARTS != 2) {
-							
-								// Set compute pass's part argument
-								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-							}
 							
 							// Add running step nineteen to the compute pass
 							computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
@@ -5136,7 +5057,7 @@ using namespace std;
 							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 							
 							// Go through all remaining trimming parts except the last one
-							for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+							for(int j = SLEAN_TRIMMING_PARTS / 2 - 2; j >= 0; --j) {
 							
 								// Add clearing number of edges per bucket one to the compute pass
 								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -5175,13 +5096,6 @@ using namespace std;
 								
 								// Set compute pass's nodes in second partition argument
 								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-								
-								// Check is slean trimming parts isn't four
-								if(SLEAN_TRIMMING_PARTS != 4) {
-								
-									// Set compute pass's part argument
-									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-								}
 								
 								// Add running step twenty-four to the compute pass
 								computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
@@ -5247,7 +5161,7 @@ using namespace std;
 								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
 								
 								// Go through all remaining trimming parts except the last one
-								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+								for(int j = (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 2; j >= 0; --j) {
 								
 									// Add clearing number of edges per bucket one to the compute pass
 									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -5286,13 +5200,6 @@ using namespace std;
 									
 									// Set compute pass's nodes in second partition argument
 									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-									
-									// Check is slean trimming parts isn't eight
-									if(SLEAN_TRIMMING_PARTS != 8) {
-									
-										// Set compute pass's part argument
-										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-									}
 									
 									// Add running step twenty-eight to the compute pass
 									computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
@@ -5576,7 +5483,7 @@ using namespace std;
 			computePassEncoder->dispatchThreads(totalNumberOfWorkItems[4], workItemsPerWorkGroup[4]);
 			
 			// Go through all remaining trimming parts except the last one
-			for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS - 1; ++i) {
+			for(int i = SLEAN_TRIMMING_PARTS - 2; i >= 0; --i) {
 			
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -5608,9 +5515,6 @@ using namespace std;
 				// Add clearing number of edges per bucket one to the compute pass
 				computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
-				
-				// Set compute pass's part argument
-				computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
 				
 				// Add running step seven to the compute pass
 				computePassEncoder->setComputePipelineState(stepSevenPipeline.get());
@@ -5660,7 +5564,7 @@ using namespace std;
 				computePassEncoder->dispatchThreads(totalNumberOfWorkItems[10], workItemsPerWorkGroup[10]);
 				
 				// Go through all remaining trimming parts except the last one
-				for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS - 1; ++i) {
+				for(int i = SLEAN_TRIMMING_PARTS - 2; i >= 0; --i) {
 				
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -5692,13 +5596,6 @@ using namespace std;
 					// Add clearing number of edges per bucket one to the compute pass
 					computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[34], workItemsPerWorkGroup[34]);
-					
-					// Check is slean trimming parts isn't two
-					if(SLEAN_TRIMMING_PARTS != 2) {
-					
-						// Set compute pass's part argument
-						computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-					}
 					
 					// Add running step thirteen to the compute pass
 					computePassEncoder->setComputePipelineState(stepThirteenPipeline.get());
@@ -5764,7 +5661,7 @@ using namespace std;
 					computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 					
 					// Go through all remaining trimming parts except the last one
-					for(unsigned int i = 0; i < SLEAN_TRIMMING_PARTS / 2 - 1; ++i) {
+					for(int i = SLEAN_TRIMMING_PARTS / 2 - 2; i >= 0; --i) {
 					
 						// Add clearing number of edges per bucket one to the compute pass
 						computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -5802,13 +5699,6 @@ using namespace std;
 							
 							// Set compute pass's nodes in second partition argument
 							computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-							
-							// Check is slean trimming parts isn't two
-							if(SLEAN_TRIMMING_PARTS != 2) {
-							
-								// Set compute pass's part argument
-								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-							}
 							
 							// Add running step nineteen to the compute pass
 							computePassEncoder->setComputePipelineState(stepNineteenPipeline.get());
@@ -5874,7 +5764,7 @@ using namespace std;
 							computePassEncoder->dispatchThreads(totalNumberOfWorkItems[16], workItemsPerWorkGroup[16]);
 							
 							// Go through all remaining trimming parts except the last one
-							for(unsigned int j = 0; j < SLEAN_TRIMMING_PARTS / 2 - 1; ++j) {
+							for(int j = SLEAN_TRIMMING_PARTS / 2 - 2; j >= 0; --j) {
 							
 								// Add clearing number of edges per bucket one to the compute pass
 								computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -5913,13 +5803,6 @@ using namespace std;
 								
 								// Set compute pass's nodes in second partition argument
 								computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-								
-								// Check is slean trimming parts isn't four
-								if(SLEAN_TRIMMING_PARTS != 4) {
-								
-									// Set compute pass's part argument
-									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-								}
 								
 								// Add running step twenty-four to the compute pass
 								computePassEncoder->setComputePipelineState(stepTwentyFourPipeline.get());
@@ -5985,7 +5868,7 @@ using namespace std;
 								computePassEncoder->dispatchThreads(totalNumberOfWorkItems[25], workItemsPerWorkGroup[25]);
 								
 								// Go through all remaining trimming parts except the last one
-								for(unsigned int j = 0; j < (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 1; ++j) {
+								for(int j = (SLEAN_TRIMMING_PARTS + 4 - 1) / 4 - 2; j >= 0; --j) {
 								
 									// Add clearing number of edges per bucket one to the compute pass
 									computePassEncoder->setComputePipelineState(clearNumberOfEdgesPerSourceBucketPipeline.get());
@@ -6024,13 +5907,6 @@ using namespace std;
 									
 									// Set compute pass's nodes in second partition argument
 									computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(i % 2)), sizeof(uint8_t), 9);
-									
-									// Check is slean trimming parts isn't eight
-									if(SLEAN_TRIMMING_PARTS != 8) {
-									
-										// Set compute pass's part argument
-										computePassEncoder->setBytes(&unmove(static_cast<uint8_t>(0)), sizeof(uint8_t), 3);
-									}
 									
 									// Add running step twenty-eight to the compute pass
 									computePassEncoder->setComputePipelineState(stepTwentyEightPipeline.get());
