@@ -25,6 +25,21 @@ This program will use Metal as the GPU backend on macOS by default, however it c
 make EDGE_BITS=30 USE_OPENCL=1
 ```
 
+#### iOS
+After installing [Xcode](https://developer.apple.com/xcode), this program can be built for iOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
+```
+sudo xcode-select --switch "/Applications/Xcode.app"
+make CC="\"$(xcrun --sdk iphoneos --find g++)\" -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\"" EDGE_BITS=30
+```
+The resulting ipa file is unsigned, so you'll need to sign and provision it if you want to install it on an iPhone. Keep in mind that this program doesn't include any iOS UI.
+
+This program can also be built for and ran with Xcode's iOS simulator with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
+```
+sudo xcode-select --switch "/Applications/Xcode.app"
+make CC="\"$(xcrun --sdk iphonesimulator --find g++)\" -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" EDGE_BITS=30
+make CC="\"$(xcrun --sdk iphonesimulator --find g++)\" -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" run
+```
+
 #### Windows
 After installing [MinGW-w64](https://winlibs.com), this program can be built and ran with Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
 ```
@@ -36,7 +51,7 @@ mingw32-make run
 This program can be built with Linux for Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
 ```
 sudo apt install make g++-mingw-w64 cmake
-make crossCompilingDependencies CC=x86_64-w64-mingw32-g++-posix
+make CC=x86_64-w64-mingw32-g++-posix crossCompilingDependencies
 make CC=x86_64-w64-mingw32-g++-posix EDGE_BITS=30
 ```
 

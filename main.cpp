@@ -16,7 +16,7 @@
 	#define UNICODE
 	#define _UNICODE
 
-// Otherwise check if using macOS
+// Otherwise check if using an Apple device
 #elif defined __APPLE__
 
 	// Use Metal
@@ -39,17 +39,24 @@
 	#include <ws2tcpip.h>
 	#include <CL/cl.h>
 	
-// Otherwise check if using macOS
+// Otherwise check if using an Apple device
 #elif defined __APPLE__
 
 	// Header files
+	#include <TargetConditionals.h>
 	#include <arpa/inet.h>
-	#include <IOKit/pwr_mgt/IOPMLib.h>
 	#include <netdb.h>
 	#include <poll.h>
 	#include <pwd.h>
 	#include <sys/sysctl.h>
 	#include "./metal.h"
+	
+	// Check if using macOS
+	#if TARGET_OS_OSX == 1
+	
+		// Header files
+		#include <IOKit/pwr_mgt/IOPMLib.h>
+	#endif
 	
 	// Check if using OpenCL
 	#ifdef USE_OPENCL
@@ -289,7 +296,7 @@ int main(int argc, char *argv[]) noexcept {
 		// Display message
 		cout << ", " TO_STRING(SLEAN_TRIMMING_PARTS) " slean trimming part(s), " TO_STRING(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS) " slean then mean slean trimming round(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory";
 		
-		// Check if using macOS and not using OpenCL
+		// Check if using an Apple device and not using OpenCL
 		#if defined __APPLE__ && !defined USE_OPENCL
 		
 			// Display message
@@ -313,7 +320,7 @@ int main(int argc, char *argv[]) noexcept {
 	// Display message
 	cout << ')' << endl;
 	
-	// Check if using macOS
+	// Check if using an Apple device
 	#ifdef __APPLE__
 	
 		// Check if creating autorelease pool failed
@@ -344,7 +351,7 @@ int main(int argc, char *argv[]) noexcept {
 		// Set current adjustable GPU memory amount is default to false
 		bool currentAdjustableGpuMemoryAmountIsDefault = false;
 		
-		// Check if using macOS
+		// Check if using an Apple device
 		#ifdef __APPLE__
 		
 			// Check if getting the current adjustable GPU memory amount was successful, but the current GPU memory amount isn't set
@@ -354,12 +361,28 @@ int main(int argc, char *argv[]) noexcept {
 				// Set current adjustable GPU memory amount is default to true
 				currentAdjustableGpuMemoryAmountIsDefault = true;
 				
-				// Check if getting all devices was successful
-				const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+				// Check if getting all devices failed
+				unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 				
 					// Free devices
 					devices->release();
 				});
+				if(!devices) {
+				
+					// Set devices to include just the default device
+					devices = unique_ptr<NS::Array, void(*)(NS::Array *)>(NS::Array::alloc()->init((const NS::Object *[]){
+					
+						// Default device
+						MTL::CreateSystemDefaultDevice()
+						
+					}, 1), [](NS::Array *devices) noexcept {
+					
+						// Free devices
+						devices->release();
+					});
+				}
+				
+				// Check if getting devices was successful
 				if(devices) {
 				
 					// Go through all devices
@@ -382,7 +405,7 @@ int main(int argc, char *argv[]) noexcept {
 			}
 		#endif
 		
-		// Check if not using macOS or using OpenCL
+		// Check if not using an Apple device or using OpenCL
 		#if !defined __APPLE__ || defined USE_OPENCL
 		
 			// Check if getting number of platforms failed or no platforms exist
@@ -755,15 +778,31 @@ int main(int argc, char *argv[]) noexcept {
 					// Set index to zero
 					unsigned int index = 0;
 					
-					// Check if using macOS and not using OpenCL
+					// Check if using an Apple device and not using OpenCL
 					#if defined __APPLE__ && !defined USE_OPENCL
 					
-						// Check if getting all devices was successful
-						const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+						// Check if getting all devices failed
+						unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 						
 							// Free devices
 							devices->release();
 						});
+						if(!devices) {
+						
+							// Set devices to include just the default device
+							devices = unique_ptr<NS::Array, void(*)(NS::Array *)>(NS::Array::alloc()->init((const NS::Object *[]){
+							
+								// Default device
+								MTL::CreateSystemDefaultDevice()
+								
+							}, 1), [](NS::Array *devices) noexcept {
+							
+								// Free devices
+								devices->release();
+							});
+						}
+						
+						// Check if getting devices was successful
 						if(devices) {
 						
 							// Go through all devices
@@ -900,7 +939,7 @@ int main(int argc, char *argv[]) noexcept {
 					// Set exit after options to false
 					exitAfterOptions = false;
 					
-					// Check if using macOS
+					// Check if using an Apple device
 					#ifdef __APPLE__
 					
 						// Set restore default RAM to if the option is default
@@ -1314,7 +1353,7 @@ int main(int argc, char *argv[]) noexcept {
 				// Display message
 				cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 				
-			// Otherwise check if using macOS
+			// Otherwise check if using an Apple device
 			#elif defined __APPLE__
 			
 				// Display message
@@ -1566,15 +1605,31 @@ int main(int argc, char *argv[]) noexcept {
 			// Set index to zero
 			unsigned int index = 0;
 			
-			// Check if using macOS and not using OpenCL
+			// Check if using an Apple device and not using OpenCL
 			#if defined __APPLE__ && !defined USE_OPENCL
 			
-				// Check if getting all devices was successful
-				const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+				// Check if getting all devices failed
+				unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 				
 					// Free devices
 					devices->release();
 				});
+				if(!devices) {
+				
+					// Set devices to include just the default device
+					devices = unique_ptr<NS::Array, void(*)(NS::Array *)>(NS::Array::alloc()->init((const NS::Object *[]){
+					
+						// Default device
+						MTL::CreateSystemDefaultDevice()
+						
+					}, 1), [](NS::Array *devices) noexcept {
+					
+						// Free devices
+						devices->release();
+					});
+				}
+				
+				// Check if getting devices was successful
 				if(devices) {
 				
 					// Go through all devices
@@ -1725,7 +1780,7 @@ int main(int argc, char *argv[]) noexcept {
 		// Display new line
 		cout << endl;
 		
-		// Check if using macOS and not using OpenCL
+		// Check if using an Apple device and not using OpenCL
 		#if defined __APPLE__ && !defined USE_OPENCL
 		
 			// Create context
@@ -1743,7 +1798,7 @@ int main(int argc, char *argv[]) noexcept {
 		// Check if using all trimming types or mean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & MEAN_TRIMMING_TYPE) {
 		
-			// Check if using macOS and not using OpenCL
+			// Check if using an Apple device and not using OpenCL
 			#if defined __APPLE__ && !defined USE_OPENCL
 			
 				// Create mean trimming context
@@ -1778,7 +1833,7 @@ int main(int argc, char *argv[]) noexcept {
 						// Display message
 						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 						
-					// Otherwise check if using macOS
+					// Otherwise check if using an Apple device
 					#elif defined __APPLE__
 					
 						// Display message
@@ -1997,7 +2052,7 @@ int main(int argc, char *argv[]) noexcept {
 		// Check if using all trimming types or slean then mean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_THEN_MEAN_TRIMMING_TYPE) {
 		
-			// Check if using macOS and not using OpenCL
+			// Check if using an Apple device and not using OpenCL
 			#if defined __APPLE__ && !defined USE_OPENCL
 			
 				// Create slean then mean trimming context
@@ -2032,7 +2087,7 @@ int main(int argc, char *argv[]) noexcept {
 						// Display message
 						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 						
-					// Otherwise check if using macOS
+					// Otherwise check if using an Apple device
 					#elif defined __APPLE__
 					
 						// Display message
@@ -2265,7 +2320,7 @@ int main(int argc, char *argv[]) noexcept {
 		// Check if using all trimming types or slean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_TRIMMING_TYPE) {
 		
-			// Check if using macOS and not using OpenCL
+			// Check if using an Apple device and not using OpenCL
 			#if defined __APPLE__ && !defined USE_OPENCL
 			
 				// Create slean trimming context
@@ -2300,7 +2355,7 @@ int main(int argc, char *argv[]) noexcept {
 						// Display message
 						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 						
-					// Otherwise check if using macOS
+					// Otherwise check if using an Apple device
 					#elif defined __APPLE__
 					
 						// Display message
@@ -2660,7 +2715,7 @@ int main(int argc, char *argv[]) noexcept {
 		// Check if using all trimming types or lean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & LEAN_TRIMMING_TYPE) {
 		
-			// Check if using macOS and not using OpenCL
+			// Check if using an Apple device and not using OpenCL
 			#if defined __APPLE__ && !defined USE_OPENCL
 			
 				// Create lean trimming context
@@ -2695,7 +2750,7 @@ int main(int argc, char *argv[]) noexcept {
 						// Display message
 						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
 						
-					// Otherwise check if using macOS
+					// Otherwise check if using an Apple device
 					#elif defined __APPLE__
 					
 						// Display message

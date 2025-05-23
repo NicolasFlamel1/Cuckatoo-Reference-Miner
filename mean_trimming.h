@@ -36,7 +36,7 @@ using namespace std;
 // Mean trimming after trimming round max number of edges per bucket (Divide by 4 and multiply by 4 makes the result a product of 4)
 #define MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET ((static_cast<uint32_t>(MEAN_TRIMMING_NUMBER_OF_ITEMS_PER_BUCKET * 0.73) / 4) * 4)
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Mean trimming required RAM bytes
@@ -58,7 +58,7 @@ using namespace std;
 
 // Function prototypes
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create mean trimming context
@@ -80,7 +80,7 @@ using namespace std;
 
 // Supporting function implementation
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create mean trimming context
@@ -89,12 +89,28 @@ using namespace std;
 		// Set index to zero
 		unsigned int index = 0;
 		
-		// Check if getting all devices was successful
-		const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+		// Check if getting all devices failed
+		unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 		
 			// Free devices
 			devices->release();
 		});
+		if(!devices) {
+		
+			// Set devices to include just the default device
+			devices = unique_ptr<NS::Array, void(*)(NS::Array *)>(NS::Array::alloc()->init((const NS::Object *[]){
+			
+				// Default device
+				MTL::CreateSystemDefaultDevice()
+				
+			}, 1), [](NS::Array *devices) noexcept {
+			
+				// Free devices
+				devices->release();
+			});
+		}
+		
+		// Check if getting devices was successful
 		if(devices) {
 		
 			// Go through all devices
@@ -211,7 +227,7 @@ using namespace std;
 	}
 #endif
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Perform mean trimming loop
@@ -706,7 +722,7 @@ using namespace std;
 			{MEAN_TRIMMING_NUMBER_OF_BUCKETS * min(bit_floor(device->maxThreadsPerThreadgroup().width), static_cast<NS::UInteger>(UINT16_MAX)), 1, 1},
 			
 			// Clear number of edges per bucket kernel
-			{((MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + sizeof(uint64_t) - 1)) / sizeof(uint64_t), 1, 1}
+			{(MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) + sizeof(uint64_t) - 1) / sizeof(uint64_t), 1, 1}
 		};
 		
 		// Set work items per work group based on the total number of work items and max work group size

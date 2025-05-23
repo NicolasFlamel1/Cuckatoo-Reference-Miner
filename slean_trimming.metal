@@ -754,7 +754,7 @@ static inline bool isBitSetInBitmap(threadgroup const uint *bitmap, const uint i
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
-		
+	
 	// Go through all groups of bytes in the bitmap as a work group
 	for(short i = localId; i < static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	
@@ -978,7 +978,7 @@ static inline bool isBitSetInBitmap(threadgroup const uint *bitmap, const uint i
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint))];
-		
+	
 	// Go through all groups of bytes in the bitmap as a work group
 	for(short i = localId; i < static_cast<short>(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	
@@ -1307,7 +1307,7 @@ static inline bool isBitSetInBitmap(threadgroup const uint *bitmap, const uint i
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
-		
+	
 	// Go through all groups of bytes in the bitmap as a work group
 	for(short i = localId; i < static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	
@@ -1481,7 +1481,7 @@ static inline bool isBitSetInBitmap(threadgroup const uint *bitmap, const uint i
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint))];
-		
+	
 	// Go through all groups of bytes in the bitmap as a work group
 	for(short i = localId; i < static_cast<short>(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	
@@ -1638,7 +1638,7 @@ static inline bool isBitSetInBitmap(threadgroup const uint *bitmap, const uint i
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
-		
+	
 	// Go through all groups of bytes in the bitmap as a work group
 	for(short i = localId; i < static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	
@@ -2024,7 +2024,7 @@ static inline bool isBitSetInBitmap(threadgroup const uint *bitmap, const uint i
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
-		
+	
 	// Go through all groups of bytes in the bitmap as a work group
 	for(short i = localId; i < static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	
@@ -2897,7 +2897,7 @@ static inline bool isBitSetInBitmap(threadgroup const uint *bitmap, const uint i
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
-		
+	
 	// Go through all groups of bytes in the bitmap as a work group
 	for(short i = localId; i < static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint)); i += localSize) {
 	

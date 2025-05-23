@@ -21,7 +21,7 @@ using namespace std;
 
 // Function prototypes
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create lean trimming context
@@ -43,7 +43,7 @@ using namespace std;
 
 // Supporting function implementation
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create lean trimming context
@@ -52,12 +52,28 @@ using namespace std;
 		// Set index to zero
 		unsigned int index = 0;
 		
-		// Check if getting all devices was successful
-		const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+		// Check if getting all devices failed
+		unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 		
 			// Free devices
 			devices->release();
 		});
+		if(!devices) {
+		
+			// Set devices to include just the default device
+			devices = unique_ptr<NS::Array, void(*)(NS::Array *)>(NS::Array::alloc()->init((const NS::Object *[]){
+			
+				// Default device
+				MTL::CreateSystemDefaultDevice()
+				
+			}, 1), [](NS::Array *devices) noexcept {
+			
+				// Free devices
+				devices->release();
+			});
+		}
+		
+		// Check if getting devices was successful
 		if(devices) {
 		
 			// Go through all devices
@@ -173,7 +189,7 @@ using namespace std;
 	}
 #endif
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Perform lean trimming loop

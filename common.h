@@ -47,7 +47,7 @@ static_assert(has_single_bit(static_cast<unsigned int>(LOCAL_RAM_KILOBYTES)), "L
 // Throw error if the size of a vector of a type isn't the same as the size of an array of that type
 static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_t[1]), "Vector vs array size mismatch");
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Throw error if the size of a vector of a type isn't the same as the size of a Metal vector of that type
@@ -146,25 +146,25 @@ class PreventSleep final {
 	// Private
 	private:
 	
-		// Check if using Windows
-		#ifdef _WIN32
+		// Check if using an Apple device
+		#ifdef __APPLE__
 		
-		// Otherwise check if using macOS
-		#elif defined __APPLE__
-		
-			// Assertion ID
-			IOPMAssertionID assertionID;
-		
-		// Otherwise
-		#else
+			// Check if using macOS
+			#if TARGET_OS_OSX == 1
+			
+				// Assertion ID
+				IOPMAssertionID assertionID;
+			#endif
+			
+		// Otherwise check if not using Windows
+		#elif !defined _WIN32
 		
 			// Allow sleep message
 			unique_ptr<DBusMessage, decltype(&dbus_message_unref)> allowSleepMessage;
-			
 		#endif
 };
 
-// Check if not using macOS or using OpenCL
+// Check if not using an Apple device or using OpenCL
 #if !defined __APPLE__ || defined USE_OPENCL
 
 	// Event class
@@ -280,20 +280,30 @@ PreventSleep::PreventSleep() noexcept
 			exit(EXIT_FAILURE);
 		}
 		
-	// Otherwise check if using macOS
+	// Otherwise check if using an Apple device
 	#elif defined __APPLE__
 	
 		{
 		
-		// Check if preventing sleep failed
-		if(IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep, kIOPMAssertionLevelOn, CFSTR(TO_STRING(NAME) " is running"), &assertionID) != kIOReturnSuccess) {
+		// Check if using macOS
+		#if TARGET_OS_OSX == 1
+		
+			// Check if preventing sleep failed
+			if(IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep, kIOPMAssertionLevelOn, CFSTR(TO_STRING(NAME) " is running"), &assertionID) != kIOReturnSuccess) {
+			
+				// Display message
+				cout << "Preventing sleep failed" << endl;
+				
+				// Exit failure
+				exit(EXIT_FAILURE);
+			}
+			
+		// Otherwise
+		#else
 		
 			// Display message
 			cout << "Preventing sleep failed" << endl;
-			
-			// Exit failure
-			exit(EXIT_FAILURE);
-		}
+		#endif
 		
 	// Otherwise
 	#else
@@ -403,11 +413,15 @@ PreventSleep::~PreventSleep() noexcept {
 		// Allow sleep
 		SetThreadExecutionState(ES_CONTINUOUS);
 		
-	// Otherwise check if using macOS
+	// Otherwise check if using an Apple device
 	#elif defined __APPLE__
 	
-		// Allow sleep
-		IOPMAssertionRelease(assertionID);
+		// Check if using macOS
+		#if TARGET_OS_OSX == 1
+		
+			// Allow sleep
+			IOPMAssertionRelease(assertionID);
+		#endif
 		
 	// Otherwise
 	#else
@@ -426,7 +440,7 @@ PreventSleep::~PreventSleep() noexcept {
 	#endif
 }
 
-// Check if not using macOS or using OpenCL
+// Check if not using an Apple device or using OpenCL
 #if !defined __APPLE__ || defined USE_OPENCL
 
 	// Event constructor
@@ -552,7 +566,7 @@ template<typename ValueType> ValueType &unmove(ValueType &&value) noexcept {
 			return false;
 		}*/
 		
-	// Otherwise check if using macOS
+	// Otherwise check if using an Apple device
 	#elif defined __APPLE__
 	
 		// Check if setting thread's scheduling priority to max failed
@@ -627,7 +641,7 @@ void securelyClear(void *data, const size_t length) noexcept {
 		// Securely clear data
 		SecureZeroMemory(data, length);
 	
-	// Otherwise check if using macOS
+	// Otherwise check if using an Apple device
 	#elif defined __APPLE__
 	
 		// Securely clear data
@@ -644,7 +658,7 @@ void securelyClear(void *data, const size_t length) noexcept {
 // Get number of CPU cores
 unsigned int getNumberOfCpuCores() noexcept {
 
-	// Check if using macOS
+	// Check if using an Apple device
 	#if __APPLE__
 	
 		// Check if getting the number of CPU cores was successful
@@ -664,7 +678,7 @@ unsigned int getNumberOfCpuCores() noexcept {
 // Get number of high performance CPU cores
 unsigned int getNumberOfHighPerformanceCpuCores() noexcept {
 
-	// Check if using macOS
+	// Check if using an Apple device
 	#if __APPLE__
 	
 		// Check if getting the number of high performance CPU cores was successful

@@ -128,7 +128,7 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 		// Make nonce big endian
 		nonce = _byteswap_uint64(nonce);
 		
-	// Otherwise check if using macOS
+	// Otherwise check if using an Apple device
 	#elif defined __APPLE__
 	
 		// Make nonce big endian

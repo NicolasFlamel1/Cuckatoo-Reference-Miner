@@ -51,7 +51,7 @@ using namespace std;
 // Slean trimming after trimming round max number of edges per remaining edges bucket (Divide by slean trimming parts and multiply by slean trimming parts makes the result a product of slean trimming parts)
 #define SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET ((static_cast<uint32_t>(SLEAN_TRIMMING_NUMBER_OF_ITEMS_PER_REMAINING_EDGES_BUCKET * 0.38) / SLEAN_TRIMMING_PARTS) * SLEAN_TRIMMING_PARTS)
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Slean trimming required RAM bytes
@@ -82,7 +82,7 @@ using namespace std;
 
 // Function prototypes
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create slean trimming context
@@ -104,7 +104,7 @@ using namespace std;
 
 // Supporting function implementation
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Create slean trimming context
@@ -113,12 +113,28 @@ using namespace std;
 		// Set index to zero
 		unsigned int index = 0;
 		
-		// Check if getting all devices was successful
-		const unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
+		// Check if getting all devices failed
+		unique_ptr<NS::Array, void(*)(NS::Array *)> devices(MTL::CopyAllDevices(), [](NS::Array *devices) noexcept {
 		
 			// Free devices
 			devices->release();
 		});
+		if(!devices) {
+		
+			// Set devices to include just the default device
+			devices = unique_ptr<NS::Array, void(*)(NS::Array *)>(NS::Array::alloc()->init((const NS::Object *[]){
+			
+				// Default device
+				MTL::CreateSystemDefaultDevice()
+				
+			}, 1), [](NS::Array *devices) noexcept {
+			
+				// Free devices
+				devices->release();
+			});
+		}
+		
+		// Check if getting devices was successful
 		if(devices) {
 		
 			// Go through all devices
@@ -235,7 +251,7 @@ using namespace std;
 	}
 #endif
 
-// Check if using macOS and not using OpenCL
+// Check if using an Apple device and not using OpenCL
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Perform slean trimming loop
