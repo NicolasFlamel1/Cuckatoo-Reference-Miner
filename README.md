@@ -1,10 +1,10 @@
 # Cuckatoo Reference Miner
 
 ### Description
-Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean, slean then mean, slean, and lean edge trimming on the GPU using OpenCL and Metal.
+Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean, slean then mean, slean, and lean edge trimming on the GPU using OpenCL and Metal. It can also run on Linux, macOS, iOS, Windows, and Android.
 
 ### Building
-If you're building this program for a desktop operating system then It's recommended that you build this program on the same system that you'll be running it on since it uses the `-march=native` and `-mtune=native` compiler flags to optimize itself for the current system's available features. Because of this, I don't release prebuilt versions of this program for desktop operating systems.
+If you're building this program for a desktop operating system then it's recommended that you build this program on the same system that you'll be running it on since it uses the `-march=native` and `-mtune=native` compiler flags to optimize itself for the current system's available features. Because of this, I don't recommend using the prebuilt versions of this program for desktop operating systems.
 
 #### Linux
 This program can be built and ran with Linux with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
