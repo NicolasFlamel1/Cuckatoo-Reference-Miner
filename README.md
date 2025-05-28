@@ -4,7 +4,7 @@
 Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean, slean then mean, slean, and lean edge trimming on the GPU using OpenCL and Metal.
 
 ### Building
-It's recommended that you build this program on the same system that you'll be running it on since it uses the `-march=native` and `-mtune=native` compiler flags to optimize itself for the current system's available features. Because of this, I don't release prebuilt versions of this program.
+If you're building this program for a desktop operating system then It's recommended that you build this program on the same system that you'll be running it on since it uses the `-march=native` and `-mtune=native` compiler flags to optimize itself for the current system's available features. Because of this, I don't release prebuilt versions of this program for desktop operating systems.
 
 #### Linux
 This program can be built and ran with Linux with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
@@ -29,15 +29,15 @@ make EDGE_BITS=30 USE_OPENCL=1
 After installing [Xcode](https://developer.apple.com/xcode), this program can be built for iOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
 ```
 sudo xcode-select --switch "/Applications/Xcode.app"
-make CC="\"$(xcrun --sdk iphoneos --find g++)\" -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\"" EDGE_BITS=30
+make CC="$(xcrun --sdk iphoneos --find g++)" SDK="$(xcrun --sdk iphoneos --show-sdk-path)" EDGE_BITS=30
 ```
-The resulting ipa file is unsigned, so you'll need to sign and provision it if you want to install it on an iPhone. Keep in mind that this program doesn't include any iOS UI.
+The resulting ipa file is unsigned, so you'll need to sign and provision it if you want to install it on an iPhone.
 
 This program can also be built for and ran with Xcode's iOS simulator with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
 ```
 sudo xcode-select --switch "/Applications/Xcode.app"
-make CC="\"$(xcrun --sdk iphonesimulator --find g++)\" -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" EDGE_BITS=30
-make CC="\"$(xcrun --sdk iphonesimulator --find g++)\" -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" run
+make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)" EDGE_BITS=30
+make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)" run
 ```
 
 #### Windows
@@ -45,6 +45,27 @@ After installing [MinGW-w64](https://winlibs.com), this program can be built and
 ```
 mingw32-make EDGE_BITS=30
 mingw32-make run
+```
+
+#### Android
+After installing [Android Studio](https://developer.android.com/studio) and [Android NDK](https://developer.android.com/ndk), this program can be built for and ran with Android with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30), `CC` is set to the location of the Android NDK compiler that you want to use which is also used to determine the Android ABI and API level to use, `BUILD_TOOLS` is set to the location of the Android SDK build tools that you want to use, `ANDROID_JAR` is set to the location of the Android Java library that you want to use, `JBR_BIN` is set to the location of an Android JetBrains Runtime, and `ADB` is set to the location of an Android ADB platform tool:
+
+If using Linux:
+```
+~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" EDGE_BITS=30
+~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" run
+```
+
+If using macOS:
+```
+~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" EDGE_BITS=30
+~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" run
+```
+
+If using Windows:
+```
+"%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android28-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" EDGE_BITS=30
+"%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android28-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" run
 ```
 
 #### Cross-compiling for Windows

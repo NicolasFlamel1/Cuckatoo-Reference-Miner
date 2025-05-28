@@ -24,6 +24,9 @@ template<const uint64_t size> class Bitmap final {
 		// Constructor
 		inline explicit Bitmap() noexcept;
 		
+		// Bool operator
+		inline explicit operator bool() const noexcept;
+		
 		// Get buffer
 		inline uint64_t *getBuffer() const noexcept;
 		
@@ -56,14 +59,25 @@ template<const uint64_t size> class Bitmap final {
 template<const uint64_t size> Bitmap<size>::Bitmap() noexcept :
 
 	// Create buffer
-	buffer(make_unique<uint64_t[]>(size / BITMAP_UNIT_WIDTH))
+	buffer(new(nothrow) uint64_t[size / BITMAP_UNIT_WIDTH])
 {
 
 	// Throw error is size is invalid
 	static_assert(size && size % BITMAP_UNIT_WIDTH == 0, "Bitmap's size is invalid");
 	
-	// Clear buffer
-	fill(buffer.get(), buffer.get() + size / BITMAP_UNIT_WIDTH, 0);
+	// Check if creating buffer was successful
+	if(buffer) {
+	
+		// Clear buffer
+		fill(buffer.get(), buffer.get() + size / BITMAP_UNIT_WIDTH, 0);
+	}
+}
+
+// Bool operator
+template<const uint64_t size> Bitmap<size>::operator bool() const noexcept {
+
+	// Return if creating buffer was successful
+	return buffer.get();
 }
 
 // Get buffer

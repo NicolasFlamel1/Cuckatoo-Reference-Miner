@@ -27,6 +27,9 @@ using namespace std;
 // Throw error if host's byte order isn't little endian
 static_assert(endian::native == endian::little, "Host's byte order isn't little endian");
 
+// Throw error is host isn't at least 64-bit
+static_assert(sizeof(size_t) >= sizeof(uint64_t), "Host isn't at least 64-bit");
+
 // Throw error if edge bits is invalid
 static_assert(EDGE_BITS >= 10 && EDGE_BITS <= 32, "Edge bits is outside of the accepted range");
 
@@ -143,9 +146,18 @@ class PreventSleep final {
 		// Destructor
 		inline ~PreventSleep() noexcept;
 		
+		// Bool operator
+		inline explicit operator bool() const noexcept;
+		
+		// Did prevent sleep
+		inline bool didPreventSleep() const noexcept;
+		
 	// Private
 	private:
 	
+		// Fatal error occurred
+		bool fatalErrorOccurred;
+		
 		// Check if using an Apple device
 		#ifdef __APPLE__
 		
@@ -156,8 +168,8 @@ class PreventSleep final {
 				IOPMAssertionID assertionID;
 			#endif
 			
-		// Otherwise check if not using Windows
-		#elif !defined _WIN32
+		// Otherwise check if not using Windows and Android
+		#elif !defined _WIN32 && !defined __ANDROID__
 		
 			// Allow sleep message
 			unique_ptr<DBusMessage, decltype(&dbus_message_unref)> allowSleepMessage;
@@ -183,7 +195,7 @@ class PreventSleep final {
 			inline cl_event *getAddress() noexcept;
 			
 			// Get
-			inline cl_event &get() noexcept;
+			inline const cl_event &get() const noexcept;
 			
 			// Free
 			inline void free() noexcept;
@@ -210,6 +222,9 @@ class PreventSleep final {
 			
 			// Destructor
 			inline ~WindowsSocket() noexcept;
+			
+			// Bool operator
+			inline explicit operator bool() const noexcept;
 		
 		// Private
 		private:
@@ -219,6 +234,9 @@ class PreventSleep final {
 			
 			// Minor version
 			static const BYTE MINOR_VERSION;
+			
+			// Fatal error occurred
+			bool fatalErrorOccurred;
 	};
 #endif
 
@@ -263,8 +281,11 @@ static inline unsigned int getNumberOfHighPerformanceCpuCores() noexcept;
 // Supporting function implementation
 
 // Prevent sleep constructor
-PreventSleep::PreventSleep() noexcept
+PreventSleep::PreventSleep() noexcept :
 
+	// Set fatal error occurred to false
+	fatalErrorOccurred(false)
+	
 	// Check if using Windows
 	#ifdef _WIN32
 	
@@ -273,11 +294,8 @@ PreventSleep::PreventSleep() noexcept
 		// Check if preventing sleep failed
 		if(!SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)) {
 		
-			// Display message
-			cout << "Preventing sleep failed" << endl;
-			
-			// Exit failure
-			exit(EXIT_FAILURE);
+			// Set fatal error occurred to true
+			fatalErrorOccurred = true;
 		}
 		
 	// Otherwise check if using an Apple device
@@ -291,27 +309,16 @@ PreventSleep::PreventSleep() noexcept
 			// Check if preventing sleep failed
 			if(IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep, kIOPMAssertionLevelOn, CFSTR(TO_STRING(NAME) " is running"), &assertionID) != kIOReturnSuccess) {
 			
-				// Display message
-				cout << "Preventing sleep failed" << endl;
-				
-				// Exit failure
-				exit(EXIT_FAILURE);
+				// Set fatal error occurred to true
+				fatalErrorOccurred = true;
 			}
-			
-		// Otherwise
-		#else
-		
-			// Display message
-			cout << "Preventing sleep failed" << endl;
 		#endif
 		
-	// Otherwise
-	#else
-	
-		:
+	// Otherwise check if not using Android
+	#elif !defined __ANDROID__
 		
 			// Set allow sleep to nothing
-			allowSleepMessage(nullptr, dbus_message_unref)
+			, allowSleepMessage(nullptr, dbus_message_unref)
 		{
 		
 		// Check if connecting to the session bus was successful
@@ -398,20 +405,69 @@ PreventSleep::PreventSleep() noexcept
 				}
 			}
 		}
-		
-		// Display message
-		cout << "Preventing sleep failed" << endl;
+	
+	// Otherwise
+	#else
+	
+		{
 	#endif
 }
 
 // Prevent sleep destructor
 PreventSleep::~PreventSleep() noexcept {
 
+	// Check if a fatal error didn't occur
+	if(!fatalErrorOccurred) {
+	
+		// Check if using Windows
+		#ifdef _WIN32
+		
+			// Allow sleep
+			SetThreadExecutionState(ES_CONTINUOUS);
+			
+		// Otherwise check if using an Apple device
+		#elif defined __APPLE__
+		
+			// Check if using macOS
+			#if TARGET_OS_OSX == 1
+			
+				// Allow sleep
+				IOPMAssertionRelease(assertionID);
+			#endif
+			
+		// Otherwise check if not using Android
+		#elif !defined __ANDROID__
+		
+			// Check if allow sleep message exists
+			if(allowSleepMessage) {
+			
+				// Check if connecting to the session bus was successful
+				DBusConnection *connection = dbus_bus_get(DBUS_BUS_SESSION, nullptr);
+				if(connection) {
+				
+					// Get allow sleep message's reply
+					unique_ptr<DBusMessage, decltype(&dbus_message_unref)>(dbus_connection_send_with_reply_and_block(connection, allowSleepMessage.get(), DBUS_TIMEOUT_USE_DEFAULT, nullptr), dbus_message_unref);
+				}
+			}
+		#endif
+	}
+}
+
+// Prevent sleep bool operator
+PreventSleep::operator bool() const noexcept {
+
+	// Return if a fatal error didn't occurred
+	return !fatalErrorOccurred;
+}
+
+// Prevent sleep did prevent sleep
+bool PreventSleep::didPreventSleep() const noexcept {
+
 	// Check if using Windows
 	#ifdef _WIN32
 	
-		// Allow sleep
-		SetThreadExecutionState(ES_CONTINUOUS);
+		// Return true;
+		return true;
 		
 	// Otherwise check if using an Apple device
 	#elif defined __APPLE__
@@ -419,24 +475,27 @@ PreventSleep::~PreventSleep() noexcept {
 		// Check if using macOS
 		#if TARGET_OS_OSX == 1
 		
-			// Allow sleep
-			IOPMAssertionRelease(assertionID);
+			// Return true;
+			return true;
+			
+		// Otherwise
+		#else
+		
+			// Return false
+			return false;
 		#endif
+		
+	// Otherwise check if not using Android
+	#elif !defined __ANDROID__
+	
+		// Return if allow sleep message exists
+		return allowSleepMessage.get();
 		
 	// Otherwise
 	#else
 	
-		// Check if allow sleep message exists
-		if(allowSleepMessage) {
-		
-			// Check if connecting to the session bus was successful
-			DBusConnection *connection = dbus_bus_get(DBUS_BUS_SESSION, nullptr);
-			if(connection) {
-			
-				// Get allow sleep message's reply
-				unique_ptr<DBusMessage, decltype(&dbus_message_unref)>(dbus_connection_send_with_reply_and_block(connection, allowSleepMessage.get(), DBUS_TIMEOUT_USE_DEFAULT, nullptr), dbus_message_unref);
-			}
-		}
+		// Return false
+		return false;
 	#endif
 }
 
@@ -469,7 +528,7 @@ PreventSleep::~PreventSleep() noexcept {
 	}
 	
 	// Event get
-	cl_event &Event::get() noexcept {
+	const cl_event &Event::get() const noexcept {
 	
 		// Return event
 		return event;
@@ -490,25 +549,37 @@ PreventSleep::~PreventSleep() noexcept {
 #ifdef _WIN32
 
 	// Windows socket constructor
-	WindowsSocket::WindowsSocket() noexcept {
+	WindowsSocket::WindowsSocket() noexcept :
+	
+		// Set fatal error occurred to false
+		fatalErrorOccurred(false)
+	{
 	
 		// Check if initializing Windows socket failed
 		WSAData windowsSocketData;
 		if(WSAStartup(MAKEWORD(WindowsSocket::MAJOR_VERSION, WindowsSocket::MINOR_VERSION), &windowsSocketData)) {
 		
-			// Display message
-			cout << "Initializing Windows socket failed" << endl;
-			
-			// Exit failure
-			exit(EXIT_FAILURE);
+			// Set fatal error occurred to true
+			fatalErrorOccurred = true;
 		}
 	}
 	
 	// Windows socket destructor
 	WindowsSocket::~WindowsSocket() noexcept {
 	
-		// Clean up Windows socket
-		WSACleanup();
+		// Check if a fatal error didn't occur
+		if(!fatalErrorOccurred) {
+		
+			// Clean up Windows socket
+			WSACleanup();
+		}
+	}
+	
+	// Windows socket bool operator
+	WindowsSocket::operator bool() const noexcept {
+
+		// Return if a fatal error didn't occurred
+		return !fatalErrorOccurred;
 	}
 #endif
 
@@ -617,11 +688,21 @@ template<typename ValueType> ValueType &unmove(ValueType &&value) noexcept {
 			return false;
 		}
 		
-		// Check if setting thread's CPU affinity to its own core failed
+		// Check if using Android and API level is less than 36
 		cpu_set_t cpuSet;
 		CPU_ZERO(&cpuSet);
 		CPU_SET(threadIndex, &cpuSet);
-		if(pthread_setaffinity_np(pthread_self(), sizeof(cpuSet), &cpuSet)) {
+		#if defined __ANDROID__ && __ANDROID_MIN_SDK_VERSION__ < 36
+		
+			// Check if setting thread's CPU affinity to its own core failed
+			if(sched_setaffinity(pthread_gettid_np(pthread_self()), sizeof(cpuSet), &cpuSet)) {
+			
+		// Otherwise
+		#else
+		
+			// Check if setting thread's CPU affinity to its own core failed
+			if(pthread_setaffinity_np(pthread_self(), sizeof(cpuSet), &cpuSet)) {
+		#endif
 		
 			// Return false
 			return false;
@@ -646,6 +727,22 @@ void securelyClear(void *data, const size_t length) noexcept {
 	
 		// Securely clear data
 		memset_s(data, length, 0, length);
+		
+	// Otherwise check if using Android
+	#elif defined __ANDROID__
+	
+		// Check if API level is at least 34
+		#if __ANDROID_MIN_SDK_VERSION__ >= 34
+	
+			// Securely clear data
+			memset_explicit(data, 0, length);
+		
+		// Otherwise
+		#else
+		
+			// Securely clear data
+			memset(data, 0, length);
+		#endif
 		
 	// Otherwise
 	#else

@@ -2,12 +2,15 @@ Cuckatoo Reference Miner
 Cuckatoo Reference Miner.exe
 Cuckatoo Reference Miner.ipa
 Cuckatoo Reference Miner.app
+libCuckatoo_Reference_Miner.so
+Cuckatoo Reference Miner.apk
+Cuckatoo Reference Miner.apk.idsig
 v2024.10.24.tar.gz
 OpenCL-Headers-2024.10.24
-opencl_headers_cross_compiling
 OpenCL-ICD-Loader-2024.10.24
-opencl_icd_loader
+opencl_loader_cross_compiling
 metal-cpp_macOS15.2_iOS18.2.zip
 metal-cpp
 Payload
+build
 private

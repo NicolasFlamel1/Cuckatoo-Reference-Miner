@@ -89,7 +89,7 @@ using namespace std;
 	static inline MTL::Device *createSleanTrimmingContext(const unsigned int deviceIndex) noexcept;
 	
 	// Perform slean trimming loop
-	static inline bool performSleanTrimmingLoop(MTL::Device *device, const unsigned int deviceIndex) noexcept;
+	static inline bool performSleanTrimmingLoop(MTL::Device *device) noexcept;
 	
 // Otherwise
 #else
@@ -98,7 +98,7 @@ using namespace std;
 	static inline cl_context createSleanTrimmingContext(const cl_platform_id platforms[], const cl_uint numberOfPlatforms, const unsigned int deviceIndex) noexcept;
 	
 	// Perform slean trimming loop
-	static inline bool performSleanTrimmingLoop(const cl_context context, const unsigned int deviceIndex) noexcept;
+	static inline bool performSleanTrimmingLoop(const cl_context context) noexcept;
 #endif
 
 
@@ -159,7 +159,21 @@ using namespace std;
 							
 								// Check if device's memory size and work group memory size are large enough
 								if(device->recommendedMaxWorkingSetSize() >= SLEAN_TRIMMING_REQUIRED_RAM_BYTES && device->maxThreadgroupMemoryLength() >= SLEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES) {
-							
+								
+									// Check if device index is specified
+									if(deviceIndex != ALL_DEVICES) {
+									
+										// Display message
+										cout << "Using the GPU for slean trimming." << endl;
+									}
+									
+									// Otherwise
+									else {
+									
+										// Display message
+										cout << "Using " << utf8String << " for slean trimming." << endl;
+									}
+									
 									// Don't free device when devices is freed
 									device->retain();
 									
@@ -232,6 +246,20 @@ using namespace std;
 												cl_context context = clCreateContext(unmove((const cl_context_properties[]){CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties>(platforms[i]), 0}), 1, &devices[j], nullptr, nullptr, nullptr);
 												if(context) {
 												
+													// Check if device index is specified
+													if(deviceIndex != ALL_DEVICES) {
+													
+														// Display message
+														cout << "Using the GPU for slean trimming." << endl;
+													}
+													
+													// Otherwise
+													else {
+													
+														// Display message
+														cout << "Using " << name << " for slean trimming." << endl;
+													}
+													
 													// Return context
 													return context;
 												}
@@ -255,49 +283,13 @@ using namespace std;
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Perform slean trimming loop
-	bool performSleanTrimmingLoop(MTL::Device *device, const unsigned int deviceIndex) noexcept {
-		
-		// Check if device index is specified
-		if(deviceIndex != ALL_DEVICES) {
-		
-			// Display message
-			cout << "Using the GPU for slean trimming" << endl;
-		}
-		
-		// Otherwise
-		else {
-		
-			// Check if device's name doesn't exist
-			const NS::String *name = device->name();
-			if(!name) {
-			
-				// Display message
-				cout << "Getting GPU's name failed" << endl;
-				
-				// Return false
-				return false;
-			}
-			
-			// Check if name's UTF-8 string doesn't exist
-			const char *utf8String = name->utf8String();
-			if(!utf8String) {
-			
-				// Display message
-				cout << "Getting GPU's name failed" << endl;
-				
-				// Return false
-				return false;
-			}
-			
-			// Display message
-			cout << "Using " << utf8String << " for slean trimming" << endl;
-		}
-		
+	bool performSleanTrimmingLoop(MTL::Device *device) noexcept {
+	
 		// Check if device's work group memory isn't fully utilized
 		if(bit_floor(device->maxThreadgroupMemoryLength()) / BYTES_IN_A_KILOBYTE > LOCAL_RAM_KILOBYTES) {
 		
 			// Display message
-			cout << "GPU's local RAM won't be fully utilized. Build this program with LOCAL_RAM_KILOBYTES=" << (bit_floor(device->maxThreadgroupMemoryLength()) / BYTES_IN_A_KILOBYTE) << " for potentially better performance" << endl;
+			cout << "GPU's local RAM won't be fully utilized. Build this program with LOCAL_RAM_KILOBYTES=" << (bit_floor(device->maxThreadgroupMemoryLength()) / BYTES_IN_A_KILOBYTE) << " for potentially better performance." << endl;
 		}
 		
 		// Try to allocate more than the max memory allocation size
@@ -318,7 +310,7 @@ using namespace std;
 		const unsigned int localBucketsSize = min(bit_floor((device->maxThreadgroupMemoryLength() - (SLEAN_TRIMMING_NUMBER_OF_BUCKETS + sizeof(uint32_t) - 1)) / (sizeof(uint32_t) * SLEAN_TRIMMING_NUMBER_OF_BUCKETS) + 1), SLEAN_TRIMMING_MAX_LOCAL_BUCKETS_SIZE);
 		
 		// Check if creating preprocessor macros failed
-		static const unique_ptr<NS::Dictionary, void(*)(NS::Dictionary *)> preprocessorMacros(NS::Dictionary::alloc()->init((const NS::Object *[]){
+		const unique_ptr<NS::Dictionary, void(*)(NS::Dictionary *)> preprocessorMacros(NS::Dictionary::alloc()->init((const NS::Object *[]){
 		
 			// Edge bits value
 			MTLSTR(TO_STRING(EDGE_BITS)),
@@ -474,14 +466,14 @@ using namespace std;
 		if(!preprocessorMacros) {
 		
 			// Display message
-			cout << "Creating preprocessor macros for the kernels failed" << endl;
+			cout << "Creating preprocessor macros for the kernels failed." << endl;
 			
 			// Return false
 			return false;
 		}
 		
 		// Check if creating compile options for the kernels failed
-		static const unique_ptr<MTL::CompileOptions, void(*)(MTL::CompileOptions *)> compileOptions(MTL::CompileOptions::alloc()->init(), [](MTL::CompileOptions *compileOptions) noexcept {
+		const unique_ptr<MTL::CompileOptions, void(*)(MTL::CompileOptions *)> compileOptions(MTL::CompileOptions::alloc()->init(), [](MTL::CompileOptions *compileOptions) noexcept {
 		
 			// Free compile options
 			compileOptions->release();
@@ -489,7 +481,7 @@ using namespace std;
 		if(!compileOptions) {
 		
 			// Display message
-			cout << "Creating compile options for the kernels failed" << endl;
+			cout << "Creating compile options for the kernels failed." << endl;
 			
 			// Return false
 			return false;
@@ -504,7 +496,7 @@ using namespace std;
 			#include "./slean_trimming.metal"
 		);
 		NS::Error *createLibraryError;
-		static const unique_ptr<MTL::Library, void(*)(MTL::Library *)> library(device->newLibrary(source, compileOptions.get(), &createLibraryError), [](MTL::Library *library) noexcept {
+		const unique_ptr<MTL::Library, void(*)(MTL::Library *)> library(device->newLibrary(source, compileOptions.get(), &createLibraryError), [](MTL::Library *library) noexcept {
 		
 			// Free library
 			library->release();
@@ -512,7 +504,7 @@ using namespace std;
 		if(!library) {
 		
 			// Display message
-			cout << "Creating library for the GPU failed" << endl;
+			cout << "Creating library for the GPU failed." << endl;
 			
 			// Check if an error exists
 			if(createLibraryError) {
@@ -536,202 +528,202 @@ using namespace std;
 		}
 		
 		// Check if getting kernels from the library failed
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepOneKernel(library->newFunction(MTLSTR("trimEdgesStepOne")), [](MTL::Function *stepOneKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepOneKernel(library->newFunction(MTLSTR("trimEdgesStepOne")), [](MTL::Function *stepOneKernel) noexcept {
 		
 			// Free step one kernel
 			stepOneKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwoKernel(library->newFunction(MTLSTR("trimEdgesStepTwo")), [](MTL::Function *stepTwoKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwoKernel(library->newFunction(MTLSTR("trimEdgesStepTwo")), [](MTL::Function *stepTwoKernel) noexcept {
 		
 			// Free step two kernel
 			stepTwoKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThreeKernel(library->newFunction(MTLSTR("trimEdgesStepThree")), [](MTL::Function *stepThreeKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThreeKernel(library->newFunction(MTLSTR("trimEdgesStepThree")), [](MTL::Function *stepThreeKernel) noexcept {
 		
 			// Free step three kernel
 			stepThreeKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFourKernel(library->newFunction(MTLSTR("trimEdgesStepFour")), [](MTL::Function *stepFourKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFourKernel(library->newFunction(MTLSTR("trimEdgesStepFour")), [](MTL::Function *stepFourKernel) noexcept {
 		
 			// Free step four kernel
 			stepFourKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFiveKernel(library->newFunction(MTLSTR("trimEdgesStepFive")), [](MTL::Function *stepFiveKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFiveKernel(library->newFunction(MTLSTR("trimEdgesStepFive")), [](MTL::Function *stepFiveKernel) noexcept {
 		
 			// Free step five kernel
 			stepFiveKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepSixKernel(library->newFunction(MTLSTR("trimEdgesStepSix")), [](MTL::Function *stepSixKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepSixKernel(library->newFunction(MTLSTR("trimEdgesStepSix")), [](MTL::Function *stepSixKernel) noexcept {
 		
 			// Free step six kernel
 			stepSixKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepSevenKernel(library->newFunction(MTLSTR("trimEdgesStepSeven")), [](MTL::Function *stepSevenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepSevenKernel(library->newFunction(MTLSTR("trimEdgesStepSeven")), [](MTL::Function *stepSevenKernel) noexcept {
 		
 			// Free step seven kernel
 			stepSevenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepEightKernel(library->newFunction(MTLSTR("trimEdgesStepEight")), [](MTL::Function *stepEightKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepEightKernel(library->newFunction(MTLSTR("trimEdgesStepEight")), [](MTL::Function *stepEightKernel) noexcept {
 		
 			// Free step eight kernel
 			stepEightKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepNineKernel(library->newFunction(MTLSTR("trimEdgesStepNine")), [](MTL::Function *stepNineKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepNineKernel(library->newFunction(MTLSTR("trimEdgesStepNine")), [](MTL::Function *stepNineKernel) noexcept {
 		
 			// Free step nine kernel
 			stepNineKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTenKernel(library->newFunction(MTLSTR("trimEdgesStepTen")), [](MTL::Function *stepTenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTenKernel(library->newFunction(MTLSTR("trimEdgesStepTen")), [](MTL::Function *stepTenKernel) noexcept {
 		
 			// Free step ten kernel
 			stepTenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepElevenKernel(library->newFunction(MTLSTR("trimEdgesStepEleven")), [](MTL::Function *stepElevenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepElevenKernel(library->newFunction(MTLSTR("trimEdgesStepEleven")), [](MTL::Function *stepElevenKernel) noexcept {
 		
 			// Free step eleven kernel
 			stepElevenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwelveKernel(library->newFunction(MTLSTR("trimEdgesStepTwelve")), [](MTL::Function *stepTwelveKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwelveKernel(library->newFunction(MTLSTR("trimEdgesStepTwelve")), [](MTL::Function *stepTwelveKernel) noexcept {
 		
 			// Free step twelve kernel
 			stepTwelveKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirteenKernel(library->newFunction(MTLSTR("trimEdgesStepThirteen")), [](MTL::Function *stepThirteenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirteenKernel(library->newFunction(MTLSTR("trimEdgesStepThirteen")), [](MTL::Function *stepThirteenKernel) noexcept {
 		
 			// Free step thirteen kernel
 			stepThirteenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFourteenKernel(library->newFunction(MTLSTR("trimEdgesStepFourteen")), [](MTL::Function *stepFourteenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFourteenKernel(library->newFunction(MTLSTR("trimEdgesStepFourteen")), [](MTL::Function *stepFourteenKernel) noexcept {
 		
 			// Free step fourteen kernel
 			stepFourteenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFifteenKernel(library->newFunction(MTLSTR("trimEdgesStepFifteen")), [](MTL::Function *stepFifteenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFifteenKernel(library->newFunction(MTLSTR("trimEdgesStepFifteen")), [](MTL::Function *stepFifteenKernel) noexcept {
 		
 			// Free step fifteen kernel
 			stepFifteenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepSixteenKernel(library->newFunction(MTLSTR("trimEdgesStepSixteen")), [](MTL::Function *stepSixteenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepSixteenKernel(library->newFunction(MTLSTR("trimEdgesStepSixteen")), [](MTL::Function *stepSixteenKernel) noexcept {
 		
 			// Free step sixteen kernel
 			stepSixteenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepSeventeenKernel(library->newFunction(MTLSTR("trimEdgesStepSeventeen")), [](MTL::Function *stepSeventeenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepSeventeenKernel(library->newFunction(MTLSTR("trimEdgesStepSeventeen")), [](MTL::Function *stepSeventeenKernel) noexcept {
 		
 			// Free step seventeen kernel
 			stepSeventeenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepEighteenKernel(library->newFunction(MTLSTR("trimEdgesStepEighteen")), [](MTL::Function *stepEighteenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepEighteenKernel(library->newFunction(MTLSTR("trimEdgesStepEighteen")), [](MTL::Function *stepEighteenKernel) noexcept {
 		
 			// Free step eighteen kernel
 			stepEighteenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepNineteenKernel(library->newFunction(MTLSTR("trimEdgesStepNineteen")), [](MTL::Function *stepNineteenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepNineteenKernel(library->newFunction(MTLSTR("trimEdgesStepNineteen")), [](MTL::Function *stepNineteenKernel) noexcept {
 		
 			// Free step nineteen kernel
 			stepNineteenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyKernel(library->newFunction(MTLSTR("trimEdgesStepTwenty")), [](MTL::Function *stepTwentyKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyKernel(library->newFunction(MTLSTR("trimEdgesStepTwenty")), [](MTL::Function *stepTwentyKernel) noexcept {
 		
 			// Free step twenty kernel
 			stepTwentyKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyOneKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyOne")), [](MTL::Function *stepTwentyOneKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyOneKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyOne")), [](MTL::Function *stepTwentyOneKernel) noexcept {
 		
 			// Free step twenty-one kernel
 			stepTwentyOneKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyTwoKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyTwo")), [](MTL::Function *stepTwentyTwoKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyTwoKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyTwo")), [](MTL::Function *stepTwentyTwoKernel) noexcept {
 		
 			// Free step twenty-two kernel
 			stepTwentyTwoKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyThreeKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyThree")), [](MTL::Function *stepTwentyThreeKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyThreeKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyThree")), [](MTL::Function *stepTwentyThreeKernel) noexcept {
 		
 			// Free step twenty-three kernel
 			stepTwentyThreeKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyFourKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyFour")), [](MTL::Function *stepTwentyFourKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyFourKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyFour")), [](MTL::Function *stepTwentyFourKernel) noexcept {
 		
 			// Free step twenty-four kernel
 			stepTwentyFourKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyFiveKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyFive")), [](MTL::Function *stepTwentyFiveKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyFiveKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyFive")), [](MTL::Function *stepTwentyFiveKernel) noexcept {
 		
 			// Free step twenty-five kernel
 			stepTwentyFiveKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentySixKernel(library->newFunction(MTLSTR("trimEdgesStepTwentySix")), [](MTL::Function *stepTwentySixKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentySixKernel(library->newFunction(MTLSTR("trimEdgesStepTwentySix")), [](MTL::Function *stepTwentySixKernel) noexcept {
 		
 			// Free step twenty-six kernel
 			stepTwentySixKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentySevenKernel(library->newFunction(MTLSTR("trimEdgesStepTwentySeven")), [](MTL::Function *stepTwentySevenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentySevenKernel(library->newFunction(MTLSTR("trimEdgesStepTwentySeven")), [](MTL::Function *stepTwentySevenKernel) noexcept {
 		
 			// Free step twenty-seven kernel
 			stepTwentySevenKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyEightKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyEight")), [](MTL::Function *stepTwentyEightKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyEightKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyEight")), [](MTL::Function *stepTwentyEightKernel) noexcept {
 		
 			// Free step twenty-eight kernel
 			stepTwentyEightKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyNineKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyNine")), [](MTL::Function *stepTwentyNineKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwentyNineKernel(library->newFunction(MTLSTR("trimEdgesStepTwentyNine")), [](MTL::Function *stepTwentyNineKernel) noexcept {
 		
 			// Free step twenty-nine kernel
 			stepTwentyNineKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyKernel(library->newFunction(MTLSTR("trimEdgesStepThirty")), [](MTL::Function *stepThirtyKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyKernel(library->newFunction(MTLSTR("trimEdgesStepThirty")), [](MTL::Function *stepThirtyKernel) noexcept {
 		
 			// Free step thirty kernel
 			stepThirtyKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyOneKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyOne")), [](MTL::Function *stepThirtyOneKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyOneKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyOne")), [](MTL::Function *stepThirtyOneKernel) noexcept {
 		
 			// Free step thirty-one kernel
 			stepThirtyOneKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyTwoKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyTwo")), [](MTL::Function *stepThirtyTwoKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyTwoKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyTwo")), [](MTL::Function *stepThirtyTwoKernel) noexcept {
 		
 			// Free step thirty-two kernel
 			stepThirtyTwoKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyThreeKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyThree")), [](MTL::Function *stepThirtyThreeKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyThreeKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyThree")), [](MTL::Function *stepThirtyThreeKernel) noexcept {
 		
 			// Free step thirty-three kernel
 			stepThirtyThreeKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyFourKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyFour")), [](MTL::Function *stepThirtyFourKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThirtyFourKernel(library->newFunction(MTLSTR("trimEdgesStepThirtyFour")), [](MTL::Function *stepThirtyFourKernel) noexcept {
 		
 			// Free step thirty-four kernel
 			stepThirtyFourKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerSourceBucketKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerSourceBucket")), [](MTL::Function *clearNumberOfEdgesPerSourceBucketKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerSourceBucketKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerSourceBucket")), [](MTL::Function *clearNumberOfEdgesPerSourceBucketKernel) noexcept {
 		
 			// Free clear number of edges per source bucket kernel
 			clearNumberOfEdgesPerSourceBucketKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketOneKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketOne")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketOneKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketOneKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketOne")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketOneKernel) noexcept {
 		
 			// Free clear number of edges per destination bucket one kernel
 			clearNumberOfEdgesPerDestinationBucketOneKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketTwoKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketTwo")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketTwoKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketTwoKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketTwo")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketTwoKernel) noexcept {
 		
 			// Free clear number of edges per destination bucket two kernel
 			clearNumberOfEdgesPerDestinationBucketTwoKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketFourKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketFour")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketFourKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketFourKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketFour")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketFourKernel) noexcept {
 		
 			// Free clear number of edges per destination bucket four kernel
 			clearNumberOfEdgesPerDestinationBucketFourKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketEightKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketEight")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketEightKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketEightKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketEight")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketEightKernel) noexcept {
 		
 			// Free clear number of edges per destination bucket eight kernel
 			clearNumberOfEdgesPerDestinationBucketEightKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketSixteenKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketSixteen")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketSixteenKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNumberOfEdgesPerDestinationBucketSixteenKernel(library->newFunction(MTLSTR("clearNumberOfEdgesPerDestinationBucketSixteen")), [](MTL::Function *clearNumberOfEdgesPerDestinationBucketSixteenKernel) noexcept {
 		
 			// Free clear number of edges per destination bucket sixteen kernel
 			clearNumberOfEdgesPerDestinationBucketSixteenKernel->release();
@@ -739,7 +731,7 @@ using namespace std;
 		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !stepFiveKernel || !stepSixKernel || !stepSevenKernel || !stepEightKernel || !stepNineKernel || !stepTenKernel || !stepElevenKernel || !stepTwelveKernel || !stepThirteenKernel || !stepFourteenKernel || !stepFifteenKernel || !stepSixteenKernel || !stepSeventeenKernel || !stepEighteenKernel || !stepNineteenKernel || !stepTwentyKernel || !stepTwentyOneKernel || !stepTwentyTwoKernel || !stepTwentyThreeKernel || !stepTwentyFourKernel || !stepTwentyFiveKernel || !stepTwentySixKernel || !stepTwentySevenKernel || !stepTwentyEightKernel || !stepTwentyNineKernel || !stepThirtyKernel || !stepThirtyOneKernel || !stepThirtyTwoKernel || !stepThirtyThreeKernel || !stepThirtyFourKernel || !clearNumberOfEdgesPerSourceBucketKernel || !clearNumberOfEdgesPerDestinationBucketOneKernel || !clearNumberOfEdgesPerDestinationBucketTwoKernel || !clearNumberOfEdgesPerDestinationBucketFourKernel || !clearNumberOfEdgesPerDestinationBucketEightKernel || !clearNumberOfEdgesPerDestinationBucketSixteenKernel) {
 		
 			// Display message
-			cout << "Getting kernels from the library failed" << endl;
+			cout << "Getting kernels from the library failed." << endl;
 			
 			// Return false
 			return false;
@@ -747,241 +739,241 @@ using namespace std;
 		
 		// Check if creating pipelines for the device failed
 		NS::Error *createPipelineOneError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepOnePipeline(device->newComputePipelineState(stepOneKernel.get(), &createPipelineOneError), [](MTL::ComputePipelineState *stepOnePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepOnePipeline(device->newComputePipelineState(stepOneKernel.get(), &createPipelineOneError), [](MTL::ComputePipelineState *stepOnePipeline) noexcept {
 		
 			// Free step one pipeline
 			stepOnePipeline->release();
 		});
 		NS::Error *createPipelineTwoError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwoPipeline(device->newComputePipelineState(stepTwoKernel.get(), &createPipelineTwoError), [](MTL::ComputePipelineState *stepTwoPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwoPipeline(device->newComputePipelineState(stepTwoKernel.get(), &createPipelineTwoError), [](MTL::ComputePipelineState *stepTwoPipeline) noexcept {
 		
 			// Free step two pipeline
 			stepTwoPipeline->release();
 		});
 		NS::Error *createPipelineThreeError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThreePipeline(device->newComputePipelineState(stepThreeKernel.get(), &createPipelineThreeError), [](MTL::ComputePipelineState *stepThreePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThreePipeline(device->newComputePipelineState(stepThreeKernel.get(), &createPipelineThreeError), [](MTL::ComputePipelineState *stepThreePipeline) noexcept {
 		
 			// Free step three pipeline
 			stepThreePipeline->release();
 		});
 		NS::Error *createPipelineFourError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFourPipeline(device->newComputePipelineState(stepFourKernel.get(), &createPipelineFourError), [](MTL::ComputePipelineState *stepFourPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFourPipeline(device->newComputePipelineState(stepFourKernel.get(), &createPipelineFourError), [](MTL::ComputePipelineState *stepFourPipeline) noexcept {
 		
 			// Free step four pipeline
 			stepFourPipeline->release();
 		});
 		NS::Error *createPipelineFiveError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFivePipeline(device->newComputePipelineState(stepFiveKernel.get(), &createPipelineFiveError), [](MTL::ComputePipelineState *stepFivePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFivePipeline(device->newComputePipelineState(stepFiveKernel.get(), &createPipelineFiveError), [](MTL::ComputePipelineState *stepFivePipeline) noexcept {
 		
 			// Free step five pipeline
 			stepFivePipeline->release();
 		});
 		NS::Error *createPipelineSixError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepSixPipeline(device->newComputePipelineState(stepSixKernel.get(), &createPipelineSixError), [](MTL::ComputePipelineState *stepSixPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepSixPipeline(device->newComputePipelineState(stepSixKernel.get(), &createPipelineSixError), [](MTL::ComputePipelineState *stepSixPipeline) noexcept {
 		
 			// Free step six pipeline
 			stepSixPipeline->release();
 		});
 		NS::Error *createPipelineSevenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepSevenPipeline(device->newComputePipelineState(stepSevenKernel.get(), &createPipelineSevenError), [](MTL::ComputePipelineState *stepSevenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepSevenPipeline(device->newComputePipelineState(stepSevenKernel.get(), &createPipelineSevenError), [](MTL::ComputePipelineState *stepSevenPipeline) noexcept {
 		
 			// Free step seven pipeline
 			stepSevenPipeline->release();
 		});
 		NS::Error *createPipelineEightError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepEightPipeline(device->newComputePipelineState(stepEightKernel.get(), &createPipelineEightError), [](MTL::ComputePipelineState *stepEightPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepEightPipeline(device->newComputePipelineState(stepEightKernel.get(), &createPipelineEightError), [](MTL::ComputePipelineState *stepEightPipeline) noexcept {
 		
 			// Free step eight pipeline
 			stepEightPipeline->release();
 		});
 		NS::Error *createPipelineNineError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepNinePipeline(device->newComputePipelineState(stepNineKernel.get(), &createPipelineNineError), [](MTL::ComputePipelineState *stepNinePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepNinePipeline(device->newComputePipelineState(stepNineKernel.get(), &createPipelineNineError), [](MTL::ComputePipelineState *stepNinePipeline) noexcept {
 		
 			// Free step nine pipeline
 			stepNinePipeline->release();
 		});
 		NS::Error *createPipelineTenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTenPipeline(device->newComputePipelineState(stepTenKernel.get(), &createPipelineTenError), [](MTL::ComputePipelineState *stepTenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTenPipeline(device->newComputePipelineState(stepTenKernel.get(), &createPipelineTenError), [](MTL::ComputePipelineState *stepTenPipeline) noexcept {
 		
 			// Free step ten pipeline
 			stepTenPipeline->release();
 		});
 		NS::Error *createPipelineElevenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepElevenPipeline(device->newComputePipelineState(stepElevenKernel.get(), &createPipelineElevenError), [](MTL::ComputePipelineState *stepElevenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepElevenPipeline(device->newComputePipelineState(stepElevenKernel.get(), &createPipelineElevenError), [](MTL::ComputePipelineState *stepElevenPipeline) noexcept {
 		
 			// Free step eleven pipeline
 			stepElevenPipeline->release();
 		});
 		NS::Error *createPipelineTwelveError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwelvePipeline(device->newComputePipelineState(stepTwelveKernel.get(), &createPipelineTwelveError), [](MTL::ComputePipelineState *stepTwelvePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwelvePipeline(device->newComputePipelineState(stepTwelveKernel.get(), &createPipelineTwelveError), [](MTL::ComputePipelineState *stepTwelvePipeline) noexcept {
 		
 			// Free step twelve pipeline
 			stepTwelvePipeline->release();
 		});
 		NS::Error *createPipelineThirteenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirteenPipeline(device->newComputePipelineState(stepThirteenKernel.get(), &createPipelineThirteenError), [](MTL::ComputePipelineState *stepThirteenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirteenPipeline(device->newComputePipelineState(stepThirteenKernel.get(), &createPipelineThirteenError), [](MTL::ComputePipelineState *stepThirteenPipeline) noexcept {
 		
 			// Free step thirteen pipeline
 			stepThirteenPipeline->release();
 		});
 		NS::Error *createPipelineFourteenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFourteenPipeline(device->newComputePipelineState(stepFourteenKernel.get(), &createPipelineFourteenError), [](MTL::ComputePipelineState *stepFourteenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFourteenPipeline(device->newComputePipelineState(stepFourteenKernel.get(), &createPipelineFourteenError), [](MTL::ComputePipelineState *stepFourteenPipeline) noexcept {
 		
 			// Free step fourteen pipeline
 			stepFourteenPipeline->release();
 		});
 		NS::Error *createPipelineFifteenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFifteenPipeline(device->newComputePipelineState(stepFifteenKernel.get(), &createPipelineFifteenError), [](MTL::ComputePipelineState *stepFifteenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFifteenPipeline(device->newComputePipelineState(stepFifteenKernel.get(), &createPipelineFifteenError), [](MTL::ComputePipelineState *stepFifteenPipeline) noexcept {
 		
 			// Free step fifteen pipeline
 			stepFifteenPipeline->release();
 		});
 		NS::Error *createPipelineSixteenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepSixteenPipeline(device->newComputePipelineState(stepSixteenKernel.get(), &createPipelineSixteenError), [](MTL::ComputePipelineState *stepSixteenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepSixteenPipeline(device->newComputePipelineState(stepSixteenKernel.get(), &createPipelineSixteenError), [](MTL::ComputePipelineState *stepSixteenPipeline) noexcept {
 		
 			// Free step sixteen pipeline
 			stepSixteenPipeline->release();
 		});
 		NS::Error *createPipelineSeventeenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepSeventeenPipeline(device->newComputePipelineState(stepSeventeenKernel.get(), &createPipelineSeventeenError), [](MTL::ComputePipelineState *stepSeventeenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepSeventeenPipeline(device->newComputePipelineState(stepSeventeenKernel.get(), &createPipelineSeventeenError), [](MTL::ComputePipelineState *stepSeventeenPipeline) noexcept {
 		
 			// Free step seventeen pipeline
 			stepSeventeenPipeline->release();
 		});
 		NS::Error *createPipelineEighteenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepEighteenPipeline(device->newComputePipelineState(stepEighteenKernel.get(), &createPipelineEighteenError), [](MTL::ComputePipelineState *stepEighteenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepEighteenPipeline(device->newComputePipelineState(stepEighteenKernel.get(), &createPipelineEighteenError), [](MTL::ComputePipelineState *stepEighteenPipeline) noexcept {
 		
 			// Free step eighteen pipeline
 			stepEighteenPipeline->release();
 		});
 		NS::Error *createPipelineNineteenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepNineteenPipeline(device->newComputePipelineState(stepNineteenKernel.get(), &createPipelineNineteenError), [](MTL::ComputePipelineState *stepNineteenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepNineteenPipeline(device->newComputePipelineState(stepNineteenKernel.get(), &createPipelineNineteenError), [](MTL::ComputePipelineState *stepNineteenPipeline) noexcept {
 		
 			// Free step nineteen pipeline
 			stepNineteenPipeline->release();
 		});
 		NS::Error *createPipelineTwentyError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyPipeline(device->newComputePipelineState(stepTwentyKernel.get(), &createPipelineTwentyError), [](MTL::ComputePipelineState *stepTwentyPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyPipeline(device->newComputePipelineState(stepTwentyKernel.get(), &createPipelineTwentyError), [](MTL::ComputePipelineState *stepTwentyPipeline) noexcept {
 		
 			// Free step twenty pipeline
 			stepTwentyPipeline->release();
 		});
 		NS::Error *createPipelineTwentyOneError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyOnePipeline(device->newComputePipelineState(stepTwentyOneKernel.get(), &createPipelineTwentyOneError), [](MTL::ComputePipelineState *stepTwentyOnePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyOnePipeline(device->newComputePipelineState(stepTwentyOneKernel.get(), &createPipelineTwentyOneError), [](MTL::ComputePipelineState *stepTwentyOnePipeline) noexcept {
 		
 			// Free step twenty-one pipeline
 			stepTwentyOnePipeline->release();
 		});
 		NS::Error *createPipelineTwentyTwoError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyTwoPipeline(device->newComputePipelineState(stepTwentyTwoKernel.get(), &createPipelineTwentyTwoError), [](MTL::ComputePipelineState *stepTwentyTwoPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyTwoPipeline(device->newComputePipelineState(stepTwentyTwoKernel.get(), &createPipelineTwentyTwoError), [](MTL::ComputePipelineState *stepTwentyTwoPipeline) noexcept {
 		
 			// Free step twenty-two pipeline
 			stepTwentyTwoPipeline->release();
 		});
 		NS::Error *createPipelineTwentyThreeError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyThreePipeline(device->newComputePipelineState(stepTwentyThreeKernel.get(), &createPipelineTwentyThreeError), [](MTL::ComputePipelineState *stepTwentyThreePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyThreePipeline(device->newComputePipelineState(stepTwentyThreeKernel.get(), &createPipelineTwentyThreeError), [](MTL::ComputePipelineState *stepTwentyThreePipeline) noexcept {
 		
 			// Free step twenty-three pipeline
 			stepTwentyThreePipeline->release();
 		});
 		NS::Error *createPipelineTwentyFourError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyFourPipeline(device->newComputePipelineState(stepTwentyFourKernel.get(), &createPipelineTwentyFourError), [](MTL::ComputePipelineState *stepTwentyFourPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyFourPipeline(device->newComputePipelineState(stepTwentyFourKernel.get(), &createPipelineTwentyFourError), [](MTL::ComputePipelineState *stepTwentyFourPipeline) noexcept {
 		
 			// Free step twenty-four pipeline
 			stepTwentyFourPipeline->release();
 		});
 		NS::Error *createPipelineTwentyFiveError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyFivePipeline(device->newComputePipelineState(stepTwentyFiveKernel.get(), &createPipelineTwentyFiveError), [](MTL::ComputePipelineState *stepTwentyFivePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyFivePipeline(device->newComputePipelineState(stepTwentyFiveKernel.get(), &createPipelineTwentyFiveError), [](MTL::ComputePipelineState *stepTwentyFivePipeline) noexcept {
 		
 			// Free step twenty-five pipeline
 			stepTwentyFivePipeline->release();
 		});
 		NS::Error *createPipelineTwentySixError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentySixPipeline(device->newComputePipelineState(stepTwentySixKernel.get(), &createPipelineTwentySixError), [](MTL::ComputePipelineState *stepTwentySixPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentySixPipeline(device->newComputePipelineState(stepTwentySixKernel.get(), &createPipelineTwentySixError), [](MTL::ComputePipelineState *stepTwentySixPipeline) noexcept {
 		
 			// Free step twenty-six pipeline
 			stepTwentySixPipeline->release();
 		});
 		NS::Error *createPipelineTwentySevenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentySevenPipeline(device->newComputePipelineState(stepTwentySevenKernel.get(), &createPipelineTwentySevenError), [](MTL::ComputePipelineState *stepTwentySevenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentySevenPipeline(device->newComputePipelineState(stepTwentySevenKernel.get(), &createPipelineTwentySevenError), [](MTL::ComputePipelineState *stepTwentySevenPipeline) noexcept {
 		
 			// Free step twenty-seven pipeline
 			stepTwentySevenPipeline->release();
 		});
 		NS::Error *createPipelineTwentyEightError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyEightPipeline(device->newComputePipelineState(stepTwentyEightKernel.get(), &createPipelineTwentyEightError), [](MTL::ComputePipelineState *stepTwentyEightPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyEightPipeline(device->newComputePipelineState(stepTwentyEightKernel.get(), &createPipelineTwentyEightError), [](MTL::ComputePipelineState *stepTwentyEightPipeline) noexcept {
 		
 			// Free step twenty-eight pipeline
 			stepTwentyEightPipeline->release();
 		});
 		NS::Error *createPipelineTwentyNineError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyNinePipeline(device->newComputePipelineState(stepTwentyNineKernel.get(), &createPipelineTwentyNineError), [](MTL::ComputePipelineState *stepTwentyNinePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwentyNinePipeline(device->newComputePipelineState(stepTwentyNineKernel.get(), &createPipelineTwentyNineError), [](MTL::ComputePipelineState *stepTwentyNinePipeline) noexcept {
 		
 			// Free step twenty-nine pipeline
 			stepTwentyNinePipeline->release();
 		});
 		NS::Error *createPipelineThirtyError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyPipeline(device->newComputePipelineState(stepThirtyKernel.get(), &createPipelineThirtyError), [](MTL::ComputePipelineState *stepThirtyPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyPipeline(device->newComputePipelineState(stepThirtyKernel.get(), &createPipelineThirtyError), [](MTL::ComputePipelineState *stepThirtyPipeline) noexcept {
 		
 			// Free step thirty pipeline
 			stepThirtyPipeline->release();
 		});
 		NS::Error *createPipelineThirtyOneError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyOnePipeline(device->newComputePipelineState(stepThirtyOneKernel.get(), &createPipelineThirtyOneError), [](MTL::ComputePipelineState *stepThirtyOnePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyOnePipeline(device->newComputePipelineState(stepThirtyOneKernel.get(), &createPipelineThirtyOneError), [](MTL::ComputePipelineState *stepThirtyOnePipeline) noexcept {
 		
 			// Free step thirty-one pipeline
 			stepThirtyOnePipeline->release();
 		});
 		NS::Error *createPipelineThirtyTwoError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyTwoPipeline(device->newComputePipelineState(stepThirtyTwoKernel.get(), &createPipelineThirtyTwoError), [](MTL::ComputePipelineState *stepThirtyTwoPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyTwoPipeline(device->newComputePipelineState(stepThirtyTwoKernel.get(), &createPipelineThirtyTwoError), [](MTL::ComputePipelineState *stepThirtyTwoPipeline) noexcept {
 		
 			// Free step thirty-two pipeline
 			stepThirtyTwoPipeline->release();
 		});
 		NS::Error *createPipelineThirtyThreeError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyThreePipeline(device->newComputePipelineState(stepThirtyThreeKernel.get(), &createPipelineThirtyThreeError), [](MTL::ComputePipelineState *stepThirtyThreePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyThreePipeline(device->newComputePipelineState(stepThirtyThreeKernel.get(), &createPipelineThirtyThreeError), [](MTL::ComputePipelineState *stepThirtyThreePipeline) noexcept {
 		
 			// Free step thirty-three pipeline
 			stepThirtyThreePipeline->release();
 		});
 		NS::Error *createPipelineThirtyFourError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyFourPipeline(device->newComputePipelineState(stepThirtyFourKernel.get(), &createPipelineThirtyFourError), [](MTL::ComputePipelineState *stepThirtyFourPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThirtyFourPipeline(device->newComputePipelineState(stepThirtyFourKernel.get(), &createPipelineThirtyFourError), [](MTL::ComputePipelineState *stepThirtyFourPipeline) noexcept {
 		
 			// Free step thirty-four pipeline
 			stepThirtyFourPipeline->release();
 		});
 		NS::Error *createPipelineClearNumberOfEdgesPerSourceBucketError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerSourceBucketPipeline(device->newComputePipelineState(clearNumberOfEdgesPerSourceBucketKernel.get(), &createPipelineClearNumberOfEdgesPerSourceBucketError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerSourceBucketPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerSourceBucketPipeline(device->newComputePipelineState(clearNumberOfEdgesPerSourceBucketKernel.get(), &createPipelineClearNumberOfEdgesPerSourceBucketError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerSourceBucketPipeline) noexcept {
 		
 			// Free clear number of edges per source bucket pipeline
 			clearNumberOfEdgesPerSourceBucketPipeline->release();
 		});
 		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketOneError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketOnePipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketOneKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketOneError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketOnePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketOnePipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketOneKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketOneError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketOnePipeline) noexcept {
 		
 			// Free clear number of edges per destination bucket one pipeline
 			clearNumberOfEdgesPerDestinationBucketOnePipeline->release();
 		});
 		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketTwoError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketTwoPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketTwoError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketTwoPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketTwoPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketTwoKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketTwoError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketTwoPipeline) noexcept {
 		
 			// Free clear number of edges per destination bucket two pipeline
 			clearNumberOfEdgesPerDestinationBucketTwoPipeline->release();
 		});
 		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketFourError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketFourPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketFourError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketFourPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketFourPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketFourKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketFourError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketFourPipeline) noexcept {
 		
 			// Free clear number of edges per destination bucket four pipeline
 			clearNumberOfEdgesPerDestinationBucketFourPipeline->release();
 		});
 		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketEightError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketEightPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketEightError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketEightPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketEightPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketEightKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketEightError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketEightPipeline) noexcept {
 		
 			// Free clear number of edges per destination bucket eight pipeline
 			clearNumberOfEdgesPerDestinationBucketEightPipeline->release();
 		});
 		NS::Error *createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketSixteenPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketSixteenKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketSixteenPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNumberOfEdgesPerDestinationBucketSixteenPipeline(device->newComputePipelineState(clearNumberOfEdgesPerDestinationBucketSixteenKernel.get(), &createPipelineClearNumberOfEdgesPerDestinationBucketSixteenError), [](MTL::ComputePipelineState *clearNumberOfEdgesPerDestinationBucketSixteenPipeline) noexcept {
 		
 			// Free clear number of edges per destination bucket sixteen pipeline
 			clearNumberOfEdgesPerDestinationBucketSixteenPipeline->release();
@@ -989,7 +981,7 @@ using namespace std;
 		if(!stepOnePipeline || !stepTwoPipeline || !stepThreePipeline || !stepFourPipeline || !stepFivePipeline || !stepSixPipeline || !stepSevenPipeline || !stepEightPipeline || !stepNinePipeline || !stepTenPipeline || !stepElevenPipeline || !stepTwelvePipeline || !stepThirteenPipeline || !stepFourteenPipeline || !stepFifteenPipeline || !stepSixteenPipeline || !stepSeventeenPipeline || !stepEighteenPipeline || !stepNineteenPipeline || !stepTwentyPipeline || !stepTwentyOnePipeline || !stepTwentyTwoPipeline || !stepTwentyThreePipeline || !stepTwentyFourPipeline || !stepTwentyFivePipeline || !stepTwentySixPipeline || !stepTwentySevenPipeline || !stepTwentyEightPipeline || !stepTwentyNinePipeline || !stepThirtyPipeline || !stepThirtyOnePipeline || !stepThirtyTwoPipeline || !stepThirtyThreePipeline || !stepThirtyFourPipeline || !clearNumberOfEdgesPerSourceBucketPipeline || !clearNumberOfEdgesPerDestinationBucketOnePipeline || !clearNumberOfEdgesPerDestinationBucketTwoPipeline || !clearNumberOfEdgesPerDestinationBucketFourPipeline || !clearNumberOfEdgesPerDestinationBucketEightPipeline || !clearNumberOfEdgesPerDestinationBucketSixteenPipeline) {
 		
 			// Display message
-			cout << "Creating pipelines for the GPU failed" << endl;
+			cout << "Creating pipelines for the GPU failed." << endl;
 			
 			// Check if creating pipeline one failed and an error exists
 			if(!stepOnePipeline && createPipelineOneError) {
@@ -1924,202 +1916,202 @@ using namespace std;
 		};
 		
 		// Check if creating pipeline descriptors failed
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepOnePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepOnePipelineDescriptor) noexcept {
 		
 			// Free step one pipeline descriptor
 			stepOnePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwoPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwoPipelineDescriptor) noexcept {
 		
 			// Free step two pipeline descriptor
 			stepTwoPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThreePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThreePipelineDescriptor) noexcept {
 		
 			// Free step three pipeline descriptor
 			stepThreePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFourPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFourPipelineDescriptor) noexcept {
 		
 			// Free step four pipeline descriptor
 			stepFourPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFivePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFivePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFivePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFivePipelineDescriptor) noexcept {
 		
 			// Free step five pipeline descriptor
 			stepFivePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepSixPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepSixPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepSixPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepSixPipelineDescriptor) noexcept {
 		
 			// Free step six pipeline descriptor
 			stepSixPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepSevenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepSevenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepSevenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepSevenPipelineDescriptor) noexcept {
 		
 			// Free step seven pipeline descriptor
 			stepSevenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepEightPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepEightPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepEightPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepEightPipelineDescriptor) noexcept {
 		
 			// Free step eight pipeline descriptor
 			stepEightPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepNinePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepNinePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepNinePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepNinePipelineDescriptor) noexcept {
 		
 			// Free step nine pipeline descriptor
 			stepNinePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTenPipelineDescriptor) noexcept {
 		
 			// Free step ten pipeline descriptor
 			stepTenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepElevenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepElevenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepElevenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepElevenPipelineDescriptor) noexcept {
 		
 			// Free step eleven pipeline descriptor
 			stepElevenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwelvePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwelvePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwelvePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwelvePipelineDescriptor) noexcept {
 		
 			// Free step twelve pipeline descriptor
 			stepTwelvePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirteenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirteenPipelineDescriptor) noexcept {
 		
 			// Free step thirteen pipeline descriptor
 			stepThirteenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFourteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFourteenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFourteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFourteenPipelineDescriptor) noexcept {
 		
 			// Free step fourteen pipeline descriptor
 			stepFourteenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFifteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFifteenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFifteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFifteenPipelineDescriptor) noexcept {
 		
 			// Free step fifteen pipeline descriptor
 			stepFifteenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepSixteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepSixteenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepSixteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepSixteenPipelineDescriptor) noexcept {
 		
 			// Free step sixteen pipeline descriptor
 			stepSixteenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepSeventeenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepSeventeenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepSeventeenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepSeventeenPipelineDescriptor) noexcept {
 		
 			// Free step seventeen pipeline descriptor
 			stepSeventeenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepEighteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepEighteenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepEighteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepEighteenPipelineDescriptor) noexcept {
 		
 			// Free step eighteen pipeline descriptor
 			stepEighteenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepNineteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepNineteenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepNineteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepNineteenPipelineDescriptor) noexcept {
 		
 			// Free step nineteen pipeline descriptor
 			stepNineteenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyPipelineDescriptor) noexcept {
 		
 			// Free step twenty pipeline descriptor
 			stepTwentyPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyOnePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyOnePipelineDescriptor) noexcept {
 		
 			// Free step twenty-one pipeline descriptor
 			stepTwentyOnePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyTwoPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyTwoPipelineDescriptor) noexcept {
 		
 			// Free step twenty-two pipeline descriptor
 			stepTwentyTwoPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyThreePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyThreePipelineDescriptor) noexcept {
 		
 			// Free step twenty-three pipeline descriptor
 			stepTwentyThreePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyFourPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyFourPipelineDescriptor) noexcept {
 		
 			// Free step twenty-four pipeline descriptor
 			stepTwentyFourPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyFivePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyFivePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyFivePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyFivePipelineDescriptor) noexcept {
 		
 			// Free step twenty-five pipeline descriptor
 			stepTwentyFivePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentySixPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentySixPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentySixPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentySixPipelineDescriptor) noexcept {
 		
 			// Free step twenty-six pipeline descriptor
 			stepTwentySixPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentySevenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentySevenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentySevenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentySevenPipelineDescriptor) noexcept {
 		
 			// Free step twenty-seven pipeline descriptor
 			stepTwentySevenPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyEightPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyEightPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyEightPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyEightPipelineDescriptor) noexcept {
 		
 			// Free step twenty-eight pipeline descriptor
 			stepTwentyEightPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyNinePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyNinePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwentyNinePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwentyNinePipelineDescriptor) noexcept {
 		
 			// Free step twenty-nine pipeline descriptor
 			stepTwentyNinePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyPipelineDescriptor) noexcept {
 		
 			// Free step thirty pipeline descriptor
 			stepThirtyPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyOnePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyOnePipelineDescriptor) noexcept {
 		
 			// Free step thirty-one pipeline descriptor
 			stepThirtyOnePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyTwoPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyTwoPipelineDescriptor) noexcept {
 		
 			// Free step thirty-two pipeline descriptor
 			stepThirtyTwoPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyThreePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyThreePipelineDescriptor) noexcept {
 		
 			// Free step thirty-three pipeline descriptor
 			stepThirtyThreePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyFourPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThirtyFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThirtyFourPipelineDescriptor) noexcept {
 		
 			// Free step thirty-four pipeline descriptor
 			stepThirtyFourPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerSourceBucketPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerSourceBucketPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerSourceBucketPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerSourceBucketPipelineDescriptor) noexcept {
 		
 			// Free clear number of edges per source bucket pipeline descriptor
 			clearNumberOfEdgesPerSourceBucketPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor) noexcept {
 		
 			// Free clear number of edges per destination bucket one pipeline descriptor
 			clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor) noexcept {
 		
 			// Free clear number of edges per destination bucket two pipeline descriptor
 			clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor) noexcept {
 		
 			// Free clear number of edges per destination bucket four pipeline descriptor
 			clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor) noexcept {
 		
 			// Free clear number of edges per destination bucket eight pipeline descriptor
 			clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor) noexcept {
 		
 			// Free clear number of edges per destination bucket sixteen pipeline descriptor
 			clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor->release();
@@ -2127,7 +2119,7 @@ using namespace std;
 		if(!stepOnePipelineDescriptor || !stepTwoPipelineDescriptor || !stepThreePipelineDescriptor || !stepFourPipelineDescriptor || !stepFivePipelineDescriptor || !stepSixPipelineDescriptor || !stepSevenPipelineDescriptor || !stepEightPipelineDescriptor || !stepNinePipelineDescriptor || !stepTenPipelineDescriptor || !stepElevenPipelineDescriptor || !stepTwelvePipelineDescriptor || !stepThirteenPipelineDescriptor || !stepFourteenPipelineDescriptor || !stepFifteenPipelineDescriptor || !stepSixteenPipelineDescriptor || !stepSeventeenPipelineDescriptor || !stepEighteenPipelineDescriptor || !stepNineteenPipelineDescriptor || !stepTwentyPipelineDescriptor || !stepTwentyOnePipelineDescriptor || !stepTwentyTwoPipelineDescriptor || !stepTwentyThreePipelineDescriptor || !stepTwentyFourPipelineDescriptor || !stepTwentyFivePipelineDescriptor || !stepTwentySixPipelineDescriptor || !stepTwentySevenPipelineDescriptor || !stepTwentyEightPipelineDescriptor || !stepTwentyNinePipelineDescriptor || !stepThirtyPipelineDescriptor || !stepThirtyOnePipelineDescriptor || !stepThirtyTwoPipelineDescriptor || !stepThirtyThreePipelineDescriptor || !stepThirtyFourPipelineDescriptor || !clearNumberOfEdgesPerSourceBucketPipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketOnePipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketTwoPipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketFourPipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketEightPipelineDescriptor || !clearNumberOfEdgesPerDestinationBucketSixteenPipelineDescriptor) {
 		
 			// Display message
-			cout << "Creating pipeline descriptors failed" << endl;
+			cout << "Creating pipeline descriptors failed." << endl;
 			
 			// Return false
 			return false;
@@ -2499,7 +2491,7 @@ using namespace std;
 		if(!stepOnePipeline || !stepTwoPipeline || !stepThreePipeline || !stepFourPipeline || !stepFivePipeline || !stepSixPipeline || !stepSevenPipeline || !stepEightPipeline || !stepNinePipeline || !stepTenPipeline || !stepElevenPipeline || !stepTwelvePipeline || !stepThirteenPipeline || !stepFourteenPipeline || !stepFifteenPipeline || !stepSixteenPipeline || !stepSeventeenPipeline || !stepEighteenPipeline || !stepNineteenPipeline || !stepTwentyPipeline || !stepTwentyOnePipeline || !stepTwentyTwoPipeline || !stepTwentyThreePipeline || !stepTwentyFourPipeline || !stepTwentyFivePipeline || !stepTwentySixPipeline || !stepTwentySevenPipeline || !stepTwentyEightPipeline || !stepTwentyNinePipeline || !stepThirtyPipeline || !stepThirtyOnePipeline || !stepThirtyTwoPipeline || !stepThirtyThreePipeline || !stepThirtyFourPipeline || !clearNumberOfEdgesPerSourceBucketPipeline || !clearNumberOfEdgesPerDestinationBucketOnePipeline || !clearNumberOfEdgesPerDestinationBucketTwoPipeline || !clearNumberOfEdgesPerDestinationBucketFourPipeline || !clearNumberOfEdgesPerDestinationBucketEightPipeline || !clearNumberOfEdgesPerDestinationBucketSixteenPipeline) {
 		
 			// Display message
-			cout << "Creating pipelines for the GPU failed" << endl;
+			cout << "Creating pipelines for the GPU failed." << endl;
 			
 			// Check if recreating pipeline one failed and an error exists
 			if(!stepOnePipeline && createPipelineOneError) {
@@ -3186,42 +3178,42 @@ using namespace std;
 		}
 		
 		// Check if allocating memory on the device failed
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> bucketsOne(device->newBuffer(static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * bucketsOneNumberOfBuckets * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *bucketsOne) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> bucketsOne(device->newBuffer(static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * bucketsOneNumberOfBuckets * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *bucketsOne) noexcept {
 		
 			// Free buckets one
 			bucketsOne->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> bucketsOneSecondPart(device->newBuffer(static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * (SLEAN_TRIMMING_NUMBER_OF_BUCKETS - bucketsOneNumberOfBuckets) * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *bucketsOneSecondPart) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> bucketsOneSecondPart(device->newBuffer(static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * (SLEAN_TRIMMING_NUMBER_OF_BUCKETS - bucketsOneNumberOfBuckets) * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *bucketsOneSecondPart) noexcept {
 		
 			// Free buckets one second part
 			bucketsOneSecondPart->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> bucketsTwo(device->newBuffer(static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *bucketsTwo) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> bucketsTwo(device->newBuffer(static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *bucketsTwo) noexcept {
 		
 			// Free buckets two
 			bucketsTwo->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> numberOfEdgesPerBucketOne(device->newBuffer(SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *numberOfEdgesPerBucketOne) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> numberOfEdgesPerBucketOne(device->newBuffer(SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *numberOfEdgesPerBucketOne) noexcept {
 		
 			// Free number of edges per bucket one
 			numberOfEdgesPerBucketOne->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> numberOfEdgesPerBucketTwo(device->newBuffer(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * SLEAN_TRIMMING_PARTS * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *numberOfEdgesPerBucketTwo) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> numberOfEdgesPerBucketTwo(device->newBuffer(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * SLEAN_TRIMMING_PARTS * sizeof(uint32_t), MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *numberOfEdgesPerBucketTwo) noexcept {
 		
 			// Free number of edges per bucket two
 			numberOfEdgesPerBucketTwo->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> edgesBitmapOne(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModeShared | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *edgesBitmapOne) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> edgesBitmapOne(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModeShared | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *edgesBitmapOne) noexcept {
 		
 			// Free edges bitmap one
 			edgesBitmapOne->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> edgesBitmapTwo(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModeShared | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *edgesBitmapTwo) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> edgesBitmapTwo(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModeShared | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *edgesBitmapTwo) noexcept {
 		
 			// Free edges bitmap two
 			edgesBitmapTwo->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> nodesBitmap(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *nodesBitmap) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> nodesBitmap(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *nodesBitmap) noexcept {
 		
 			// Free nodes bitmap
 			nodesBitmap->release();
@@ -3229,14 +3221,14 @@ using namespace std;
 		if(!bucketsOne || (bucketsOneNumberOfBuckets != SLEAN_TRIMMING_NUMBER_OF_BUCKETS && !bucketsOneSecondPart) || !bucketsTwo || !numberOfEdgesPerBucketOne || !numberOfEdgesPerBucketTwo || !edgesBitmapOne || !edgesBitmapTwo || !nodesBitmap) {
 		
 			// Display message
-			cout << "Allocating memory on the GPU failed" << endl;
+			cout << "Allocating memory on the GPU failed." << endl;
 			
 			// Return false
 			return false;
 		}
 		
 		// Check if creating command queue for the device failed
-		static const unique_ptr<MTL::CommandQueue, void(*)(MTL::CommandQueue *)> commandQueue(device->newCommandQueue(), [](MTL::CommandQueue *commandQueue) noexcept {
+		const unique_ptr<MTL::CommandQueue, void(*)(MTL::CommandQueue *)> commandQueue(device->newCommandQueue(), [](MTL::CommandQueue *commandQueue) noexcept {
 		
 			// Free command queue
 			commandQueue->release();
@@ -3244,7 +3236,7 @@ using namespace std;
 		if(!commandQueue) {
 		
 			// Display message
-			cout << "Creating command queue for the GPU failed" << endl;
+			cout << "Creating command queue for the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -3270,7 +3262,7 @@ using namespace std;
 		chrono::high_resolution_clock::time_point startTime = previousGraphProcessedTime;
 		
 		// Check if creating autorelease pool failed
-		static unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
+		unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
 		
 			// Free autorelease pool
 			autoreleasePool->release();
@@ -3278,7 +3270,7 @@ using namespace std;
 		if(!autoreleasePool) {
 		
 			// Display message
-			cout << "Creating autorelease pool failed" << endl;
+			cout << "Creating autorelease pool failed." << endl;
 			
 			// Return false
 			return false;
@@ -3289,7 +3281,7 @@ using namespace std;
 		if(!commandBuffer) {
 		
 			// Display message
-			cout << "Creating command queue's command buffer failed" << endl;
+			cout << "Creating command queue's command buffer failed." << endl;
 			
 			// Return false
 			return false;
@@ -3300,7 +3292,7 @@ using namespace std;
 		if(!computePassEncoder) {
 		
 			// Display message
-			cout << "Creating command buffer's compute pass encoder failed" << endl;
+			cout << "Creating command buffer's compute pass encoder failed." << endl;
 			
 			// Return false
 			return false;
@@ -3945,6 +3937,9 @@ using namespace std;
 		// Run the compute pass
 		commandBuffer->commit();
 		
+		// Wait until the compute pass has finished
+		commandBuffer->waitUntilCompleted();
+		
 		// Check if closing
 		if(closing) {
 			
@@ -3952,14 +3947,11 @@ using namespace std;
 			return true;
 		}
 		
-		// Wait until the compute pass has finished
-		commandBuffer->waitUntilCompleted();
-		
 		// Check if running compute pass failed
 		if(commandBuffer->error()) {
 		
 			// Display message
-			cout << "Running compute pass failed" << endl;
+			cout << "Running compute pass failed." << endl;
 			
 			// Return false
 			return false;
@@ -3983,7 +3975,7 @@ using namespace std;
 		if(!autoreleasePool) {
 		
 			// Display message
-			cout << "Creating autorelease pool failed" << endl;
+			cout << "Creating autorelease pool failed." << endl;
 			
 			// Return false
 			return false;
@@ -3994,7 +3986,7 @@ using namespace std;
 		if(!commandBuffer) {
 		
 			// Display message
-			cout << "Creating command queue's command buffer failed" << endl;
+			cout << "Creating command queue's command buffer failed." << endl;
 			
 			// Return false
 			return false;
@@ -4005,7 +3997,7 @@ using namespace std;
 		if(!computePassEncoder) {
 		
 			// Display message
-			cout << "Creating command buffer's compute pass encoder failed" << endl;
+			cout << "Creating command buffer's compute pass encoder failed." << endl;
 			
 			// Return false
 			return false;
@@ -4653,17 +4645,17 @@ using namespace std;
 		// Trimming finished
 		trimmingFinished(edgesBitmapOne->contents(), sipHashKeysOne, heightOne, idOne, nonceOne);
 		
+		// Wait until the compute pass has finished
+		commandBuffer->waitUntilCompleted();
+		
 		// While not closing
 		while(!closing) {
 		
-			// Wait until the compute pass has finished
-			commandBuffer->waitUntilCompleted();
-			
 			// Check if running compute pass failed
 			if(commandBuffer->error()) {
 			
 				// Display message
-				cout << "Running compute pass failed" << endl;
+				cout << "Running compute pass failed." << endl;
 				
 				// Return false
 				return false;
@@ -4687,7 +4679,7 @@ using namespace std;
 			if(!autoreleasePool) {
 			
 				// Display message
-				cout << "Creating autorelease pool failed" << endl;
+				cout << "Creating autorelease pool failed." << endl;
 				
 				// Return false
 				return false;
@@ -4698,7 +4690,7 @@ using namespace std;
 			if(!commandBuffer) {
 			
 				// Display message
-				cout << "Creating command queue's command buffer failed" << endl;
+				cout << "Creating command queue's command buffer failed." << endl;
 				
 				// Return false
 				return false;
@@ -4709,7 +4701,7 @@ using namespace std;
 			if(!computePassEncoder) {
 			
 				// Display message
-				cout << "Creating command buffer's compute pass encoder failed" << endl;
+				cout << "Creating command buffer's compute pass encoder failed." << endl;
 				
 				// Return false
 				return false;
@@ -5356,6 +5348,9 @@ using namespace std;
 			// Trimming finished
 			trimmingFinished(edgesBitmapTwo->contents(), sipHashKeysTwo, heightTwo, idTwo, nonceTwo);
 			
+			// Wait until the compute pass has finished
+			commandBuffer->waitUntilCompleted();
+			
 			// Check if closing
 			if(closing) {
 			
@@ -5363,14 +5358,11 @@ using namespace std;
 				return true;
 			}
 			
-			// Wait until the compute pass has finished
-			commandBuffer->waitUntilCompleted();
-			
 			// Check if running compute pass failed
 			if(commandBuffer->error()) {
 			
 				// Display message
-				cout << "Running compute pass failed" << endl;
+				cout << "Running compute pass failed." << endl;
 				
 				// Return false
 				return false;
@@ -5394,7 +5386,7 @@ using namespace std;
 			if(!autoreleasePool) {
 			
 				// Display message
-				cout << "Creating autorelease pool failed" << endl;
+				cout << "Creating autorelease pool failed." << endl;
 				
 				// Return false
 				return false;
@@ -5405,7 +5397,7 @@ using namespace std;
 			if(!commandBuffer) {
 			
 				// Display message
-				cout << "Creating command queue's command buffer failed" << endl;
+				cout << "Creating command queue's command buffer failed." << endl;
 				
 				// Return false
 				return false;
@@ -5416,7 +5408,7 @@ using namespace std;
 			if(!computePassEncoder) {
 			
 				// Display message
-				cout << "Creating command buffer's compute pass encoder failed" << endl;
+				cout << "Creating command buffer's compute pass encoder failed." << endl;
 				
 				// Return false
 				return false;
@@ -6062,6 +6054,9 @@ using namespace std;
 			
 			// Trimming finished
 			trimmingFinished(edgesBitmapOne->contents(), sipHashKeysOne, heightOne, idOne, nonceOne);
+			
+			// Wait until the compute pass has finished
+			commandBuffer->waitUntilCompleted();
 		}
 		
 		// Return true
@@ -6072,14 +6067,14 @@ using namespace std;
 #else
 
 	// Perform slean trimming loop
-	bool performSleanTrimmingLoop(const cl_context context, const unsigned int deviceIndex) noexcept {
+	bool performSleanTrimmingLoop(const cl_context context) noexcept {
 	
 		// Check if getting context's device failed
 		cl_device_id device;
 		if(clGetContextInfo(context, CL_CONTEXT_DEVICES, sizeof(device), &device, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Getting OpenCL context's GPU failed" << endl;
+			cout << "Getting OpenCL context's GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6092,53 +6087,17 @@ using namespace std;
 		if(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(maxMemoryAllocationSize), &maxMemoryAllocationSize, nullptr) != CL_SUCCESS || clGetDeviceInfo(device, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(workGroupMemorySize), &workGroupMemorySize, nullptr) != CL_SUCCESS || !maxWorkGroupSize) {
 		
 			// Display message
-			cout << "Getting GPU's info failed" << endl;
+			cout << "Getting GPU's info failed." << endl;
 			
 			// Return false
 			return false;
-		}
-		
-		// Check if device index is specified
-		if(deviceIndex != ALL_DEVICES) {
-		
-			// Display message
-			cout << "Using the GPU for slean trimming" << endl;
-		}
-		
-		// Otherwise
-		else {
-		
-			// Check if getting device's name size failed or its name exists
-			size_t nameSize;
-			if(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &nameSize) != CL_SUCCESS || !nameSize) {
-			
-				// Display message
-				cout << "Getting GPU's name failed" << endl;
-				
-				// Return false
-				return false;
-			}
-			
-			// Check if getting device's name failed
-			char name[nameSize];
-			if(clGetDeviceInfo(device, CL_DEVICE_NAME, nameSize, name, nullptr) != CL_SUCCESS) {
-			
-				// Display message
-				cout << "Getting GPU's name failed" << endl;
-				
-				// Return false
-				return false;
-			}
-			
-			// Display message
-			cout << "Using " << name << " for slean trimming" << endl;
 		}
 		
 		// Check if device's work group memory isn't fully utilized
 		if(bit_floor(workGroupMemorySize) / BYTES_IN_A_KILOBYTE > LOCAL_RAM_KILOBYTES) {
 		
 			// Display message
-			cout << "GPU's local RAM won't be fully utilized. Build this program with LOCAL_RAM_KILOBYTES=" << (bit_floor(workGroupMemorySize) / BYTES_IN_A_KILOBYTE) << " for potentially better performance" << endl;
+			cout << "GPU's local RAM won't be fully utilized. Build this program with LOCAL_RAM_KILOBYTES=" << (bit_floor(workGroupMemorySize) / BYTES_IN_A_KILOBYTE) << " for potentially better performance." << endl;
 		}
 		
 		// Try to allocate more than the max memory allocation size
@@ -6154,11 +6113,11 @@ using namespace std;
 			#include "./slean_trimming.cl"
 		);
 		const size_t sourceSize = strlen(source);
-		static unique_ptr<remove_pointer<cl_program>::type, decltype(&clReleaseProgram)> program(clCreateProgramWithSource(context, 1, &source, &sourceSize, nullptr), clReleaseProgram);
+		unique_ptr<remove_pointer<cl_program>::type, decltype(&clReleaseProgram)> program(clCreateProgramWithSource(context, 1, &source, &sourceSize, nullptr), clReleaseProgram);
 		if(!program) {
 		
 			// Display message
-			cout << "Creating program for the GPU failed" << endl;
+			cout << "Creating program for the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6174,7 +6133,7 @@ using namespace std;
 		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DSLEAN_TRIMMING_PARTS=" TO_STRING(SLEAN_TRIMMING_PARTS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(SLEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) + " -DNUMBER_OF_BITMAP_BYTES=" + to_string(SLEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES) + " -DNUMBER_OF_BUCKETS=" + to_string(SLEAN_TRIMMING_NUMBER_OF_BUCKETS) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING=" + to_string(SLEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING) + " -DINITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET=" + to_string(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING=" + to_string(SLEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING) + " -DNUMBER_OF_REMAINING_EDGES_BITMAP_BYTES=" + to_string(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES) + " -DINITIAL_BUCKETS_NUMBER_OF_BUCKETS=" + to_string(bucketsOneNumberOfBuckets) + " -DLOCAL_BUCKETS_SIZE=" + to_string(localBucketsSize)).c_str(), nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Building program for the GPU failed" << endl;
+			cout << "Building program for the GPU failed." << endl;
 			
 			// Check if getting log size for building the program was successful
 			size_t logSize;
@@ -6194,44 +6153,44 @@ using namespace std;
 		}
 		
 		// Check if creating kernels for the device failed
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepOneKernel(clCreateKernel(program.get(), "trimEdgesStepOne", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwoKernel(clCreateKernel(program.get(), "trimEdgesStepTwo", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThreeKernel(clCreateKernel(program.get(), "trimEdgesStepThree", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFourKernel(clCreateKernel(program.get(), "trimEdgesStepFour", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFiveKernel(clCreateKernel(program.get(), "trimEdgesStepFive", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSixKernel(clCreateKernel(program.get(), "trimEdgesStepSix", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSevenKernel(clCreateKernel(program.get(), "trimEdgesStepSeven", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepEightKernel(clCreateKernel(program.get(), "trimEdgesStepEight", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepNineKernel(clCreateKernel(program.get(), "trimEdgesStepNine", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTenKernel(clCreateKernel(program.get(), "trimEdgesStepTen", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepElevenKernel(clCreateKernel(program.get(), "trimEdgesStepEleven", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwelveKernel(clCreateKernel(program.get(), "trimEdgesStepTwelve", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirteenKernel(clCreateKernel(program.get(), "trimEdgesStepThirteen", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFourteenKernel(clCreateKernel(program.get(), "trimEdgesStepFourteen", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFifteenKernel(clCreateKernel(program.get(), "trimEdgesStepFifteen", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSixteenKernel(clCreateKernel(program.get(), "trimEdgesStepSixteen", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSeventeenKernel(clCreateKernel(program.get(), "trimEdgesStepSeventeen", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepEighteenKernel(clCreateKernel(program.get(), "trimEdgesStepEighteen", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepNineteenKernel(clCreateKernel(program.get(), "trimEdgesStepNineteen", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyKernel(clCreateKernel(program.get(), "trimEdgesStepTwenty", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyOneKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyOne", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyTwoKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyTwo", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyThreeKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyThree", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyFourKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyFour", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyFiveKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyFive", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentySixKernel(clCreateKernel(program.get(), "trimEdgesStepTwentySix", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentySevenKernel(clCreateKernel(program.get(), "trimEdgesStepTwentySeven", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyEightKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyEight", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyNineKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyNine", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyKernel(clCreateKernel(program.get(), "trimEdgesStepThirty", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyOneKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyOne", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyTwoKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyTwo", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyThreeKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyThree", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyFourKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyFour", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepOneKernel(clCreateKernel(program.get(), "trimEdgesStepOne", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwoKernel(clCreateKernel(program.get(), "trimEdgesStepTwo", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThreeKernel(clCreateKernel(program.get(), "trimEdgesStepThree", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFourKernel(clCreateKernel(program.get(), "trimEdgesStepFour", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFiveKernel(clCreateKernel(program.get(), "trimEdgesStepFive", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSixKernel(clCreateKernel(program.get(), "trimEdgesStepSix", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSevenKernel(clCreateKernel(program.get(), "trimEdgesStepSeven", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepEightKernel(clCreateKernel(program.get(), "trimEdgesStepEight", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepNineKernel(clCreateKernel(program.get(), "trimEdgesStepNine", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTenKernel(clCreateKernel(program.get(), "trimEdgesStepTen", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepElevenKernel(clCreateKernel(program.get(), "trimEdgesStepEleven", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwelveKernel(clCreateKernel(program.get(), "trimEdgesStepTwelve", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirteenKernel(clCreateKernel(program.get(), "trimEdgesStepThirteen", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFourteenKernel(clCreateKernel(program.get(), "trimEdgesStepFourteen", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFifteenKernel(clCreateKernel(program.get(), "trimEdgesStepFifteen", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSixteenKernel(clCreateKernel(program.get(), "trimEdgesStepSixteen", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepSeventeenKernel(clCreateKernel(program.get(), "trimEdgesStepSeventeen", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepEighteenKernel(clCreateKernel(program.get(), "trimEdgesStepEighteen", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepNineteenKernel(clCreateKernel(program.get(), "trimEdgesStepNineteen", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyKernel(clCreateKernel(program.get(), "trimEdgesStepTwenty", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyOneKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyOne", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyTwoKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyTwo", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyThreeKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyThree", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyFourKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyFour", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyFiveKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyFive", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentySixKernel(clCreateKernel(program.get(), "trimEdgesStepTwentySix", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentySevenKernel(clCreateKernel(program.get(), "trimEdgesStepTwentySeven", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyEightKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyEight", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwentyNineKernel(clCreateKernel(program.get(), "trimEdgesStepTwentyNine", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyKernel(clCreateKernel(program.get(), "trimEdgesStepThirty", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyOneKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyOne", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyTwoKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyTwo", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyThreeKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyThree", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThirtyFourKernel(clCreateKernel(program.get(), "trimEdgesStepThirtyFour", nullptr), clReleaseKernel);
 		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !stepFiveKernel || !stepSixKernel || !stepSevenKernel || !stepEightKernel || !stepNineKernel || !stepTenKernel || !stepElevenKernel || !stepTwelveKernel || !stepThirteenKernel || !stepFourteenKernel || !stepFifteenKernel || !stepSixteenKernel || !stepSeventeenKernel || !stepEighteenKernel || !stepNineteenKernel || !stepTwentyKernel || !stepTwentyOneKernel || !stepTwentyTwoKernel || !stepTwentyThreeKernel || !stepTwentyFourKernel || !stepTwentyFiveKernel || !stepTwentySixKernel || !stepTwentySevenKernel || !stepTwentyEightKernel || !stepTwentyNineKernel || !stepThirtyKernel || !stepThirtyOneKernel || !stepThirtyTwoKernel || !stepThirtyThreeKernel || !stepThirtyFourKernel) {
 		
 			// Display message
-			cout << "Creating kernels for the GPU failed" << endl;
+			cout << "Creating kernels for the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6490,7 +6449,7 @@ using namespace std;
 		if(!program) {
 		
 			// Display message
-			cout << "Creating program for the GPU failed" << endl;
+			cout << "Creating program for the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6500,7 +6459,7 @@ using namespace std;
 		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DSLEAN_TRIMMING_PARTS=" TO_STRING(SLEAN_TRIMMING_PARTS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(SLEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) + " -DNUMBER_OF_BITMAP_BYTES=" + to_string(SLEAN_TRIMMING_NUMBER_OF_BITMAP_BYTES) + " -DNUMBER_OF_BUCKETS=" + to_string(SLEAN_TRIMMING_NUMBER_OF_BUCKETS) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING=" + to_string(SLEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_BUCKET_SORTING) + " -DINITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET=" + to_string(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET) + " -DAFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET=" + to_string(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) + " -DNUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING=" + to_string(SLEAN_TRIMMING_NUMBER_OF_LEAST_SIGNIFICANT_BITS_IGNORED_DURING_REMAINING_EDGES_BUCKET_SORTING) + " -DNUMBER_OF_REMAINING_EDGES_BITMAP_BYTES=" + to_string(SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES) + " -DINITIAL_BUCKETS_NUMBER_OF_BUCKETS=" + to_string(bucketsOneNumberOfBuckets) + " -DLOCAL_BUCKETS_SIZE=" + to_string(localBucketsSize) + " -DTRIM_EDGES_STEP_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[0]) + " -DTRIM_EDGES_STEP_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[1]) + " -DTRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[2]) + " -DTRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[3]) + " -DTRIM_EDGES_STEP_FIVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[4]) + " -DTRIM_EDGES_STEP_SIX_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[5]) + " -DTRIM_EDGES_STEP_SEVEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[6]) + " -DTRIM_EDGES_STEP_EIGHT_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[7]) + " -DTRIM_EDGES_STEP_NINE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[8]) + " -DTRIM_EDGES_STEP_TEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[9]) + " -DTRIM_EDGES_STEP_ELEVEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[10]) + " -DTRIM_EDGES_STEP_TWELVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[11]) + " -DTRIM_EDGES_STEP_THIRTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[12]) + " -DTRIM_EDGES_STEP_FOURTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[13]) + " -DTRIM_EDGES_STEP_FIFTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[14]) + " -DTRIM_EDGES_STEP_SIXTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[15]) + " -DTRIM_EDGES_STEP_SEVENTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[16]) + " -DTRIM_EDGES_STEP_EIGHTEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[17]) + " -DTRIM_EDGES_STEP_NINETEEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[18]) + " -DTRIM_EDGES_STEP_TWENTY_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[19]) + " -DTRIM_EDGES_STEP_TWENTY_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[20]) + " -DTRIM_EDGES_STEP_TWENTY_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[21]) + " -DTRIM_EDGES_STEP_TWENTY_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[22]) + " -DTRIM_EDGES_STEP_TWENTY_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[23]) + " -DTRIM_EDGES_STEP_TWENTY_FIVE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[24]) + " -DTRIM_EDGES_STEP_TWENTY_SIX_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[25]) + " -DTRIM_EDGES_STEP_TWENTY_SEVEN_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[26]) + " -DTRIM_EDGES_STEP_TWENTY_EIGHT_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[27]) + " -DTRIM_EDGES_STEP_TWENTY_NINE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[28]) + " -DTRIM_EDGES_STEP_THIRTY_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[29]) + " -DTRIM_EDGES_STEP_THIRTY_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[30]) + " -DTRIM_EDGES_STEP_THIRTY_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[31]) + " -DTRIM_EDGES_STEP_THIRTY_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[32]) + " -DTRIM_EDGES_STEP_THIRTY_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[33])).c_str(), nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Building program for the GPU failed" << endl;
+			cout << "Building program for the GPU failed." << endl;
 			
 			// Check if getting log size for building the program was successful
 			size_t logSize;
@@ -6557,43 +6516,80 @@ using namespace std;
 		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !stepFiveKernel || !stepSixKernel || !stepSevenKernel || !stepEightKernel || !stepNineKernel || !stepTenKernel || !stepElevenKernel || !stepTwelveKernel || !stepThirteenKernel || !stepFourteenKernel || !stepFifteenKernel || !stepSixteenKernel || !stepSeventeenKernel || !stepEighteenKernel || !stepNineteenKernel || !stepTwentyKernel || !stepTwentyOneKernel || !stepTwentyTwoKernel || !stepTwentyThreeKernel || !stepTwentyFourKernel || !stepTwentyFiveKernel || !stepTwentySixKernel || !stepTwentySevenKernel || !stepTwentyEightKernel || !stepTwentyNineKernel || !stepThirtyKernel || !stepThirtyOneKernel || !stepThirtyTwoKernel || !stepThirtyThreeKernel || !stepThirtyFourKernel) {
 		
 			// Display message
-			cout << "Creating kernels for the GPU failed" << endl;
+			cout << "Creating kernels for the GPU failed." << endl;
 			
 			// Return false
 			return false;
 		}
 		
 		// Check if allocating memory on the device failed
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * bucketsOneNumberOfBuckets * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsOneSecondPart(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * (SLEAN_TRIMMING_NUMBER_OF_BUCKETS - bucketsOneNumberOfBuckets) * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * SLEAN_TRIMMING_PARTS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> nodesBitmap(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
+		const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * bucketsOneNumberOfBuckets * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
+		const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsOneSecondPart(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(SLEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * (SLEAN_TRIMMING_NUMBER_OF_BUCKETS - bucketsOneNumberOfBuckets) * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
+		const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> bucketsTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, static_cast<uint64_t>(SLEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET) * SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
+		const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
+		const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> numberOfEdgesPerBucketTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * SLEAN_TRIMMING_PARTS * sizeof(cl_uint), nullptr, nullptr), clReleaseMemObject);
+		static unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapOne(nullptr, clReleaseMemObject);
+		edgesBitmapOne = unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)>(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
+		static unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapTwo(nullptr, clReleaseMemObject);
+		edgesBitmapTwo = unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)>(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
+		const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> nodesBitmap(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
 		if(!bucketsOne || (bucketsOneNumberOfBuckets != SLEAN_TRIMMING_NUMBER_OF_BUCKETS && !bucketsOneSecondPart) || !bucketsTwo || !numberOfEdgesPerBucketOne || !numberOfEdgesPerBucketTwo || !edgesBitmapOne || !edgesBitmapTwo || !nodesBitmap) {
 		
 			// Display message
-			cout << "Allocating memory on the GPU failed" << endl;
+			cout << "Allocating memory on the GPU failed." << endl;
+			
+			// Free edges bitmap one and two
+			edgesBitmapOne.reset();
+			edgesBitmapTwo.reset();
 			
 			// Return false
 			return false;
 		}
 		
 		// Check if creating command queue for the device failed
-		static const unique_ptr<remove_pointer<cl_command_queue>::type, void(*)(cl_command_queue)> commandQueue(clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, nullptr), [](cl_command_queue commandQueue) noexcept {
+		static uint64_t *resultOne = nullptr;
+		static uint64_t *resultTwo = nullptr;
+		const unique_ptr<remove_pointer<cl_command_queue>::type, void(*)(cl_command_queue)> commandQueue(clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, nullptr), [](cl_command_queue commandQueue) noexcept {
 		
+			// Wait for all commands in the queue to finish
+			clFinish(commandQueue);
+			
+			// Check if result one exists
+			if(resultOne) {
+			
+				// Queue unmapping result one
+				clEnqueueUnmapMemObject(commandQueue, edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr);
+			}
+			
+			// Check if result two exists
+			if(resultTwo) {
+			
+				// Queue unmapping result two
+				clEnqueueUnmapMemObject(commandQueue, edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), 0, nullptr, nullptr);
+			}
+			
 			// Wait for all commands in the queue to finish
 			clFinish(commandQueue);
 			
 			// Free command queue
 			clReleaseCommandQueue(commandQueue);
+			
+			// Reset result one and two
+			resultOne = nullptr;
+			resultTwo = nullptr;
+			
+			// Free edges bitmap one and two
+			edgesBitmapOne.reset();
+			edgesBitmapTwo.reset();
 		});
 		if(!commandQueue) {
 		
 			// Display message
-			cout << "Creating command queue for the GPU failed" << endl;
+			cout << "Creating command queue for the GPU failed." << endl;
+			
+			// Free edges bitmap one and two
+			edgesBitmapOne.reset();
+			edgesBitmapTwo.reset();
 			
 			// Return false
 			return false;
@@ -6603,7 +6599,7 @@ using namespace std;
 		if(clSetKernelArg(stepOneKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepEightKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepEightKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepEightKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepNineKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTenKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwelveKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFifteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepFifteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepFifteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSixteenKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSeventeenKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepEighteenKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyOneKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyOneKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyOneKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyThreeKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFiveKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFiveKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFiveKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFiveKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentySevenKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyNineKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyNineKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyNineKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyNineKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 2, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 3, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyOneKernel.get(), 4, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 1, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 2, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyThreeKernel.get(), 0, sizeof(bucketsOne.get()), &unmove(bucketsOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyThreeKernel.get(), 1, sizeof(numberOfEdgesPerBucketOne.get()), &unmove(numberOfEdgesPerBucketOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyThreeKernel.get(), 2, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyThreeKernel.get(), 3, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 0, sizeof(bucketsTwo.get()), &unmove(bucketsTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 1, sizeof(numberOfEdgesPerBucketTwo.get()), &unmove(numberOfEdgesPerBucketTwo.get())) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6616,7 +6612,7 @@ using namespace std;
 			if(clSetKernelArg(stepOneKernel.get(), 4, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 4, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 4, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 6, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS || clSetKernelArg(stepSixKernel.get(), 7, sizeof(bucketsOneSecondPart.get()), &unmove(bucketsOneSecondPart.get())) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6630,7 +6626,7 @@ using namespace std;
 			if(clSetKernelArg(stepSixteenKernel.get(), 5, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyTwoKernel.get(), 4, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6644,7 +6640,7 @@ using namespace std;
 			if(clSetKernelArg(stepTwentyFiveKernel.get(), 4, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6658,7 +6654,7 @@ using namespace std;
 			if(clSetKernelArg(stepTwentyNineKernel.get(), 4, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6682,11 +6678,11 @@ using namespace std;
 		previousGraphProcessedTime = chrono::high_resolution_clock::now();
 		
 		// Check if queuing clearing number of edges per bucket one on the device failed
-		static Event firstCommandEvent;
+		Event firstCommandEvent;
 		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Preparing program's arguments on the GPU failed" << endl;
+			cout << "Preparing program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6703,7 +6699,7 @@ using namespace std;
 		if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6713,7 +6709,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6723,7 +6719,7 @@ using namespace std;
 		if(clSetKernelArg(stepTwoKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6733,7 +6729,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6746,7 +6742,7 @@ using namespace std;
 			if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6760,7 +6756,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6770,7 +6766,7 @@ using namespace std;
 			if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6780,7 +6776,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6793,7 +6789,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -6807,7 +6803,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -6817,7 +6813,7 @@ using namespace std;
 				if(clSetKernelArg(stepFourKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -6827,7 +6823,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -6839,7 +6835,7 @@ using namespace std;
 		if(clSetKernelArg(stepFiveKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6849,7 +6845,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6859,7 +6855,7 @@ using namespace std;
 		if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -6872,7 +6868,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6882,7 +6878,7 @@ using namespace std;
 			if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6892,7 +6888,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6902,7 +6898,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6912,7 +6908,7 @@ using namespace std;
 			if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6922,7 +6918,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6932,7 +6928,7 @@ using namespace std;
 			if(clSetKernelArg(stepFiveKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6942,7 +6938,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6956,7 +6952,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6966,7 +6962,7 @@ using namespace std;
 			if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6976,7 +6972,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6986,7 +6982,7 @@ using namespace std;
 			if(clSetKernelArg(stepEightKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -6996,7 +6992,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[7], &workItemsPerWorkGroup[7], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -7009,7 +7005,7 @@ using namespace std;
 				if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7023,7 +7019,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7033,7 +7029,7 @@ using namespace std;
 				if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7043,7 +7039,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7056,7 +7052,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[8], &workItemsPerWorkGroup[8], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7070,7 +7066,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7080,7 +7076,7 @@ using namespace std;
 					if(clSetKernelArg(stepTenKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7090,7 +7086,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepTenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[9], &workItemsPerWorkGroup[9], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7102,7 +7098,7 @@ using namespace std;
 			if(clSetKernelArg(stepElevenKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -7112,7 +7108,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepElevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[10], &workItemsPerWorkGroup[10], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -7122,7 +7118,7 @@ using namespace std;
 			if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -7135,7 +7131,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7145,7 +7141,7 @@ using namespace std;
 				if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7155,7 +7151,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7165,7 +7161,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7175,7 +7171,7 @@ using namespace std;
 				if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7185,7 +7181,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwelveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[11], &workItemsPerWorkGroup[11], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7195,7 +7191,7 @@ using namespace std;
 				if(clSetKernelArg(stepElevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7205,7 +7201,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepElevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[10], &workItemsPerWorkGroup[10], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7219,7 +7215,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7229,7 +7225,7 @@ using namespace std;
 				if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7242,7 +7238,7 @@ using namespace std;
 					if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7253,7 +7249,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7266,7 +7262,7 @@ using namespace std;
 					if(clSetKernelArg(stepFourteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7276,7 +7272,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7286,7 +7282,7 @@ using namespace std;
 					if(clSetKernelArg(stepFifteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7299,7 +7295,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -7309,7 +7305,7 @@ using namespace std;
 						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -7319,7 +7315,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -7332,7 +7328,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7346,7 +7342,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7356,7 +7352,7 @@ using namespace std;
 							if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7366,7 +7362,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7382,7 +7378,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7392,7 +7388,7 @@ using namespace std;
 					if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7402,7 +7398,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7413,7 +7409,7 @@ using namespace std;
 				if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7426,7 +7422,7 @@ using namespace std;
 					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7437,7 +7433,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -7450,7 +7446,7 @@ using namespace std;
 					if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7464,7 +7460,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7474,7 +7470,7 @@ using namespace std;
 					if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7484,7 +7480,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7494,7 +7490,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7504,7 +7500,7 @@ using namespace std;
 					if(clSetKernelArg(stepEighteenKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7514,7 +7510,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepEighteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[17], &workItemsPerWorkGroup[17], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7524,7 +7520,7 @@ using namespace std;
 					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7534,7 +7530,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7548,7 +7544,7 @@ using namespace std;
 					if(clSetKernelArg(stepNineteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -7561,7 +7557,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -7571,7 +7567,7 @@ using namespace std;
 						if(clSetKernelArg(stepNineteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -7584,7 +7580,7 @@ using namespace std;
 							if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7595,7 +7591,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -7608,7 +7604,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7621,7 +7617,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -7631,7 +7627,7 @@ using namespace std;
 								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -7641,7 +7637,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -7654,7 +7650,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -7668,7 +7664,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -7678,7 +7674,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -7694,7 +7690,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7704,7 +7700,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7718,7 +7714,7 @@ using namespace std;
 							if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7729,7 +7725,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -7742,7 +7738,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7752,7 +7748,7 @@ using namespace std;
 							if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7762,7 +7758,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7772,7 +7768,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7782,7 +7778,7 @@ using namespace std;
 							if(clSetKernelArg(stepTwentyThreeKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7792,7 +7788,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[22], &workItemsPerWorkGroup[22], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7802,7 +7798,7 @@ using namespace std;
 							if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7812,7 +7808,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7827,7 +7823,7 @@ using namespace std;
 						if(clSetKernelArg(stepTwentyFourKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -7840,7 +7836,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7850,7 +7846,7 @@ using namespace std;
 							if(clSetKernelArg(stepTwentyFourKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7863,7 +7859,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -7874,7 +7870,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -7887,7 +7883,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -7900,7 +7896,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -7910,7 +7906,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -7920,7 +7916,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -7933,7 +7929,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -7947,7 +7943,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -7957,7 +7953,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -7973,7 +7969,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -7983,7 +7979,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -7997,7 +7993,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 4 - 1))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8008,7 +8004,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -8021,7 +8017,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8031,7 +8027,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8041,7 +8037,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8051,7 +8047,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8061,7 +8057,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentySevenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8071,7 +8067,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[26], &workItemsPerWorkGroup[26], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8081,7 +8077,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8091,7 +8087,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8106,7 +8102,7 @@ using namespace std;
 							if(clSetKernelArg(stepTwentyEightKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -8119,7 +8115,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8129,7 +8125,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyEightKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8142,7 +8138,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8153,7 +8149,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8166,7 +8162,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8179,7 +8175,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -8189,7 +8185,7 @@ using namespace std;
 										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -8199,7 +8195,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -8212,7 +8208,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -8226,7 +8222,7 @@ using namespace std;
 											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Preparing program's arguments on the GPU failed" << endl;
+												cout << "Preparing program's arguments on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -8236,7 +8232,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -8252,7 +8248,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8262,7 +8258,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8276,7 +8272,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 8 - 1))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8287,7 +8283,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8300,7 +8296,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8310,7 +8306,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8320,7 +8316,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8330,7 +8326,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8340,7 +8336,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyOneKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8350,7 +8346,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[30], &workItemsPerWorkGroup[30], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8360,7 +8356,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8370,7 +8366,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8385,7 +8381,7 @@ using namespace std;
 								if(clSetKernelArg(stepThirtyTwoKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -8398,7 +8394,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8408,7 +8404,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyTwoKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8418,7 +8414,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[31], &workItemsPerWorkGroup[31], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8428,7 +8424,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8438,7 +8434,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[32], &workItemsPerWorkGroup[32], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8448,7 +8444,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[33], &workItemsPerWorkGroup[33], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -8462,27 +8458,16 @@ using namespace std;
 		}
 		
 		// Check if queuing map result failed
-		static Event mapEvent;
-		static uint64_t *resultOne = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapOne.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
+		Event mapEvent;
+		resultOne = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapOne.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
 		if(!resultOne) {
 		
 			// Display message
-			cout << "Getting result from the GPU failed" << endl;
+			cout << "Getting result from the GPU failed." << endl;
 			
 			// Return false
 			return false;
 		}
-		
-		// Automatically unmap result one when done
-		static const unique_ptr<uint64_t, void(*)(uint64_t *)> resultOneUniquePointer(resultOne, [](__attribute__((unused)) uint64_t *unused) noexcept {
-		
-			// Check if result one exists
-			if(resultOne) {
-			
-				// Queue unmapping result one
-				clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), nullptr);
-			}
-		});
 		
 		// Check if closing
 		if(closing) {
@@ -8495,7 +8480,7 @@ using namespace std;
 		if(clWaitForEvents(1, mapEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Getting result from the GPU failed" << endl;
+			cout << "Getting result from the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -8507,7 +8492,7 @@ using namespace std;
 		if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Getting GPU trimming time failed" << endl;
+			cout << "Getting GPU trimming time failed." << endl;
 			
 			// Return false
 			return false;
@@ -8521,7 +8506,7 @@ using namespace std;
 		if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Preparing program's arguments on the GPU failed" << endl;
+			cout << "Preparing program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -8538,7 +8523,7 @@ using namespace std;
 		if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -8548,7 +8533,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -8558,7 +8543,7 @@ using namespace std;
 		if(clSetKernelArg(stepTwoKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -8568,7 +8553,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -8581,7 +8566,7 @@ using namespace std;
 			if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8595,7 +8580,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8605,7 +8590,7 @@ using namespace std;
 			if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8615,7 +8600,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8628,7 +8613,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8642,7 +8627,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8652,7 +8637,7 @@ using namespace std;
 				if(clSetKernelArg(stepFourKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8662,7 +8647,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8674,7 +8659,7 @@ using namespace std;
 		if(clSetKernelArg(stepFiveKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -8684,7 +8669,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -8694,7 +8679,7 @@ using namespace std;
 		if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -8707,7 +8692,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8717,7 +8702,7 @@ using namespace std;
 			if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8727,7 +8712,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8737,7 +8722,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8747,7 +8732,7 @@ using namespace std;
 			if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8757,7 +8742,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8767,7 +8752,7 @@ using namespace std;
 			if(clSetKernelArg(stepFiveKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8777,7 +8762,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8791,7 +8776,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8801,7 +8786,7 @@ using namespace std;
 			if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8811,7 +8796,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8821,7 +8806,7 @@ using namespace std;
 			if(clSetKernelArg(stepEightKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8831,7 +8816,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[7], &workItemsPerWorkGroup[7], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8844,7 +8829,7 @@ using namespace std;
 				if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8858,7 +8843,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8868,7 +8853,7 @@ using namespace std;
 				if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8878,7 +8863,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8891,7 +8876,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[8], &workItemsPerWorkGroup[8], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -8905,7 +8890,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -8915,7 +8900,7 @@ using namespace std;
 					if(clSetKernelArg(stepTenKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -8925,7 +8910,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepTenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[9], &workItemsPerWorkGroup[9], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -8937,7 +8922,7 @@ using namespace std;
 			if(clSetKernelArg(stepElevenKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8947,7 +8932,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepElevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[10], &workItemsPerWorkGroup[10], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8957,7 +8942,7 @@ using namespace std;
 			if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -8970,7 +8955,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8980,7 +8965,7 @@ using namespace std;
 				if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -8990,7 +8975,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9000,7 +8985,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9010,7 +8995,7 @@ using namespace std;
 				if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9020,7 +9005,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwelveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[11], &workItemsPerWorkGroup[11], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9030,7 +9015,7 @@ using namespace std;
 				if(clSetKernelArg(stepElevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9040,7 +9025,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepElevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[10], &workItemsPerWorkGroup[10], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9054,7 +9039,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9064,7 +9049,7 @@ using namespace std;
 				if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9077,7 +9062,7 @@ using namespace std;
 					if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9088,7 +9073,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9101,7 +9086,7 @@ using namespace std;
 					if(clSetKernelArg(stepFourteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9111,7 +9096,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9124,7 +9109,7 @@ using namespace std;
 						if(clSetKernelArg(stepFifteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -9138,7 +9123,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -9148,7 +9133,7 @@ using namespace std;
 						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -9158,7 +9143,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -9171,7 +9156,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9185,7 +9170,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9195,7 +9180,7 @@ using namespace std;
 							if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9205,7 +9190,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9221,7 +9206,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9231,7 +9216,7 @@ using namespace std;
 					if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9241,7 +9226,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9252,7 +9237,7 @@ using namespace std;
 				if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9265,7 +9250,7 @@ using namespace std;
 					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9276,7 +9261,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -9289,7 +9274,7 @@ using namespace std;
 					if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9303,7 +9288,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9313,7 +9298,7 @@ using namespace std;
 					if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9323,7 +9308,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9333,7 +9318,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9343,7 +9328,7 @@ using namespace std;
 					if(clSetKernelArg(stepEighteenKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9353,7 +9338,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepEighteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[17], &workItemsPerWorkGroup[17], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9363,7 +9348,7 @@ using namespace std;
 					if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9373,7 +9358,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9387,7 +9372,7 @@ using namespace std;
 					if(clSetKernelArg(stepNineteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -9400,7 +9385,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -9410,7 +9395,7 @@ using namespace std;
 						if(clSetKernelArg(stepNineteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -9423,7 +9408,7 @@ using namespace std;
 							if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9434,7 +9419,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -9447,7 +9432,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9460,7 +9445,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9470,7 +9455,7 @@ using namespace std;
 								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9480,7 +9465,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9493,7 +9478,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -9507,7 +9492,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -9517,7 +9502,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -9533,7 +9518,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9543,7 +9528,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9557,7 +9542,7 @@ using namespace std;
 							if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9568,7 +9553,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -9581,7 +9566,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9591,7 +9576,7 @@ using namespace std;
 							if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9601,7 +9586,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9611,7 +9596,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9621,7 +9606,7 @@ using namespace std;
 							if(clSetKernelArg(stepTwentyThreeKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9631,7 +9616,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[22], &workItemsPerWorkGroup[22], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9641,7 +9626,7 @@ using namespace std;
 							if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9651,7 +9636,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9666,7 +9651,7 @@ using namespace std;
 						if(clSetKernelArg(stepTwentyFourKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -9679,7 +9664,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9689,7 +9674,7 @@ using namespace std;
 							if(clSetKernelArg(stepTwentyFourKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9702,7 +9687,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9713,7 +9698,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9726,7 +9711,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9739,7 +9724,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -9749,7 +9734,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -9759,7 +9744,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -9772,7 +9757,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -9786,7 +9771,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -9796,7 +9781,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -9812,7 +9797,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9822,7 +9807,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9836,7 +9821,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 4 - 1))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9847,7 +9832,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9860,7 +9845,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9870,7 +9855,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9880,7 +9865,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9890,7 +9875,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9900,7 +9885,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentySevenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9910,7 +9895,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[26], &workItemsPerWorkGroup[26], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9920,7 +9905,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9930,7 +9915,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9945,7 +9930,7 @@ using namespace std;
 							if(clSetKernelArg(stepTwentyEightKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -9958,7 +9943,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9968,7 +9953,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyEightKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -9981,7 +9966,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -9992,7 +9977,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -10005,7 +9990,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10018,7 +10003,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -10028,7 +10013,7 @@ using namespace std;
 										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -10038,7 +10023,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -10051,7 +10036,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -10065,7 +10050,7 @@ using namespace std;
 											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Preparing program's arguments on the GPU failed" << endl;
+												cout << "Preparing program's arguments on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -10075,7 +10060,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -10091,7 +10076,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10101,7 +10086,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10115,7 +10100,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 8 - 1))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10126,7 +10111,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -10139,7 +10124,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10149,7 +10134,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10159,7 +10144,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10169,7 +10154,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10179,7 +10164,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyOneKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10189,7 +10174,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[30], &workItemsPerWorkGroup[30], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10199,7 +10184,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10209,7 +10194,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10224,7 +10209,7 @@ using namespace std;
 								if(clSetKernelArg(stepThirtyTwoKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -10237,7 +10222,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10247,7 +10232,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyTwoKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10257,7 +10242,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[31], &workItemsPerWorkGroup[31], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10267,7 +10252,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10277,7 +10262,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[32], &workItemsPerWorkGroup[32], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10287,7 +10272,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[33], &workItemsPerWorkGroup[33], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -10302,26 +10287,15 @@ using namespace std;
 		
 		// Check if queuing map result failed
 		mapEvent.free();
-		static uint64_t *resultTwo = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapTwo.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
+		resultTwo = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapTwo.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
 		if(!resultTwo) {
 		
 			// Display message
-			cout << "Getting result from the GPU failed" << endl;
+			cout << "Getting result from the GPU failed." << endl;
 			
 			// Return false
 			return false;
 		}
-		
-		// Automatically unmap result two when done
-		static const unique_ptr<uint64_t, void(*)(uint64_t *)> resultTwoUniquePointer(resultTwo, [](__attribute__((unused)) uint64_t *unused) noexcept {
-		
-			// Check if result two exists
-			if(resultTwo) {
-			
-				// Queue unmapping result two
-				clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), nullptr);
-			}
-		});
 		
 		// Trimming finished
 		trimmingFinished(resultOne, sipHashKeysOne, heightOne, idOne, nonceOne);
@@ -10330,7 +10304,7 @@ using namespace std;
 		if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Getting result from the GPU failed" << endl;
+			cout << "Getting result from the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -10346,7 +10320,7 @@ using namespace std;
 			if(clWaitForEvents(1, mapEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -10356,7 +10330,7 @@ using namespace std;
 			if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting GPU trimming time failed" << endl;
+				cout << "Getting GPU trimming time failed." << endl;
 				
 				// Return false
 				return false;
@@ -10370,7 +10344,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -10386,7 +10360,7 @@ using namespace std;
 			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -10396,7 +10370,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -10406,7 +10380,7 @@ using namespace std;
 			if(clSetKernelArg(stepTwoKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -10416,7 +10390,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -10429,7 +10403,7 @@ using namespace std;
 				if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10443,7 +10417,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10453,7 +10427,7 @@ using namespace std;
 				if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10463,7 +10437,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10476,7 +10450,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10490,7 +10464,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10500,7 +10474,7 @@ using namespace std;
 					if(clSetKernelArg(stepFourKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10510,7 +10484,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10522,7 +10496,7 @@ using namespace std;
 			if(clSetKernelArg(stepFiveKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -10532,7 +10506,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -10542,7 +10516,7 @@ using namespace std;
 			if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -10555,7 +10529,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10565,7 +10539,7 @@ using namespace std;
 				if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10575,7 +10549,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10585,7 +10559,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10595,7 +10569,7 @@ using namespace std;
 				if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10605,7 +10579,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10615,7 +10589,7 @@ using namespace std;
 				if(clSetKernelArg(stepFiveKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10625,7 +10599,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10639,7 +10613,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10649,7 +10623,7 @@ using namespace std;
 				if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10659,7 +10633,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10669,7 +10643,7 @@ using namespace std;
 				if(clSetKernelArg(stepEightKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10679,7 +10653,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[7], &workItemsPerWorkGroup[7], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10692,7 +10666,7 @@ using namespace std;
 					if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10706,7 +10680,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10716,7 +10690,7 @@ using namespace std;
 					if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10726,7 +10700,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10739,7 +10713,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[8], &workItemsPerWorkGroup[8], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -10753,7 +10727,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -10763,7 +10737,7 @@ using namespace std;
 						if(clSetKernelArg(stepTenKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -10773,7 +10747,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepTenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[9], &workItemsPerWorkGroup[9], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -10785,7 +10759,7 @@ using namespace std;
 				if(clSetKernelArg(stepElevenKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10795,7 +10769,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepElevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[10], &workItemsPerWorkGroup[10], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10805,7 +10779,7 @@ using namespace std;
 				if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -10818,7 +10792,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10828,7 +10802,7 @@ using namespace std;
 					if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10838,7 +10812,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10848,7 +10822,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10858,7 +10832,7 @@ using namespace std;
 					if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10868,7 +10842,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwelveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[11], &workItemsPerWorkGroup[11], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10878,7 +10852,7 @@ using namespace std;
 					if(clSetKernelArg(stepElevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10888,7 +10862,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepElevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[10], &workItemsPerWorkGroup[10], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10902,7 +10876,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10912,7 +10886,7 @@ using namespace std;
 					if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10925,7 +10899,7 @@ using namespace std;
 						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -10936,7 +10910,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -10949,7 +10923,7 @@ using namespace std;
 						if(clSetKernelArg(stepFourteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -10959,7 +10933,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -10972,7 +10946,7 @@ using namespace std;
 							if(clSetKernelArg(stepFifteenKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -10986,7 +10960,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -10996,7 +10970,7 @@ using namespace std;
 							if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -11006,7 +10980,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -11019,7 +10993,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11033,7 +11007,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11043,7 +11017,7 @@ using namespace std;
 								if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11053,7 +11027,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11069,7 +11043,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11079,7 +11053,7 @@ using namespace std;
 						if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11089,7 +11063,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11100,7 +11074,7 @@ using namespace std;
 					if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -11113,7 +11087,7 @@ using namespace std;
 						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11124,7 +11098,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -11137,7 +11111,7 @@ using namespace std;
 						if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11151,7 +11125,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11161,7 +11135,7 @@ using namespace std;
 						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11171,7 +11145,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11181,7 +11155,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11191,7 +11165,7 @@ using namespace std;
 						if(clSetKernelArg(stepEighteenKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11201,7 +11175,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepEighteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[17], &workItemsPerWorkGroup[17], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11211,7 +11185,7 @@ using namespace std;
 						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11221,7 +11195,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11235,7 +11209,7 @@ using namespace std;
 						if(clSetKernelArg(stepNineteenKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -11248,7 +11222,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -11258,7 +11232,7 @@ using namespace std;
 							if(clSetKernelArg(stepNineteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -11271,7 +11245,7 @@ using namespace std;
 								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11282,7 +11256,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -11295,7 +11269,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11308,7 +11282,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11318,7 +11292,7 @@ using namespace std;
 									if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11328,7 +11302,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11341,7 +11315,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11355,7 +11329,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11365,7 +11339,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11381,7 +11355,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11391,7 +11365,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11405,7 +11379,7 @@ using namespace std;
 								if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11416,7 +11390,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -11429,7 +11403,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11439,7 +11413,7 @@ using namespace std;
 								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11449,7 +11423,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11459,7 +11433,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11469,7 +11443,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyThreeKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11479,7 +11453,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[22], &workItemsPerWorkGroup[22], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11489,7 +11463,7 @@ using namespace std;
 								if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11499,7 +11473,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11514,7 +11488,7 @@ using namespace std;
 							if(clSetKernelArg(stepTwentyFourKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -11527,7 +11501,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11537,7 +11511,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyFourKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11550,7 +11524,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11561,7 +11535,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11574,7 +11548,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11587,7 +11561,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11597,7 +11571,7 @@ using namespace std;
 										if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11607,7 +11581,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11620,7 +11594,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -11634,7 +11608,7 @@ using namespace std;
 											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Preparing program's arguments on the GPU failed" << endl;
+												cout << "Preparing program's arguments on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -11644,7 +11618,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -11660,7 +11634,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11670,7 +11644,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11684,7 +11658,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 4 - 1))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11695,7 +11669,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11708,7 +11682,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11718,7 +11692,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11728,7 +11702,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11738,7 +11712,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11748,7 +11722,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentySevenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11758,7 +11732,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[26], &workItemsPerWorkGroup[26], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11768,7 +11742,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11778,7 +11752,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11793,7 +11767,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyEightKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -11806,7 +11780,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11816,7 +11790,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyEightKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11829,7 +11803,7 @@ using namespace std;
 										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11840,7 +11814,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11853,7 +11827,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11866,7 +11840,7 @@ using namespace std;
 											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Preparing program's arguments on the GPU failed" << endl;
+												cout << "Preparing program's arguments on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -11876,7 +11850,7 @@ using namespace std;
 											if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Setting program's arguments on the GPU failed" << endl;
+												cout << "Setting program's arguments on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -11886,7 +11860,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -11899,7 +11873,7 @@ using namespace std;
 												if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 												
 													// Display message
-													cout << "Running program on the GPU failed" << endl;
+													cout << "Running program on the GPU failed." << endl;
 													
 													// Return false
 													return false;
@@ -11913,7 +11887,7 @@ using namespace std;
 												if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 												
 													// Display message
-													cout << "Preparing program's arguments on the GPU failed" << endl;
+													cout << "Preparing program's arguments on the GPU failed." << endl;
 													
 													// Return false
 													return false;
@@ -11923,7 +11897,7 @@ using namespace std;
 												if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
 												
 													// Display message
-													cout << "Running program on the GPU failed" << endl;
+													cout << "Running program on the GPU failed." << endl;
 													
 													// Return false
 													return false;
@@ -11939,7 +11913,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11949,7 +11923,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11963,7 +11937,7 @@ using namespace std;
 										if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 8 - 1))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11974,7 +11948,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -11987,7 +11961,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -11997,7 +11971,7 @@ using namespace std;
 										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12007,7 +11981,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12017,7 +11991,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12027,7 +12001,7 @@ using namespace std;
 										if(clSetKernelArg(stepThirtyOneKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12037,7 +12011,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[30], &workItemsPerWorkGroup[30], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12047,7 +12021,7 @@ using namespace std;
 										if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12057,7 +12031,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12072,7 +12046,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyTwoKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 4, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 2, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -12085,7 +12059,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12095,7 +12069,7 @@ using namespace std;
 										if(clSetKernelArg(stepThirtyTwoKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12105,7 +12079,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[31], &workItemsPerWorkGroup[31], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12115,7 +12089,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12125,7 +12099,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[32], &workItemsPerWorkGroup[32], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12135,7 +12109,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[33], &workItemsPerWorkGroup[33], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -12154,7 +12128,7 @@ using namespace std;
 			if(!resultOne) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12167,7 +12141,7 @@ using namespace std;
 			if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12187,7 +12161,7 @@ using namespace std;
 			if(clWaitForEvents(1, mapEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12197,7 +12171,7 @@ using namespace std;
 			if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting GPU trimming time failed" << endl;
+				cout << "Getting GPU trimming time failed." << endl;
 				
 				// Return false
 				return false;
@@ -12211,7 +12185,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12227,7 +12201,7 @@ using namespace std;
 			if(clSetKernelArg(stepOneKernel.get(), 2, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12237,7 +12211,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12247,7 +12221,7 @@ using namespace std;
 			if(clSetKernelArg(stepTwoKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12257,7 +12231,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12270,7 +12244,7 @@ using namespace std;
 				if(clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12284,7 +12258,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12294,7 +12268,7 @@ using namespace std;
 				if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12304,7 +12278,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12317,7 +12291,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12331,7 +12305,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12341,7 +12315,7 @@ using namespace std;
 					if(clSetKernelArg(stepFourKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12351,7 +12325,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12363,7 +12337,7 @@ using namespace std;
 			if(clSetKernelArg(stepFiveKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFiveKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12373,7 +12347,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12383,7 +12357,7 @@ using namespace std;
 			if(clSetKernelArg(stepSixKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -12396,7 +12370,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12406,7 +12380,7 @@ using namespace std;
 				if(clSetKernelArg(stepOneKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12416,7 +12390,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12426,7 +12400,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12436,7 +12410,7 @@ using namespace std;
 				if(clSetKernelArg(stepSixKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12446,7 +12420,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[5], &workItemsPerWorkGroup[5], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12456,7 +12430,7 @@ using namespace std;
 				if(clSetKernelArg(stepFiveKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12466,7 +12440,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[4], &workItemsPerWorkGroup[4], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12480,7 +12454,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12490,7 +12464,7 @@ using namespace std;
 				if(clSetKernelArg(stepSevenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12500,7 +12474,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12510,7 +12484,7 @@ using namespace std;
 				if(clSetKernelArg(stepEightKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12520,7 +12494,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[7], &workItemsPerWorkGroup[7], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12533,7 +12507,7 @@ using namespace std;
 					if(clSetKernelArg(stepNineKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12547,7 +12521,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12557,7 +12531,7 @@ using namespace std;
 					if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12567,7 +12541,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12580,7 +12554,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[8], &workItemsPerWorkGroup[8], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12594,7 +12568,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12604,7 +12578,7 @@ using namespace std;
 						if(clSetKernelArg(stepTenKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12614,7 +12588,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepTenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[9], &workItemsPerWorkGroup[9], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12626,7 +12600,7 @@ using namespace std;
 				if(clSetKernelArg(stepElevenKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepElevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS - 1))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12636,7 +12610,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepElevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[10], &workItemsPerWorkGroup[10], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12646,7 +12620,7 @@ using namespace std;
 				if(clSetKernelArg(stepTwelveKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -12659,7 +12633,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12669,7 +12643,7 @@ using namespace std;
 					if(clSetKernelArg(stepSevenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12679,7 +12653,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[6], &workItemsPerWorkGroup[6], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12689,7 +12663,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12699,7 +12673,7 @@ using namespace std;
 					if(clSetKernelArg(stepTwelveKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12709,7 +12683,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwelveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[11], &workItemsPerWorkGroup[11], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12719,7 +12693,7 @@ using namespace std;
 					if(clSetKernelArg(stepElevenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12729,7 +12703,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepElevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[10], &workItemsPerWorkGroup[10], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12743,7 +12717,7 @@ using namespace std;
 					if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Preparing program's arguments on the GPU failed" << endl;
+						cout << "Preparing program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12753,7 +12727,7 @@ using namespace std;
 					if(clSetKernelArg(stepThirteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12766,7 +12740,7 @@ using namespace std;
 						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12777,7 +12751,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12790,7 +12764,7 @@ using namespace std;
 						if(clSetKernelArg(stepFourteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12800,7 +12774,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[13], &workItemsPerWorkGroup[13], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12813,7 +12787,7 @@ using namespace std;
 							if(clSetKernelArg(stepFifteenKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -12827,7 +12801,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -12837,7 +12811,7 @@ using namespace std;
 							if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -12847,7 +12821,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -12860,7 +12834,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepFifteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[14], &workItemsPerWorkGroup[14], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -12874,7 +12848,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -12884,7 +12858,7 @@ using namespace std;
 								if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -12894,7 +12868,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -12910,7 +12884,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12920,7 +12894,7 @@ using namespace std;
 						if(clSetKernelArg(stepSixteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12930,7 +12904,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSixteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[15], &workItemsPerWorkGroup[15], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12941,7 +12915,7 @@ using namespace std;
 					if(clSetKernelArg(stepSeventeenKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Setting program's arguments on the GPU failed" << endl;
+						cout << "Setting program's arguments on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12954,7 +12928,7 @@ using namespace std;
 						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12965,7 +12939,7 @@ using namespace std;
 					if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 					
 						// Display message
-						cout << "Running program on the GPU failed" << endl;
+						cout << "Running program on the GPU failed." << endl;
 						
 						// Return false
 						return false;
@@ -12978,7 +12952,7 @@ using namespace std;
 						if(clSetKernelArg(stepEighteenKernel.get(), 5, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -12992,7 +12966,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -13002,7 +12976,7 @@ using namespace std;
 						if(clSetKernelArg(stepThirteenKernel.get(), 4, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -13012,7 +12986,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[12], &workItemsPerWorkGroup[12], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -13022,7 +12996,7 @@ using namespace std;
 						if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Preparing program's arguments on the GPU failed" << endl;
+							cout << "Preparing program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -13032,7 +13006,7 @@ using namespace std;
 						if(clSetKernelArg(stepEighteenKernel.get(), 6, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -13042,7 +13016,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepEighteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[17], &workItemsPerWorkGroup[17], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -13052,7 +13026,7 @@ using namespace std;
 						if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i))) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -13062,7 +13036,7 @@ using namespace std;
 						if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Running program on the GPU failed" << endl;
+							cout << "Running program on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -13076,7 +13050,7 @@ using namespace std;
 						if(clSetKernelArg(stepNineteenKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepNineteenKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 						
 							// Display message
-							cout << "Setting program's arguments on the GPU failed" << endl;
+							cout << "Setting program's arguments on the GPU failed." << endl;
 							
 							// Return false
 							return false;
@@ -13089,7 +13063,7 @@ using namespace std;
 							if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Preparing program's arguments on the GPU failed" << endl;
+								cout << "Preparing program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -13099,7 +13073,7 @@ using namespace std;
 							if(clSetKernelArg(stepNineteenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -13112,7 +13086,7 @@ using namespace std;
 								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13123,7 +13097,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -13136,7 +13110,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13149,7 +13123,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13159,7 +13133,7 @@ using namespace std;
 									if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13169,7 +13143,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13182,7 +13156,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13196,7 +13170,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13206,7 +13180,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13222,7 +13196,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13232,7 +13206,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[21], &workItemsPerWorkGroup[21], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13246,7 +13220,7 @@ using namespace std;
 								if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 2 - 1))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13257,7 +13231,7 @@ using namespace std;
 							if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Running program on the GPU failed" << endl;
+								cout << "Running program on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -13270,7 +13244,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13280,7 +13254,7 @@ using namespace std;
 								if(clSetKernelArg(stepNineteenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13290,7 +13264,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepNineteenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[18], &workItemsPerWorkGroup[18], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13300,7 +13274,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 2 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13310,7 +13284,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyThreeKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13320,7 +13294,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[22], &workItemsPerWorkGroup[22], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13330,7 +13304,7 @@ using namespace std;
 								if(clSetKernelArg(stepSeventeenKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13340,7 +13314,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepSeventeenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[16], &workItemsPerWorkGroup[16], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13355,7 +13329,7 @@ using namespace std;
 							if(clSetKernelArg(stepTwentyFourKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyFourKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepTwentySixKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 							
 								// Display message
-								cout << "Setting program's arguments on the GPU failed" << endl;
+								cout << "Setting program's arguments on the GPU failed." << endl;
 								
 								// Return false
 								return false;
@@ -13368,7 +13342,7 @@ using namespace std;
 								if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Preparing program's arguments on the GPU failed" << endl;
+									cout << "Preparing program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13378,7 +13352,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyFourKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13391,7 +13365,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13402,7 +13376,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13415,7 +13389,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13428,7 +13402,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13438,7 +13412,7 @@ using namespace std;
 										if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13448,7 +13422,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13461,7 +13435,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -13475,7 +13449,7 @@ using namespace std;
 											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Preparing program's arguments on the GPU failed" << endl;
+												cout << "Preparing program's arguments on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -13485,7 +13459,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -13501,7 +13475,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13511,7 +13485,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFiveKernel.get(), 1, nullptr, &totalNumberOfWorkItems[24], &workItemsPerWorkGroup[24], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13525,7 +13499,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 4 - 1))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13536,7 +13510,7 @@ using namespace std;
 								if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Running program on the GPU failed" << endl;
+									cout << "Running program on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13549,7 +13523,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13559,7 +13533,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyFourKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13569,7 +13543,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[23], &workItemsPerWorkGroup[23], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13579,7 +13553,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 4 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13589,7 +13563,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentySevenKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13599,7 +13573,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySevenKernel.get(), 1, nullptr, &totalNumberOfWorkItems[26], &workItemsPerWorkGroup[26], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13609,7 +13583,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentySixKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13619,7 +13593,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentySixKernel.get(), 1, nullptr, &totalNumberOfWorkItems[25], &workItemsPerWorkGroup[25], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13634,7 +13608,7 @@ using namespace std;
 								if(clSetKernelArg(stepTwentyEightKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwentyEightKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepThirtyKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 								
 									// Display message
-									cout << "Setting program's arguments on the GPU failed" << endl;
+									cout << "Setting program's arguments on the GPU failed." << endl;
 									
 									// Return false
 									return false;
@@ -13647,7 +13621,7 @@ using namespace std;
 									if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Preparing program's arguments on the GPU failed" << endl;
+										cout << "Preparing program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13657,7 +13631,7 @@ using namespace std;
 									if(clSetKernelArg(stepTwentyEightKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13670,7 +13644,7 @@ using namespace std;
 										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(0))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13681,7 +13655,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13694,7 +13668,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[19], &workItemsPerWorkGroup[19], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13707,7 +13681,7 @@ using namespace std;
 											if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Preparing program's arguments on the GPU failed" << endl;
+												cout << "Preparing program's arguments on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -13717,7 +13691,7 @@ using namespace std;
 											if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Setting program's arguments on the GPU failed" << endl;
+												cout << "Setting program's arguments on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -13727,7 +13701,7 @@ using namespace std;
 											if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 											
 												// Display message
-												cout << "Running program on the GPU failed" << endl;
+												cout << "Running program on the GPU failed." << endl;
 												
 												// Return false
 												return false;
@@ -13740,7 +13714,7 @@ using namespace std;
 												if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[20], &workItemsPerWorkGroup[20], 0, nullptr, nullptr) != CL_SUCCESS) {
 												
 													// Display message
-													cout << "Running program on the GPU failed" << endl;
+													cout << "Running program on the GPU failed." << endl;
 													
 													// Return false
 													return false;
@@ -13754,7 +13728,7 @@ using namespace std;
 												if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 												
 													// Display message
-													cout << "Preparing program's arguments on the GPU failed" << endl;
+													cout << "Preparing program's arguments on the GPU failed." << endl;
 													
 													// Return false
 													return false;
@@ -13764,7 +13738,7 @@ using namespace std;
 												if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
 												
 													// Display message
-													cout << "Running program on the GPU failed" << endl;
+													cout << "Running program on the GPU failed." << endl;
 													
 													// Return false
 													return false;
@@ -13780,7 +13754,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13790,7 +13764,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyNineKernel.get(), 1, nullptr, &totalNumberOfWorkItems[28], &workItemsPerWorkGroup[28], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13804,7 +13778,7 @@ using namespace std;
 										if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(SLEAN_TRIMMING_PARTS / 8 - 1))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13815,7 +13789,7 @@ using namespace std;
 									if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Running program on the GPU failed" << endl;
+										cout << "Running program on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13828,7 +13802,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13838,7 +13812,7 @@ using namespace std;
 										if(clSetKernelArg(stepTwentyEightKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13848,7 +13822,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwentyEightKernel.get(), 1, nullptr, &totalNumberOfWorkItems[27], &workItemsPerWorkGroup[27], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13858,7 +13832,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 8 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13868,7 +13842,7 @@ using namespace std;
 										if(clSetKernelArg(stepThirtyOneKernel.get(), 5, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13878,7 +13852,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[30], &workItemsPerWorkGroup[30], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13888,7 +13862,7 @@ using namespace std;
 										if(clSetKernelArg(stepThirtyKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(j))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13898,7 +13872,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyKernel.get(), 1, nullptr, &totalNumberOfWorkItems[29], &workItemsPerWorkGroup[29], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13913,7 +13887,7 @@ using namespace std;
 									if(clSetKernelArg(stepThirtyTwoKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThirtyTwoKernel.get(), 4, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepThirtyFourKernel.get(), 2, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS) {
 									
 										// Display message
-										cout << "Setting program's arguments on the GPU failed" << endl;
+										cout << "Setting program's arguments on the GPU failed." << endl;
 										
 										// Return false
 										return false;
@@ -13926,7 +13900,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketOne.get(), (const cl_ulong[]){0}, (SLEAN_TRIMMING_NUMBER_OF_BUCKETS == 1) ? sizeof(cl_uint) : sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13936,7 +13910,7 @@ using namespace std;
 										if(clSetKernelArg(stepThirtyTwoKernel.get(), 3, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Setting program's arguments on the GPU failed" << endl;
+											cout << "Setting program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13946,7 +13920,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[31], &workItemsPerWorkGroup[31], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13956,7 +13930,7 @@ using namespace std;
 										if(clEnqueueFillBuffer(commandQueue.get(), numberOfEdgesPerBucketTwo.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, SLEAN_TRIMMING_NUMBER_OF_REMAINING_EDGES_BUCKETS * 16 * sizeof(cl_uint), 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Preparing program's arguments on the GPU failed" << endl;
+											cout << "Preparing program's arguments on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13966,7 +13940,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[32], &workItemsPerWorkGroup[32], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13976,7 +13950,7 @@ using namespace std;
 										if(clEnqueueNDRangeKernel(commandQueue.get(), stepThirtyFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[33], &workItemsPerWorkGroup[33], 0, nullptr, nullptr) != CL_SUCCESS) {
 										
 											// Display message
-											cout << "Running program on the GPU failed" << endl;
+											cout << "Running program on the GPU failed." << endl;
 											
 											// Return false
 											return false;
@@ -13995,7 +13969,7 @@ using namespace std;
 			if(!resultTwo) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -14008,7 +13982,7 @@ using namespace std;
 			if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;

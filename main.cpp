@@ -47,7 +47,6 @@
 	#include <arpa/inet.h>
 	#include <netdb.h>
 	#include <poll.h>
-	#include <pwd.h>
 	#include <sys/sysctl.h>
 	#include "./metal.h"
 	
@@ -71,9 +70,22 @@
 	// Header files
 	#include <arpa/inet.h>
 	#include <CL/cl.h>
-	#include <dbus/dbus.h>
 	#include <netdb.h>
 	#include <poll.h>
+	#include <unistd.h>
+	
+	// Check if using Android
+	#ifdef __ANDROID__
+	
+		// Header files
+		#include <android/log.h>
+		
+	// Otherwise
+	#else
+	
+		// Header files
+		#include <dbus/dbus.h>
+	#endif
 #endif
 
 // Header files
@@ -83,7 +95,6 @@
 #include <condition_variable>
 #include <csignal>
 #include <cstring>
-#include <functional>
 #include <getopt.h>
 #include <iostream>
 #include <random>
@@ -92,6 +103,7 @@
 #include "./bitmap.h"
 #include "./blake2b.h"
 #include "./hash_table.h"
+#include "./main.h"
 #include "./siphash.h"
 #include "./cuckatoo.h"
 
@@ -175,7 +187,7 @@ enum TrimmingType {
 // Global variables
 
 // Closing
-static volatile sig_atomic_t closing = false;
+static volatile sig_atomic_t closing;
 
 // Previous graph processed time
 static chrono::high_resolution_clock::time_point previousGraphProcessedTime;
@@ -199,7 +211,7 @@ static uint32_t searchingThreadsSolution[SOLUTION_SIZE];
 static bool searchingThreadsFinished;
 
 // Start searching threads trigger toggle
-static bool startSearchingThreadsTriggerToggle = false;
+static bool startSearchingThreadsTriggerToggle;
 
 // Start searching threads conditional variable
 static condition_variable *startSearchingThreadsConditionalVariable;
@@ -207,20 +219,23 @@ static condition_variable *startSearchingThreadsConditionalVariable;
 // Searching threads finished conditional variable
 static condition_variable *searchingThreadsFinishedConditionalVariable;
 
+// Graphs processed
+static uint64_t graphsProcessed;
+
 // Check if not tuning
 #ifndef TUNING
 
-	// Set stratum server address to nothing
-	static char *stratumServerAddress = nullptr;
+	// Stratum server address
+	static char *stratumServerAddress;
 	
-	// Set stratum server port to the default stratum server port
-	static const char *stratumServerPort = DEFAULT_STRATUM_SERVER_PORT;
+	// Stratum server port
+	static const char *stratumServerPort;
 	
-	// Set stratum server username to nothing
-	static const char *stratumServerUsername = nullptr;
+	// Stratum server username
+	static const char *stratumServerUsername;
 	
-	// Set stratum server password to nothing
-	static char *stratumServerPassword = nullptr;
+	// Stratum server password
+	static char *stratumServerPassword;
 	
 	// Random number generator
 	static mt19937_64 randomNumberGenerator((random_device())());
@@ -237,6 +252,11 @@ static condition_variable *searchingThreadsFinishedConditionalVariable;
 		// Socket descriptor
 		static int socketDescriptor;
 	#endif
+	
+	// Create socket descriptor unique pointer
+	static unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)> socketDescriptorUniquePointer(nullptr, [](__attribute__((unused)) decltype(socketDescriptor) *socketDescriptorPointer) noexcept {
+
+	});
 	
 	// Server response
 	static char serverResponse[SERVER_RESPONSE_SIZE];
@@ -284,9 +304,83 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 #include "./slean_trimming.h"
 
 
-// Main function
-int main(int argc, char *argv[]) noexcept {
+// Check if not using other main function
+#ifndef USE_OTHER_MAIN_FUNCTION
 
+	// Main function
+	int main(const int argc, char *argv[]) noexcept {
+
+		// Return success if starting miner was successful otherwise return failure
+		return startMiner(argc, argv) ? EXIT_SUCCESS : EXIT_FAILURE;
+	}
+#endif
+
+
+// Supporting function implementation
+
+// Redirect cout constructor
+RedirectCout::RedirectCout(const function<void(const char)> &callback) noexcept:
+
+	// Set callback to callback
+	callback(callback),
+	
+	// Save cout's buffer
+	buffer(cout.rdbuf())
+{
+
+	// Replace cout's buffer
+	cout.rdbuf(this);
+}
+
+// Redirect cout destructor
+RedirectCout::~RedirectCout() noexcept {
+
+	// Restore cout's buffer
+	cout.rdbuf(buffer);
+}
+
+// Redirect cout overflow
+RedirectCout::traits_type::int_type RedirectCout::overflow(const traits_type::int_type character) noexcept {
+
+	// Check if character isn't EOF
+	if(!traits_type::eq_int_type(character, traits_type::eof())) {
+	
+		// Run callback with character
+		callback(traits_type::to_char_type(character));
+	}
+	
+	// Return success
+	return traits_type::not_eof(character);
+}
+
+// Start miner
+bool startMiner(const int argc, char *argv[]) noexcept {
+
+	// Set closing to false
+	closing = false;
+	
+	// Set start searching threads trigger toggle to false
+	startSearchingThreadsTriggerToggle = false;
+	
+	// Set graphs processed to zero
+	graphsProcessed = 0;
+	
+	// Check if not tuning
+	#ifndef TUNING
+	
+		// Set stratum server address to nothing
+		stratumServerAddress = nullptr;
+		
+		// Set stratum server port to the default stratum server port
+		stratumServerPort = DEFAULT_STRATUM_SERVER_PORT;
+		
+		// Set stratum server username to nothing
+		stratumServerUsername = nullptr;
+		
+		// Set stratum server password to nothing
+		stratumServerPassword = nullptr;
+	#endif
+	
 	// Display message
 	cout << TO_STRING(NAME) " v" TO_STRING(VERSION) " (Cuckatoo" TO_STRING(EDGE_BITS) ", " TO_STRING(TRIMMING_ROUNDS) " trimming round(s)";
 	
@@ -324,7 +418,7 @@ int main(int argc, char *argv[]) noexcept {
 	#ifdef __APPLE__
 	
 		// Check if creating autorelease pool failed
-		static const unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
+		const unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
 		
 			// Free autorelease pool
 			autoreleasePool->release();
@@ -332,15 +426,27 @@ int main(int argc, char *argv[]) noexcept {
 		if(!autoreleasePool) {
 		
 			// Display message
-			cout << "Creating autorelease pool failed" << endl;
+			cout << "Creating autorelease pool failed." << endl;
 			
-			// Return failure
-			exit(EXIT_FAILURE);
+			// Return false
+			return false;
 		}
 	#endif
 	
-	// Prevent sleep
-	static const PreventSleep preventSleep;
+	// Check if creating prevent sleep failed
+	const PreventSleep preventSleep;
+	if(!preventSleep) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Check if preventing sleep failed
+	if(!preventSleep.didPreventSleep()) {
+	
+		// Display message
+		cout << "Preventing sleep failed." << endl;
+	}
 	
 	// Set current adjustable GPU memory amount to zero
 	int64_t currentAdjustableGpuMemoryAmount = 0;
@@ -413,10 +519,10 @@ int main(int argc, char *argv[]) noexcept {
 			if(clGetPlatformIDs(0, nullptr, &numberOfPlatforms) != CL_SUCCESS || !numberOfPlatforms) {
 			
 				// Display message
-				cout << "No OpenCL platforms found" << endl;
+				cout << "No OpenCL platforms found." << endl;
 				
-				// Return failure
-				exit(EXIT_FAILURE);
+				// Return false
+				return false;
 			}
 			
 			// Check if getting platforms failed
@@ -424,10 +530,10 @@ int main(int argc, char *argv[]) noexcept {
 			if(clGetPlatformIDs(numberOfPlatforms, platforms, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting OpenCL platforms failed" << endl;
+				cout << "Getting OpenCL platforms failed." << endl;
 				
-				// Return failure
-				exit(EXIT_FAILURE);
+				// Return false
+				return false;
 			}
 		#endif
 	#endif
@@ -491,7 +597,7 @@ int main(int argc, char *argv[]) noexcept {
 		bool stratumServerPortSet = false;
 		
 		// Create stratum server password unique pointer
-		static unique_ptr<char, void(*)(char *)> stratumServerPasswordUniquePointer(nullptr, [](__attribute__((unused)) char *stratumServerPassword) noexcept {
+		unique_ptr<char, void(*)(char *)> stratumServerPasswordUniquePointer(nullptr, [](__attribute__((unused)) char *stratumServerPassword) noexcept {
 		
 		});
 	#endif
@@ -967,10 +1073,10 @@ int main(int argc, char *argv[]) noexcept {
 							if(sysctlbyname("hw.memsize", &totalMemoryAmount, &totalMemoryAmountSize, nullptr, 0)) {
 							
 								// Display message
-								cout << "Getting your total amount of RAM failed" << endl;
+								cout << "Getting your total amount of RAM failed." << endl;
 								
-								// Exit failure
-								exit(EXIT_FAILURE);
+								// Return false
+								return false;
 							}
 							
 							// Otherwise check if option is to use all of the total memory for the GPU
@@ -1001,40 +1107,24 @@ int main(int argc, char *argv[]) noexcept {
 								if(sysctlbyname("iogpu.wired_limit_mb", nullptr, 0, &newGpuMemoryAmount, sizeof(newGpuMemoryAmount))) {
 								
 									// Display message
-									cout << "Changing the GPU's RAM failed" << endl;
+									cout << "Changing the GPU's RAM failed." << endl;
 									
-									// Exit failure
-									exit(EXIT_FAILURE);
+									// Return false
+									return false;
+								}
+								
+								// Otherwise check if default RAM was restored
+								else if(restoreDefaultRam) {
+								
+									// Display message
+									cout << "Changed the GPU's RAM to its default amount." << endl;
 								}
 								
 								// Otherwise
 								else {
 								
-									// Check if default RAM was restored
-									if(restoreDefaultRam) {
-									
-										// Display message
-										cout << "Changed the GPU's RAM to its default amount" << endl;
-									}
-									
-									// Otherwise
-									else {
-									
-										// Display message
-										cout << "Changed the GPU's RAM to " << optionAsNumber << " GB" << endl;
-									}
-									
-									// Check if dropping root privileges failed
-									const char *username = getlogin();
-									const passwd *userInfo;
-									if(!username || !(userInfo = getpwnam(username)) || setgid(userInfo->pw_gid) || setuid(userInfo->pw_uid)) {
-									
-										// Display message
-										cout << "Dropping root privileges failed" << endl;
-										
-										// Exit failure
-										exit(EXIT_FAILURE);
-									}
+									// Display message
+									cout << "Changed the GPU's RAM to " << optionAsNumber << " GB." << endl;
 								}
 							}
 						}
@@ -1179,8 +1269,8 @@ int main(int argc, char *argv[]) noexcept {
 	// Check if exiting after options and not displaying help
 	if(exitAfterOptions && !displayHelp) {
 	
-		// Return success
-		exit(EXIT_SUCCESS);
+		// Return true
+		return true;
 	}
 	
 	// Check if not tuning
@@ -1258,8 +1348,8 @@ int main(int argc, char *argv[]) noexcept {
 		cout << "\t-i, --instance\t\t\tThe index of this instance (default: " TO_STRING(DEFAULT_INSTANCE_INDEX) ")" << endl;
 		cout << "\t-h, --help\t\t\tDisplay help information" << endl;
 		
-		// Return success if help was requested otherwise failure
-		exit(helpRequested ? EXIT_SUCCESS : EXIT_FAILURE);
+		// Return if help was requested
+		return helpRequested;
 	}
 	
 	// Get number of applicable CPU cores
@@ -1278,36 +1368,47 @@ int main(int argc, char *argv[]) noexcept {
 	if(!setThreadPriorityAndAffinity((firstThreadIndex + numberOfThreads - 1) % numberOfApplicableCpuCores)) {
 	
 		// Display message
-		cout << "Setting searching thread's priority and affinity failed" << endl;
+		cout << "Setting thread's priority and affinity failed." << endl;
 		
-		// Return failure
-		exit(EXIT_FAILURE);
+		// Return false
+		return false;
 	}
 	
-	// Check if setting interrupt signal handler failed
-	if(signal(SIGINT, [](const int signal) noexcept {
+	// Check if not using other main function
+	#ifndef USE_OTHER_MAIN_FUNCTION
 	
-		// Check if interrupt signal occurred
-		if(signal == SIGINT) {
+		// Check if setting interrupt signal handler failed
+		if(signal(SIGINT, [](const int signal) noexcept {
 		
-			// Set closing to true
-			closing = true;
+			// Check if interrupt signal occurred
+			if(signal == SIGINT) {
+			
+				// Stop miner
+				stopMiner();
+			}
+			
+		}) == SIG_ERR) {
+		
+			// Display message
+			cout << "Setting interrupt signal handler failed." << endl;
+			
+			// Return false
+			return false;
 		}
 		
-	}) == SIG_ERR) {
-	
-		// Display message
-		cout << "Setting interrupt signal handler failed" << endl;
+		// Automatically restore default interrupt signal handler when done
+		const unique_ptr<volatile sig_atomic_t, void(*)(volatile sig_atomic_t *)> signalHandlerUniquePointer(&closing, [](__attribute__((unused)) volatile sig_atomic_t *closingPointer) noexcept {
 		
-		// Return failure
-		exit(EXIT_FAILURE);
-	}
+			// Restore default interrupt signal handler
+			signal(SIGINT, SIG_DFL);
+		});
+	#endif
 	
 	// Display message
-	cout << "This is instance " << instanceIndex << " out of " << totalNumberOfInstances << ((totalNumberOfInstances == DEFAULT_TOTAL_NUMBER_OF_INSTANCES) ? ". You should change this if you're planning on running multiple instances of this program at once" : "") << endl;
+	cout << "This is instance " << instanceIndex << " out of " << totalNumberOfInstances << ((totalNumberOfInstances == DEFAULT_TOTAL_NUMBER_OF_INSTANCES) ? ". You should change this if you're planning on running multiple instances of this program at once" : "") << '.' << endl;
 	
 	// Display message
-	cout << "Using the cuckatoo" TO_STRING(EDGE_BITS) " (C" TO_STRING(EDGE_BITS) ") mining algorithm. You should verify that this is the correct algorithm for the cryptocurrency that you're trying to mine" << endl;
+	cout << "Using the cuckatoo" TO_STRING(EDGE_BITS) " (C" TO_STRING(EDGE_BITS) ") mining algorithm. You should verify that this is the correct algorithm for the cryptocurrency that you're trying to mine." << endl;
 	
 	// Check if not tuning
 	#ifndef TUNING
@@ -1315,15 +1416,26 @@ int main(int argc, char *argv[]) noexcept {
 		// Check if using Windows
 		#ifdef _WIN32
 		
-			// Create Windows socket
-			static const WindowsSocket windowsSocket;
+			// Check if creating Windows socket failed
+			const WindowsSocket windowsSocket;
+			if(!windowsSocket) {
+			
+				// Display message
+				cout << "Initializing Windows socket failed." << endl;
+				
+				// Return false
+				return false;
+			}
 		#endif
 		
 		// Check if connecting to the server failed
 		if(!connectToServer()) {
 		
-			// Return failure
-			exit(EXIT_FAILURE);
+			// Free socket descriptor
+			socketDescriptorUniquePointer.reset();
+			
+			// Return false
+			return false;
 		}
 	#endif
 	
@@ -1374,11 +1486,14 @@ int main(int argc, char *argv[]) noexcept {
 		const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
 		
 		// Go through all searching threads
+		thread searchingThreads[numberOfSearchingThreads];
 		uint64_t numberOfEdges[numberOfSearchingThreads];
 		barrier searchingThreadsBarrier(numberOfSearchingThreads);
-		const unique_ptr edges = make_unique<uint32_t[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS);
+		const unique_ptr<uint32_t[]> edges(new(nothrow) uint32_t[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS]);
 		unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreadsSearchingEdges];
 		unsigned int numberOfSearchingThreadsFinished = 0;
+		bool closeSearchingThreads = false;
+		bool searchingThreadsInitializedSuccessfully = true;
 		
 		for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
 		
@@ -1386,27 +1501,48 @@ int main(int argc, char *argv[]) noexcept {
 			if(i < numberOfSearchingThreadsSearchingEdges) {
 			
 				// Create searching thread's node connections
-				nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
+				nodeConnections[i] = unique_ptr<CuckatooNodeConnectionsLink[]>(new(nothrow) CuckatooNodeConnectionsLink[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2]);
 			}
 			
 			// Create searching thread
-			thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+			searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 			
-				// Check if setting searching thread's priority and affinity failed
-				if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
+				// Set searching thread's priority and affinity
+				const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
 				
-					// Display message
-					cout << "Setting searching thread's priority and affinity failed" << endl;
-					
-					// Return failure
-					exit(EXIT_FAILURE);
+				// Check if setting searching thread's priority and affinity failed, creating edges failed, creating node connections failed, or initializing thread local global variables failed
+				unique_lock lock(searchingThreadsMutex);
+				const bool initializingFailed = !setThreadPriorityAndAffinityResult || !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+				if(initializingFailed) {
+				
+					// Set searching threads initialized successfully to false
+					searchingThreadsInitializedSuccessfully = false;
 				}
 				
-				// Check if searching thread is searching edges
-				if(searchingThreadIndex < numberOfSearchingThreadsSearchingEdges) {
+				// Check if all searching threads have initialized
+				if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
 				
-					// Initialize thread local global variables
-					initializeCuckatooThreadLocalGlobalVariables();
+					// Reset number of searching threads finished
+					numberOfSearchingThreadsFinished = 0;
+					
+					// Notify that searching threads have initialized
+					searchingThreadsFinished = true;
+					lock.unlock();
+					searchingThreadsFinishedConditionalVariable->notify_one();
+				}
+				
+				// Otherwise
+				else {
+				
+					// Unlock
+					lock.unlock();
+				}
+				
+				// Check if initializing failed
+				if(initializingFailed) {
+				
+					// Return
+					return;
 				}
 				
 				// Set searching thread's bitmap start and end
@@ -1414,7 +1550,6 @@ int main(int argc, char *argv[]) noexcept {
 				const uint_fast32_t bitmapEnd = min((EDGES_BITMAP_SIZE + numberOfSearchingThreads - 1) / numberOfSearchingThreads * (searchingThreadIndex + 1), EDGES_BITMAP_SIZE);
 				
 				// Loop forever
-				unique_lock lock(searchingThreadsMutex, defer_lock);
 				for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
 				
 					// Wait until starting searching threads
@@ -1424,7 +1559,17 @@ int main(int argc, char *argv[]) noexcept {
 						// Return if starting searching threads
 						return startSearchingThreadsTriggerToggle == startTriggerTrue;
 					});
+					
+					// Get if closing thread
+					const bool closeThread = closeSearchingThreads;
 					lock.unlock();
+					
+					// Check if closing thread
+					if(closeThread) {
+					
+						// Return
+						return;
+					}
 					
 					// Go through all of the searching thread's units in the edges bitmap
 					numberOfEdges[searchingThreadIndex] = 0;
@@ -1567,27 +1712,71 @@ int main(int argc, char *argv[]) noexcept {
 						lock.unlock();
 					}
 				}
-				
-			}).detach();
+			});
 		}
 		
-		// Enable all edges in edges bitmap
+		// Wait until searching threads have initialized
+		searchingThreadsFinished = false;
+		searchingThreadsFinishedConditionalVariable->wait(searchingThreadsLock, []() noexcept -> bool {
+		
+			// Return if searching threads have initialized
+			return searchingThreadsFinished;
+		});
+		
+		// Check if searching threads didn't initialized successfully or creating edges bitmap failed
 		Bitmap<NUMBER_OF_EDGES> edgesBitmap;
-		edgesBitmap.setAllBits();
+		if(!searchingThreadsInitializedSuccessfully || !edgesBitmap) {
 		
-		// Display message
-		cout << "Mining started" << endl;
-		
-		// While not closing
-		while(!closing) {
-		
-			// Get SipHash keys from job's header and nonce
-			uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) sipHashKeys;
-			blake2b(sipHashKeys, jobHeader, jobNonce);
-			
-			// Trimming finished
-			trimmingFinished(edgesBitmap.getBuffer(), sipHashKeys, jobHeight, jobId, jobNonce++);
+			// Display message
+			cout << "Allocating memory failed." << endl;
 		}
+		
+		// Otherwise
+		else {
+		
+			// Enable all edges in edges bitmap
+			edgesBitmap.setAllBits();
+			
+			// Display message
+			cout << "Mining started." << endl;
+			
+			// While not closing
+			while(!closing) {
+			
+				// Get SipHash keys from job's header and nonce
+				uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) sipHashKeys;
+				blake2b(sipHashKeys, jobHeader, jobNonce);
+				
+				// Trimming finished
+				trimmingFinished(edgesBitmap.getBuffer(), sipHashKeys, jobHeight, jobId, jobNonce++);
+			}
+		}
+		
+		// Close searching threads
+		closeSearchingThreads = true;
+		startSearchingThreadsTriggerToggle = !startSearchingThreadsTriggerToggle;
+		searchingThreadsLock.unlock();
+		startSearchingThreadsConditionalVariable->notify_all();
+		
+		// Go through all searching threads
+		for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+		
+			// Join searching thread
+			searchingThreads[i].join();
+		}
+		
+		// Lock searching threads lock
+		searchingThreadsLock.lock();
+		
+		// Check if not tuning
+		#ifndef TUNING
+		
+			// Free socket descriptor
+			socketDescriptorUniquePointer.reset();
+		#endif
+		
+		// Return if searching threads initialized successfully and creating edges bitmap was successful
+		return searchingThreadsInitializedSuccessfully && edgesBitmap;
 		
 	// Otherwise
 	#else
@@ -1596,7 +1785,7 @@ int main(int argc, char *argv[]) noexcept {
 		if(deviceIndex == ALL_DEVICES) {
 		
 			// Display message
-			cout << "Using the first applicable GPU" << endl;
+			cout << "Using the first applicable GPU." << endl;
 		}
 		
 		// Otherwise
@@ -1724,10 +1913,17 @@ int main(int argc, char *argv[]) noexcept {
 			if(index != deviceIndex) {
 			
 				// Display message
-				cout << "GPU at the specified index doesn't exist" << endl;
+				cout << "GPU at the specified index doesn't exist." << endl;
 				
-				// Return failure
-				exit(EXIT_FAILURE);
+				// Check if not tuning
+				#ifndef TUNING
+				
+					// Free socket descriptor
+					socketDescriptorUniquePointer.reset();
+				#endif
+				
+				// Return false
+				return false;
 			}
 		}
 		
@@ -1784,7 +1980,7 @@ int main(int argc, char *argv[]) noexcept {
 		#if defined __APPLE__ && !defined USE_OPENCL
 		
 			// Create context
-			static unique_ptr<MTL::Device, void(*)(MTL::Device *)> context(nullptr, [](__attribute__((unused)) MTL::Device *context) noexcept {
+			unique_ptr<MTL::Device, void(*)(MTL::Device *)> context(nullptr, [](__attribute__((unused)) MTL::Device *context) noexcept {
 			
 			});
 			
@@ -1792,7 +1988,7 @@ int main(int argc, char *argv[]) noexcept {
 		#else
 		
 			// Create context
-			static unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)> context(nullptr, clReleaseContext);
+			unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)> context(nullptr, clReleaseContext);
 		#endif
 		
 		// Check if using all trimming types or mean trimming is enabled
@@ -1851,32 +2047,59 @@ int main(int argc, char *argv[]) noexcept {
 				cout << endl;
 				
 				// Go through all searching threads
+				thread searchingThreads[numberOfSearchingThreads];
 				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreads];
 				unsigned int numberOfSearchingThreadsFinished = 0;
+				bool closeSearchingThreads = false;
+				bool searchingThreadsInitializedSuccessfully = true;
 				
 				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
 				
 					// Create searching thread's node connections
-					nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
+					nodeConnections[i] = unique_ptr<CuckatooNodeConnectionsLink[]>(new(nothrow) CuckatooNodeConnectionsLink[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2]);
 					
 					// Create searching thread
-					thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 					
-						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
+						// Set searching thread's priority and affinity
+						const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
 						
-							// Display message
-							cout << "Setting searching thread's priority and affinity failed" << endl;
-							
-							// Return failure
-							exit(EXIT_FAILURE);
+						// Check if setting searching thread's priority and affinity failed, creating node connections failed, or initializing thread local global variables failed
+						unique_lock lock(searchingThreadsMutex);
+						const bool initializingFailed = !setThreadPriorityAndAffinityResult || !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
+						if(initializingFailed) {
+						
+							// Set searching threads initialized successfully to false
+							searchingThreadsInitializedSuccessfully = false;
 						}
 						
-						// Initialize thread local global variables
-						initializeCuckatooThreadLocalGlobalVariables();
+						// Check if all searching threads have initialized
+						if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
+						
+							// Reset number of searching threads finished
+							numberOfSearchingThreadsFinished = 0;
+							
+							// Notify that searching threads have initialized
+							searchingThreadsFinished = true;
+							lock.unlock();
+							searchingThreadsFinishedConditionalVariable->notify_one();
+						}
+						
+						// Otherwise
+						else {
+						
+							// Unlock
+							lock.unlock();
+						}
+						
+						// Check if initializing failed
+						if(initializingFailed) {
+						
+							// Return
+							return;
+						}
 						
 						// Loop forever
-						unique_lock lock(searchingThreadsMutex, defer_lock);
 						for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
 						
 							// Wait until starting searching threads
@@ -1886,7 +2109,17 @@ int main(int argc, char *argv[]) noexcept {
 								// Return if starting searching threads
 								return startSearchingThreadsTriggerToggle == startTriggerTrue;
 							});
+							
+							// Get if closing thread
+							const bool closeThread = closeSearchingThreads;
 							lock.unlock();
+							
+							// Check if closing thread
+							if(closeThread) {
+							
+								// Return
+								return;
+							}
 							
 							// Get number of edges
 							const uint32_t &numberOfEdges = reinterpret_cast<const uint32_t *>(searchingThreadsData)[0];
@@ -1938,14 +2171,14 @@ int main(int argc, char *argv[]) noexcept {
 									if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently." << endl;
 									}
 									
 									// Otherwise
 									else {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently." << endl;
 									}
 								}
 								
@@ -1987,20 +2220,58 @@ int main(int argc, char *argv[]) noexcept {
 								// Unlock
 								lock.unlock();
 							}
-						}
-						
-					}).detach();
+						}	
+					});
 				}
 				
-				// Check if performing mean trimming loop failed
-				if(!performMeanTrimmingLoop(context.get(), deviceIndex)) {
+				// Wait until searching threads have initialized
+				searchingThreadsFinished = false;
+				searchingThreadsFinishedConditionalVariable->wait(searchingThreadsLock, []() noexcept -> bool {
 				
-					// Return failure
-					exit(EXIT_FAILURE);
+					// Return if searching threads have initialized
+					return searchingThreadsFinished;
+				});
+				
+				// Check if searching threads didn't initialized successfully
+				bool performingTrimmingLoopResult = false;
+				if(!searchingThreadsInitializedSuccessfully) {
+				
+					// Display message
+					cout << "Allocating memory failed." << endl;
 				}
 				
-				// Return success
-				exit(EXIT_SUCCESS);
+				// Otherwise
+				else {
+				
+					// Perform mean trimming loop
+					performingTrimmingLoopResult = performMeanTrimmingLoop(context.get());
+				}
+				
+				// Close searching threads
+				closeSearchingThreads = true;
+				startSearchingThreadsTriggerToggle = !startSearchingThreadsTriggerToggle;
+				searchingThreadsLock.unlock();
+				startSearchingThreadsConditionalVariable->notify_all();
+				
+				// Go through all searching threads
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Join searching thread
+					searchingThreads[i].join();
+				}
+				
+				// Lock searching threads lock
+				searchingThreadsLock.lock();
+				
+				// Check if not tuning
+				#ifndef TUNING
+				
+					// Free socket descriptor
+					socketDescriptorUniquePointer.reset();
+				#endif
+				
+				// Return if searching threads initialized successfully and performing trimming loop was successful
+				return searchingThreadsInitializedSuccessfully && performingTrimmingLoopResult;
 			}
 			
 			// Otherwise
@@ -2038,13 +2309,13 @@ int main(int argc, char *argv[]) noexcept {
 				}
 				
 				// Display message
-				cout << " of RAM and " << (MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory" << endl;
+				cout << " of RAM and " << (MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory." << endl;
 				
 				// Check if local RAM kilobytes is greater than its min value
 				if(LOCAL_RAM_KILOBYTES > MIN_LOCAL_RAM_KILOBYTES) {
 				
 					// Display message
-					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce mean trimming's GPU local memory requirement by half" << endl;
+					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce mean trimming's GPU local memory requirement by half." << endl;
 				}
 			}
 		}
@@ -2105,32 +2376,59 @@ int main(int argc, char *argv[]) noexcept {
 				cout << endl;
 				
 				// Go through all searching threads
+				thread searchingThreads[numberOfSearchingThreads];
 				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreads];
 				unsigned int numberOfSearchingThreadsFinished = 0;
+				bool closeSearchingThreads = false;
+				bool searchingThreadsInitializedSuccessfully = true;
 				
 				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
 				
 					// Create searching thread's node connections
-					nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
+					nodeConnections[i] = unique_ptr<CuckatooNodeConnectionsLink[]>(new(nothrow) CuckatooNodeConnectionsLink[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2]);
 					
 					// Create searching thread
-					thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 					
-						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
+						// Set searching thread's priority and affinity
+						const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
 						
-							// Display message
-							cout << "Setting searching thread's priority and affinity failed" << endl;
-							
-							// Return failure
-							exit(EXIT_FAILURE);
+						// Check if setting searching thread's priority and affinity failed, creating node connections failed, or initializing thread local global variables failed
+						unique_lock lock(searchingThreadsMutex);
+						const bool initializingFailed = !setThreadPriorityAndAffinityResult || !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
+						if(initializingFailed) {
+						
+							// Set searching threads initialized successfully to false
+							searchingThreadsInitializedSuccessfully = false;
 						}
 						
-						// Initialize thread local global variables
-						initializeCuckatooThreadLocalGlobalVariables();
+						// Check if all searching threads have initialized
+						if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
+						
+							// Reset number of searching threads finished
+							numberOfSearchingThreadsFinished = 0;
+							
+							// Notify that searching threads have initialized
+							searchingThreadsFinished = true;
+							lock.unlock();
+							searchingThreadsFinishedConditionalVariable->notify_one();
+						}
+						
+						// Otherwise
+						else {
+						
+							// Unlock
+							lock.unlock();
+						}
+						
+						// Check if initializing failed
+						if(initializingFailed) {
+						
+							// Return
+							return;
+						}
 						
 						// Loop forever
-						unique_lock lock(searchingThreadsMutex, defer_lock);
 						for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
 						
 							// Wait until starting searching threads
@@ -2140,7 +2438,17 @@ int main(int argc, char *argv[]) noexcept {
 								// Return if starting searching threads
 								return startSearchingThreadsTriggerToggle == startTriggerTrue;
 							});
+							
+							// Get if closing thread
+							const bool closeThread = closeSearchingThreads;
 							lock.unlock();
+							
+							// Check if closing thread
+							if(closeThread) {
+							
+								// Return
+								return;
+							}
 							
 							// Get number of edges
 							const uint32_t &numberOfEdges = reinterpret_cast<const uint32_t *>(searchingThreadsData)[0];
@@ -2192,14 +2500,14 @@ int main(int argc, char *argv[]) noexcept {
 									if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently." << endl;
 									}
 									
 									// Otherwise
 									else {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently." << endl;
 									}
 								}
 								
@@ -2241,20 +2549,58 @@ int main(int argc, char *argv[]) noexcept {
 								// Unlock
 								lock.unlock();
 							}
-						}
-						
-					}).detach();
+						}	
+					});
 				}
 				
-				// Check if performing slean then mean trimming loop failed
-				if(!performSleanThenMeanTrimmingLoop(context.get(), deviceIndex)) {
+				// Wait until searching threads have initialized
+				searchingThreadsFinished = false;
+				searchingThreadsFinishedConditionalVariable->wait(searchingThreadsLock, []() noexcept -> bool {
 				
-					// Return failure
-					exit(EXIT_FAILURE);
+					// Return if searching threads have initialized
+					return searchingThreadsFinished;
+				});
+				
+				// Check if searching threads didn't initialized successfully
+				bool performingTrimmingLoopResult = false;
+				if(!searchingThreadsInitializedSuccessfully) {
+				
+					// Display message
+					cout << "Allocating memory failed." << endl;
 				}
 				
-				// Return success
-				exit(EXIT_SUCCESS);
+				// Otherwise
+				else {
+				
+					// Perform slean then mean trimming loop
+					performingTrimmingLoopResult = performSleanThenMeanTrimmingLoop(context.get());
+				}
+				
+				// Close searching threads
+				closeSearchingThreads = true;
+				startSearchingThreadsTriggerToggle = !startSearchingThreadsTriggerToggle;
+				searchingThreadsLock.unlock();
+				startSearchingThreadsConditionalVariable->notify_all();
+				
+				// Go through all searching threads
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Join searching thread
+					searchingThreads[i].join();
+				}
+				
+				// Lock searching threads lock
+				searchingThreadsLock.lock();
+				
+				// Check if not tuning
+				#ifndef TUNING
+				
+					// Free socket descriptor
+					socketDescriptorUniquePointer.reset();
+				#endif
+				
+				// Return if searching threads initialized successfully and performing trimming loop was successful
+				return searchingThreadsInitializedSuccessfully && performingTrimmingLoopResult;
 			}
 			
 			// Otherwise
@@ -2292,27 +2638,27 @@ int main(int argc, char *argv[]) noexcept {
 				}
 				
 				// Display message
-				cout << " of RAM and " << (SLEAN_THEN_MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory" << endl;
+				cout << " of RAM and " << (SLEAN_THEN_MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory." << endl;
 				
 				// Check if slean trimming parts is less than its max value
 				if(SLEAN_TRIMMING_PARTS < MAX_SLEAN_TRIMMING_PARTS) {
 				
 					// Display message
-					cout << "Build this program with SLEAN_TRIMMING_PARTS=" << (SLEAN_TRIMMING_PARTS * 2) << " to reduce slean then mean trimming's GPU RAM requirement by about half" << endl;
+					cout << "Build this program with SLEAN_TRIMMING_PARTS=" << (SLEAN_TRIMMING_PARTS * 2) << " to reduce slean then mean trimming's GPU RAM requirement by about half." << endl;
 				}
 				
 				// Check if slean then mean slean trimming rounds is less than its max value
 				if(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS < TRIMMING_ROUNDS - 1) {
 				
 					// Display message
-					cout << "Build this program with SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=" << (SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS + 1) << " to reduce slean then mean trimming's GPU RAM requirement" << endl;
+					cout << "Build this program with SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=" << (SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS + 1) << " to reduce slean then mean trimming's GPU RAM requirement." << endl;
 				}
 				
 				// Check if local RAM kilobytes is greater than its min value
 				if(LOCAL_RAM_KILOBYTES > MIN_LOCAL_RAM_KILOBYTES) {
 				
 					// Display message
-					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce slean then mean trimming's GPU local memory requirement by half" << endl;
+					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce slean then mean trimming's GPU local memory requirement by half." << endl;
 				}
 			}
 		}
@@ -2376,11 +2722,14 @@ int main(int argc, char *argv[]) noexcept {
 				const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
 				
 				// Go through all searching threads
+				thread searchingThreads[numberOfSearchingThreads];
 				uint64_t numberOfEdges[numberOfSearchingThreads];
 				barrier searchingThreadsBarrier(numberOfSearchingThreads);
-				const unique_ptr edges = make_unique<uint32_t[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS);
+				const unique_ptr<uint32_t[]> edges(new(nothrow) uint32_t[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS]);
 				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreadsSearchingEdges];
 				unsigned int numberOfSearchingThreadsFinished = 0;
+				bool closeSearchingThreads = false;
+				bool searchingThreadsInitializedSuccessfully = true;
 				
 				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
 				
@@ -2388,27 +2737,48 @@ int main(int argc, char *argv[]) noexcept {
 					if(i < numberOfSearchingThreadsSearchingEdges) {
 					
 						// Create searching thread's node connections
-						nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
+						nodeConnections[i] = unique_ptr<CuckatooNodeConnectionsLink[]>(new(nothrow) CuckatooNodeConnectionsLink[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2]);
 					}
 					
 					// Create searching thread
-					thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 					
-						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
+						// Set searching thread's priority and affinity
+						const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
 						
-							// Display message
-							cout << "Setting searching thread's priority and affinity failed" << endl;
-							
-							// Return failure
-							exit(EXIT_FAILURE);
+						// Check if setting searching thread's priority and affinity failed, creating edges failed, creating node connections failed, or initializing thread local global variables failed
+						unique_lock lock(searchingThreadsMutex);
+						const bool initializingFailed = !setThreadPriorityAndAffinityResult || !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+						if(initializingFailed) {
+						
+							// Set searching threads initialized successfully to false
+							searchingThreadsInitializedSuccessfully = false;
 						}
 						
-						// Check if searching thread is searching edges
-						if(searchingThreadIndex < numberOfSearchingThreadsSearchingEdges) {
+						// Check if all searching threads have initialized
+						if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
 						
-							// Initialize thread local global variables
-							initializeCuckatooThreadLocalGlobalVariables();
+							// Reset number of searching threads finished
+							numberOfSearchingThreadsFinished = 0;
+							
+							// Notify that searching threads have initialized
+							searchingThreadsFinished = true;
+							lock.unlock();
+							searchingThreadsFinishedConditionalVariable->notify_one();
+						}
+						
+						// Otherwise
+						else {
+						
+							// Unlock
+							lock.unlock();
+						}
+						
+						// Check if initializing failed
+						if(initializingFailed) {
+						
+							// Return
+							return;
 						}
 						
 						// Set searching thread's bitmap start and end
@@ -2416,7 +2786,6 @@ int main(int argc, char *argv[]) noexcept {
 						const uint_fast32_t bitmapEnd = min((EDGES_BITMAP_SIZE + numberOfSearchingThreads - 1) / numberOfSearchingThreads * (searchingThreadIndex + 1), EDGES_BITMAP_SIZE);
 						
 						// Loop forever
-						unique_lock lock(searchingThreadsMutex, defer_lock);
 						for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
 						
 							// Wait until starting searching threads
@@ -2426,7 +2795,17 @@ int main(int argc, char *argv[]) noexcept {
 								// Return if starting searching threads
 								return startSearchingThreadsTriggerToggle == startTriggerTrue;
 							});
+							
+							// Get if closing thread
+							const bool closeThread = closeSearchingThreads;
 							lock.unlock();
+							
+							// Check if closing thread
+							if(closeThread) {
+							
+								// Return
+								return;
+							}
 							
 							// Go through all of the searching thread's units in the edges bitmap
 							numberOfEdges[searchingThreadIndex] = 0;
@@ -2506,14 +2885,14 @@ int main(int argc, char *argv[]) noexcept {
 											if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+												cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently." << endl;
 											}
 											
 											// Otherwise
 											else {
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+												cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently." << endl;
 											}
 										}
 										
@@ -2533,14 +2912,14 @@ int main(int argc, char *argv[]) noexcept {
 									if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently." << endl;
 									}
 									
 									// Otherwise
 									else {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently." << endl;
 									}
 								}
 								
@@ -2643,20 +3022,58 @@ int main(int argc, char *argv[]) noexcept {
 								// Unlock
 								lock.unlock();
 							}
-						}
-						
-					}).detach();
+						}	
+					});
 				}
 				
-				// Check if performing slean trimming loop failed
-				if(!performSleanTrimmingLoop(context.get(), deviceIndex)) {
+				// Wait until searching threads have initialized
+				searchingThreadsFinished = false;
+				searchingThreadsFinishedConditionalVariable->wait(searchingThreadsLock, []() noexcept -> bool {
 				
-					// Return failure
-					exit(EXIT_FAILURE);
+					// Return if searching threads have initialized
+					return searchingThreadsFinished;
+				});
+				
+				// Check if searching threads didn't initialized successfully
+				bool performingTrimmingLoopResult = false;
+				if(!searchingThreadsInitializedSuccessfully) {
+				
+					// Display message
+					cout << "Allocating memory failed." << endl;
 				}
 				
-				// Return success
-				exit(EXIT_SUCCESS);
+				// Otherwise
+				else {
+				
+					// Perform slean trimming loop
+					performingTrimmingLoopResult = performSleanTrimmingLoop(context.get());
+				}
+				
+				// Close searching threads
+				closeSearchingThreads = true;
+				startSearchingThreadsTriggerToggle = !startSearchingThreadsTriggerToggle;
+				searchingThreadsLock.unlock();
+				startSearchingThreadsConditionalVariable->notify_all();
+				
+				// Go through all searching threads
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Join searching thread
+					searchingThreads[i].join();
+				}
+				
+				// Lock searching threads lock
+				searchingThreadsLock.lock();
+				
+				// Check if not tuning
+				#ifndef TUNING
+				
+					// Free socket descriptor
+					socketDescriptorUniquePointer.reset();
+				#endif
+				
+				// Return if searching threads initialized successfully and performing trimming loop was successful
+				return searchingThreadsInitializedSuccessfully && performingTrimmingLoopResult;
 			}
 			
 			// Otherwise
@@ -2694,20 +3111,20 @@ int main(int argc, char *argv[]) noexcept {
 				}
 				
 				// Display message
-				cout << " of RAM and " << (SLEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory" << endl;
+				cout << " of RAM and " << (SLEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory." << endl;
 				
 				// Check if slean trimming parts is less than its max value
 				if(SLEAN_TRIMMING_PARTS < MAX_SLEAN_TRIMMING_PARTS) {
 				
 					// Display message
-					cout << "Build this program with SLEAN_TRIMMING_PARTS=" << (SLEAN_TRIMMING_PARTS * 2) << " to reduce slean trimming's GPU RAM requirement by about half" << endl;
+					cout << "Build this program with SLEAN_TRIMMING_PARTS=" << (SLEAN_TRIMMING_PARTS * 2) << " to reduce slean trimming's GPU RAM requirement by about half." << endl;
 				}
 				
 				// Check if local RAM kilobytes is greater than its min value
 				if(LOCAL_RAM_KILOBYTES > MIN_LOCAL_RAM_KILOBYTES) {
 				
 					// Display message
-					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce slean trimming's GPU local memory requirement by half" << endl;
+					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce slean trimming's GPU local memory requirement by half." << endl;
 				}
 			}
 		}
@@ -2771,11 +3188,14 @@ int main(int argc, char *argv[]) noexcept {
 				const unsigned int numberOfSearchingThreadsSearchingEdges = min(min(numberOfSearchingThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
 				
 				// Go through all searching threads
+				thread searchingThreads[numberOfSearchingThreads];
 				uint64_t numberOfEdges[numberOfSearchingThreads];
 				barrier searchingThreadsBarrier(numberOfSearchingThreads);
-				const unique_ptr edges = make_unique<uint32_t[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS);
+				const unique_ptr<uint32_t[]> edges(new(nothrow) uint32_t[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS]);
 				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreadsSearchingEdges];
 				unsigned int numberOfSearchingThreadsFinished = 0;
+				bool closeSearchingThreads = false;
+				bool searchingThreadsInitializedSuccessfully = true;
 				
 				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
 				
@@ -2783,27 +3203,48 @@ int main(int argc, char *argv[]) noexcept {
 					if(i < numberOfSearchingThreadsSearchingEdges) {
 					
 						// Create searching thread's node connections
-						nodeConnections[i] = make_unique<CuckatooNodeConnectionsLink[]>(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2);
+						nodeConnections[i] = unique_ptr<CuckatooNodeConnectionsLink[]>(new(nothrow) CuckatooNodeConnectionsLink[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2]);
 					}
 					
 					// Create searching thread
-					thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, searchingThreadIndex = i]() noexcept {
+					searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 					
-						// Check if setting searching thread's priority and affinity failed
-						if(!setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores)) {
+						// Set searching thread's priority and affinity
+						const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
 						
-							// Display message
-							cout << "Setting searching thread's priority and affinity failed" << endl;
-							
-							// Return failure
-							exit(EXIT_FAILURE);
+						// Check if setting searching thread's priority and affinity failed, creating edges failed, creating node connections failed, or initializing thread local global variables failed
+						unique_lock lock(searchingThreadsMutex);
+						const bool initializingFailed = !setThreadPriorityAndAffinityResult || !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+						if(initializingFailed) {
+						
+							// Set searching threads initialized successfully to false
+							searchingThreadsInitializedSuccessfully = false;
 						}
 						
-						// Check if searching thread is searching edges
-						if(searchingThreadIndex < numberOfSearchingThreadsSearchingEdges) {
+						// Check if all searching threads have initialized
+						if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
 						
-							// Initialize thread local global variables
-							initializeCuckatooThreadLocalGlobalVariables();
+							// Reset number of searching threads finished
+							numberOfSearchingThreadsFinished = 0;
+							
+							// Notify that searching threads have initialized
+							searchingThreadsFinished = true;
+							lock.unlock();
+							searchingThreadsFinishedConditionalVariable->notify_one();
+						}
+						
+						// Otherwise
+						else {
+						
+							// Unlock
+							lock.unlock();
+						}
+						
+						// Check if initializing failed
+						if(initializingFailed) {
+						
+							// Return
+							return;
 						}
 						
 						// Set searching thread's bitmap start and end
@@ -2811,7 +3252,6 @@ int main(int argc, char *argv[]) noexcept {
 						const uint_fast32_t bitmapEnd = min((EDGES_BITMAP_SIZE + numberOfSearchingThreads - 1) / numberOfSearchingThreads * (searchingThreadIndex + 1), EDGES_BITMAP_SIZE);
 						
 						// Loop forever
-						unique_lock lock(searchingThreadsMutex, defer_lock);
 						for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
 						
 							// Wait until starting searching threads
@@ -2821,7 +3261,17 @@ int main(int argc, char *argv[]) noexcept {
 								// Return if starting searching threads
 								return startSearchingThreadsTriggerToggle == startTriggerTrue;
 							});
+							
+							// Get if closing thread
+							const bool closeThread = closeSearchingThreads;
 							lock.unlock();
+							
+							// Check if closing thread
+							if(closeThread) {
+							
+								// Return
+								return;
+							}
 							
 							// Go through all of the searching thread's units in the edges bitmap
 							numberOfEdges[searchingThreadIndex] = 0;
@@ -2901,14 +3351,14 @@ int main(int argc, char *argv[]) noexcept {
 											if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+												cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently." << endl;
 											}
 											
 											// Otherwise
 											else {
 											
 												// Display message
-												cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+												cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently." << endl;
 											}
 										}
 										
@@ -2928,14 +3378,14 @@ int main(int argc, char *argv[]) noexcept {
 									if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently." << endl;
 									}
 									
 									// Otherwise
 									else {
 									
 										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently" << endl;
+										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently." << endl;
 									}
 								}
 								
@@ -3038,20 +3488,58 @@ int main(int argc, char *argv[]) noexcept {
 								// Unlock
 								lock.unlock();
 							}
-						}
-						
-					}).detach();
+						}	
+					});
 				}
 				
-				// Check if performing lean trimming loop failed
-				if(!performLeanTrimmingLoop(context.get(), deviceIndex)) {
+				// Wait until searching threads have initialized
+				searchingThreadsFinished = false;
+				searchingThreadsFinishedConditionalVariable->wait(searchingThreadsLock, []() noexcept -> bool {
 				
-					// Return failure
-					exit(EXIT_FAILURE);
+					// Return if searching threads have initialized
+					return searchingThreadsFinished;
+				});
+				
+				// Check if searching threads didn't initialized successfully
+				bool performingTrimmingLoopResult = false;
+				if(!searchingThreadsInitializedSuccessfully) {
+				
+					// Display message
+					cout << "Allocating memory failed." << endl;
 				}
 				
-				// Return success
-				exit(EXIT_SUCCESS);
+				// Otherwise
+				else {
+				
+					// Perform lean trimming loop
+					performingTrimmingLoopResult = performLeanTrimmingLoop(context.get());
+				}
+				
+				// Close searching threads
+				closeSearchingThreads = true;
+				startSearchingThreadsTriggerToggle = !startSearchingThreadsTriggerToggle;
+				searchingThreadsLock.unlock();
+				startSearchingThreadsConditionalVariable->notify_all();
+				
+				// Go through all searching threads
+				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
+				
+					// Join searching thread
+					searchingThreads[i].join();
+				}
+				
+				// Lock searching threads lock
+				searchingThreadsLock.lock();
+				
+				// Check if not tuning
+				#ifndef TUNING
+				
+					// Free socket descriptor
+					socketDescriptorUniquePointer.reset();
+				#endif
+				
+				// Return if searching threads initialized successfully and performing trimming loop was successful
+				return searchingThreadsInitializedSuccessfully && performingTrimmingLoopResult;
 			}
 			
 			// Otherwise
@@ -3089,17 +3577,143 @@ int main(int argc, char *argv[]) noexcept {
 				}
 				
 				// Display message
-				cout << " of RAM" << endl;
+				cout << " of RAM." << endl;
 			}
 		}
+		
+		// Check if not tuning
+		#ifndef TUNING
+		
+			// Free socket descriptor
+			socketDescriptorUniquePointer.reset();
+		#endif
+		
+		// Return true
+		return true;
 	#endif
-	
-	// Return success
-	exit(EXIT_SUCCESS);
 }
 
+// Stop miner
+void stopMiner() noexcept {
 
-// Supporting function implementation
+	// Set closing to true
+	closing = true;
+}
+
+// Check if using Android
+#ifdef __ANDROID__
+
+	// Start miner
+	jboolean Java_com_Cuckatoo_1Reference_1Miner_MainActivity_startMiner(JNIEnv *environment, const jobject object, const jint argc, const jobjectArray argv) noexcept {
+	
+		// Check if getting object's class failed
+		const jclass objectClass = environment->GetObjectClass(object);
+		if(!objectClass) {
+		
+			// Return false
+			return JNI_FALSE;
+		}
+		
+		// Check if getting class's get package name method failed
+		const jmethodID getPackageName = environment->GetMethodID(objectClass, "getPackageName", "()Ljava/lang/String;");
+		if(!getPackageName) {
+		
+			// Return false
+			return JNI_FALSE;
+		}
+		
+		// Check if calling get package name method on the object failed
+		const jstring packageName = reinterpret_cast<jstring>(environment->CallObjectMethod(object, getPackageName));
+		if(!packageName) {
+		
+			// Return false
+			return JNI_FALSE;
+		}
+		
+		// Check if getting package name as a C string failed
+		const auto freePackageNameChar = [environment, packageName](const char *packageNameChar) {
+		
+			// Free package name as a C string
+			environment->ReleaseStringUTFChars(packageName, packageNameChar);
+		};
+		const unique_ptr<const char, decltype(freePackageNameChar)> packageNameChar(environment->GetStringUTFChars(packageName, nullptr), freePackageNameChar);
+		if(!packageNameChar) {
+		
+			// Return false
+			return JNI_FALSE;
+		}
+		
+		// Redirect cout
+		char buffer[BYTES_IN_A_KILOBYTE];
+		size_t bufferSize = 0;
+		const RedirectCout redirectCout([&buffer, &bufferSize, packageNameChar = packageNameChar.get()](const char character) {
+		
+			// Check if character isn't a newline
+			if(character != '\n') {
+			
+				// Check if buffer isn't full
+				if(bufferSize != sizeof(buffer) - sizeof('\0')) {
+				
+					// Append character in buffer
+					buffer[bufferSize++] = character;
+				}
+			}
+			
+			// Otherwise
+			else {
+			
+				// Null terminate buffer
+				buffer[bufferSize] = '\0';
+				
+				// Log buffer
+				__android_log_write(ANDROID_LOG_INFO, packageNameChar, buffer);
+				
+				// Set buffer size to zero
+				bufferSize = 0;
+			}
+		});
+		
+		// Go through all arguments
+		char *argvChar[argc];
+		for(jint i = 0; i < argc; ++i) {
+		
+			// Check if getting argument as a C string failed
+			argvChar[i] = const_cast<char *>(environment->GetStringUTFChars(reinterpret_cast<jstring>(environment->GetObjectArrayElement(argv, i)), nullptr));
+			if(!argvChar[i]) {
+			
+				// Go through all previous arguments
+				for(jint j = 0; j < i; ++j) {
+				
+					// Free argument as a C string
+					environment->ReleaseStringUTFChars(reinterpret_cast<jstring>(environment->GetObjectArrayElement(argv, j)), argvChar[j]);
+				}
+				
+				// Return false
+				return JNI_FALSE;
+			}
+		}
+		
+		// Get result of starting miner
+		const bool result = startMiner(argc, argvChar);
+		
+		// Go through all arguments
+		for(jint i = 0; i < argc; ++i) {
+		
+			// Free argument as a C string
+			environment->ReleaseStringUTFChars(reinterpret_cast<jstring>(environment->GetObjectArrayElement(argv, i)), argvChar[i]);
+		}
+		
+		// Return result
+		return result ? JNI_TRUE : JNI_FALSE;
+	}
+	
+	// Stop miner
+	void Java_com_Cuckatoo_1Reference_1Miner_MainActivity_stopMiner(__attribute__((unused)) const JNIEnv *environment, __attribute__((unused)) const jobject object) noexcept {
+	
+		// Stop miner
+		stopMiner();
+	}
+#endif
 
 // Check if not tuning
 #ifndef TUNING
@@ -3140,11 +3754,16 @@ int main(int argc, char *argv[]) noexcept {
 	// Display message
 	cout << endl << "Mining info:" << endl;
 	
-	// Set graphs searched to zero
-	static uint64_t graphsProcessed = 0;
+	// Get if is first graph
+	const bool isFirstGraph = !graphsProcessed;
 	
-	// Set previously disconnected from server to false
-	static bool previouslyDisconnectedFromServer = false;
+	// Check if is first graph
+	static bool previouslyDisconnectedFromServer;
+	if(isFirstGraph) {
+	
+		// Set previously disconnected from server to false
+		previouslyDisconnectedFromServer = false;
+	}
 	
 	// Display message
 	cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (graphsProcessed ? (previouslyDisconnectedFromServer ? ". This is lower for this graph since it includes the time taken to reconnect to the stratum server" : "") : ". This is lower for the first graph since it includes the time taken to prime the pipeline") << endl;
@@ -3161,14 +3780,20 @@ int main(int argc, char *argv[]) noexcept {
 	// Check if not tuning
 	#ifndef TUNING
 	
-		// Set solutions found to zero
-		static uint64_t solutionsFound = 0;
+		// Check if is first graph
+		static uint64_t solutionsFound;
+		static chrono::high_resolution_clock::time_point lastKeepAliveTime;
+		if(isFirstGraph) {
+		
+			// Set solutions found to zero
+			solutionsFound = 0;
+			
+			// Record last keep alive time
+			lastKeepAliveTime = endTime;
+		}
 		
 		// Set reconnect to server to false
 		bool reconnectToServer = false;
-		
-		// Record last keep alive time
-		static chrono::high_resolution_clock::time_point lastKeepAliveTime = endTime;
 		
 		// Check if searching threads found a solution
 		if(searchingThreadsSolution[1]) {
@@ -3182,14 +3807,14 @@ int main(int argc, char *argv[]) noexcept {
 			if(requestSize < 0) {
 			
 				// Display message
-				cout << "Creating submit request failed" << endl;
+				cout << "Creating submit request failed." << endl;
 			}
 			
 			// Otherwise check if sending submit request to the stratum server failed
 			else if(!sendFull(submitRequest, requestSize)) {
 			
 				// Display message
-				cout << "Sending submit request to the stratum server failed" << endl;
+				cout << "Sending submit request to the stratum server failed." << endl;
 				
 				// Set reconnect to server to true
 				reconnectToServer = true;
@@ -3213,7 +3838,7 @@ int main(int argc, char *argv[]) noexcept {
 			if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
 			
 				// Display message
-				cout << "Sending keep alive request to the stratum server failed" << endl;
+				cout << "Sending keep alive request to the stratum server failed." << endl;
 				
 				// Set reconnect to server to true
 				reconnectToServer = true;
@@ -3227,8 +3852,13 @@ int main(int argc, char *argv[]) noexcept {
 			}
 		}
 		
-		// Set total received to zero
-		static size_t totalReceived = 0;
+		// Check if is first graph
+		static size_t totalReceived;
+		if(isFirstGraph) {
+		
+			// Set total received to zero
+			totalReceived = 0;
+		}
 		
 		// Check if not reconnecting to the server
 		if(!reconnectToServer) {
@@ -3263,7 +3893,7 @@ int main(int argc, char *argv[]) noexcept {
 				#endif
 				
 					// Display message
-					cout << "Getting if a response from the stratum server exists failed" << endl;
+					cout << "Getting if a response from the stratum server exists failed." << endl;
 					
 					// Set reconnect to server to true
 					reconnectToServer = true;
@@ -3280,7 +3910,7 @@ int main(int argc, char *argv[]) noexcept {
 					if(received <= 0) {
 					
 						// Display message
-						cout << "Receiving response from the stratum server failed" << endl;
+						cout << "Receiving response from the stratum server failed." << endl;
 						
 						// Set reconnect to server to true
 						reconnectToServer = true;
@@ -3296,7 +3926,7 @@ int main(int argc, char *argv[]) noexcept {
 						if(static_cast<size_t>(received) == sizeof(serverResponse) - totalReceived - sizeof('\0')) {
 						
 							// Display message
-							cout << "Receiving response from the stratum server failed" << endl;
+							cout << "Receiving response from the stratum server failed." << endl;
 							
 							// Set reconnect to server to true
 							reconnectToServer = true;
@@ -3334,11 +3964,14 @@ int main(int argc, char *argv[]) noexcept {
 		if(reconnectToServer) {
 		
 			// Display message
-			cout << "Disconnected from the stratum server" << endl;
+			cout << "Disconnected from the stratum server." << endl;
 			
 			// Loop while not closing, not connecting to server, and not closing
 			while(!closing && !connectToServer() && !closing) {
 			
+				// Free socket descriptor
+				socketDescriptorUniquePointer.reset();
+				
 				// Check if using Windows
 				#ifdef _WIN32
 				
@@ -3398,12 +4031,7 @@ int main(int argc, char *argv[]) noexcept {
 		// Display message
 		cout << ':' << stratumServerPort << endl;
 		
-		// Create socket descriptor unique pointer
-		static unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)> socketDescriptorUniquePointer(nullptr, [](__attribute__((unused)) decltype(socketDescriptor) *socketDescriptorPointer) noexcept {
-		
-		});
-		
-		// Free socket descriptor if it exists
+		// Free socket descriptor
 		socketDescriptorUniquePointer.reset();
 		
 		// Check if getting address info for the stratum server failed
@@ -3422,7 +4050,7 @@ int main(int argc, char *argv[]) noexcept {
 		if(getaddrinfo(serverAddress, stratumServerPort, &addressInfoHints, &addressInfo)) {
 		
 			// Display message
-			cout << "Getting address info for the stratum server failed" << endl;
+			cout << "Getting address info for the stratum server failed." << endl;
 			
 			// Return false
 			return false;
@@ -3536,14 +4164,14 @@ int main(int argc, char *argv[]) noexcept {
 		#endif
 		
 			// Display message
-			cout << "Connecting to the stratum server failed" << endl;
+			cout << "Connecting to the stratum server failed." << endl;
 			
 			// Return false
 			return false;
 		}
 		
 		// Display message
-		cout << "Connected to the stratum server" << endl;
+		cout << "Connected to the stratum server." << endl;
 		
 		// Automatically free socket descriptor when done
 		socketDescriptorUniquePointer = unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)>(&socketDescriptor, [](decltype(socketDescriptor) *socketDescriptorPointer) noexcept {
@@ -3579,28 +4207,28 @@ int main(int argc, char *argv[]) noexcept {
 		else {
 		
 			// Display message
-			cout << "Logging into the stratum server without a username" << endl;
+			cout << "Logging into the stratum server without a username." << endl;
 		}
 		
 		// Check if stratum server password exists
 		if(stratumServerPassword) {
 		
 			// Display message
-			cout << "Logging into the stratum server with the specified password" << endl;
+			cout << "Logging into the stratum server with the specified password." << endl;
 		}
 		
 		// Otherwise
 		else {
 		
 			// Display message
-			cout << "Logging into the stratum server without a password" << endl;
+			cout << "Logging into the stratum server without a password." << endl;
 		}
 		
 		// Check if sending login request to the stratum server failed
 		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0')) || (stratumServerUsername && !sendFull(stratumServerUsername, strlen(stratumServerUsername))) || !sendFull("\",\"pass\":\"", sizeof("\",\"pass\":\"") - sizeof('\0')) || (stratumServerPassword && !sendFull(stratumServerPassword, strlen(stratumServerPassword))) || !sendFull("\",\"agent\":\"" TO_STRING(NAME) "\"}}\n", sizeof("\",\"agent\":\"" TO_STRING(NAME) "\"}}\n") - sizeof('\0'))) {
 		
 			// Display message
-			cout << "Sending login request to the stratum server failed" << endl;
+			cout << "Sending login request to the stratum server failed." << endl;
 			
 			// Return false
 			return false;
@@ -3610,7 +4238,7 @@ int main(int argc, char *argv[]) noexcept {
 		if(!receiveFull(serverResponse, sizeof(serverResponse))) {
 		
 			// Display message
-			cout << "Receiving response from the stratum server failed" << endl;
+			cout << "Receiving response from the stratum server failed." << endl;
 			
 			// Return false
 			return false;
@@ -3620,7 +4248,7 @@ int main(int argc, char *argv[]) noexcept {
 		if((strstr(serverResponse, "\"error\":") && !strstr(serverResponse, "\"error\":null") && !strstr(serverResponse, "\"error\": null")) || strstr(serverResponse, "\"result\":null") || strstr(serverResponse, "\"result\": null")) {
 		
 			// Display message
-			cout << "Logging into the stratum server failed" << endl;
+			cout << "Logging into the stratum server failed." << endl;
 			
 			// Check if response contains a message
 			const char *message = strstr(serverResponse, "\"message\":");
@@ -3661,16 +4289,16 @@ int main(int argc, char *argv[]) noexcept {
 		}
 		
 		// Display message
-		cout << "Logged into the stratum server" << endl;
+		cout << "Logged into the stratum server." << endl;
 		
 		// Display message
-		cout << "Getting job from the stratum server" << endl;
+		cout << "Getting job from the stratum server." << endl;
 		
 		// Check if sending get job template request to the stratum server failed
 		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n") - sizeof('\0'))) {
 		
 			// Display message
-			cout << "Sending get job template request to the stratum server failed" << endl;
+			cout << "Sending get job template request to the stratum server failed." << endl;
 			
 			// Return false
 			return false;
@@ -3680,7 +4308,7 @@ int main(int argc, char *argv[]) noexcept {
 		if(!receiveFull(serverResponse, sizeof(serverResponse))) {
 		
 			// Display message
-			cout << "Receiving response from the stratum server failed" << endl;
+			cout << "Receiving response from the stratum server failed." << endl;
 			
 			// Return false
 			return false;
@@ -3690,14 +4318,14 @@ int main(int argc, char *argv[]) noexcept {
 		if(!processServerResponse()) {
 		
 			// Display message
-			cout << "Getting job from the stratum server failed" << endl;
+			cout << "Getting job from the stratum server failed." << endl;
 			
 			// Return false
 			return false;
 		}
 		
 		// Display message
-		cout << "Got job from the stratum server" << endl;
+		cout << "Got job from the stratum server." << endl;
 		
 		// Return true
 		return true;

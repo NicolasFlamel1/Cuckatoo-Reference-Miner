@@ -188,13 +188,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
+		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint *bucketsSecondPart) {
+		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint *bucketsSecondPart) {
 	#endif
 
 // Otherwise check if local buckets size is two
@@ -204,13 +204,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
+		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint2 *bucketsSecondPart) {
+		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint2 *bucketsSecondPart) {
 	#endif
 
 // Otherwise
@@ -220,13 +220,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
+		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint4 *bucketsSecondPart) {
+		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, __global uint4 *bucketsSecondPart) {
 	#endif
 #endif
 
@@ -475,13 +475,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step two
-	void trimEdgesStepTwo(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepTwo(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step two
-	void trimEdgesStepTwo(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart) {
+	__kernel void trimEdgesStepTwo(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart) {
 #endif
 
 	// Declare bitmap
@@ -579,7 +579,7 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 }
 
 // Trim edges step three
-void trimEdgesStepThree(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint2 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepThree(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint2 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -653,7 +653,7 @@ void trimEdgesStepThree(__global const uint *sourceBuckets, __global const uint 
 }
 
 // Trim edges step four
-void trimEdgesStepFour(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint4 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepFour(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint4 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -721,7 +721,7 @@ void trimEdgesStepFour(__global const uint2 *sourceBuckets, __global const uint 
 }
 
 // Trim edges step five
-void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint4 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
+__kernel void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint4 *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -789,19 +789,19 @@ void trimEdgesStepFive(__global const uint4 *sourceBuckets, __global const uint 
 #if TRIMMING_ROUNDS == 1
 
 	// Trim edges step six
-	void trimEdgesStepSix(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepSix(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges, const ulong4 sipHashKeys) {
 
 // Otherwise check if trimming rounds is two
 #elif TRIMMING_ROUNDS == 2
 
 	// Trim edges step six
-	void trimEdgesStepSix(__global const uint2 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepSix(__global const uint2 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step six
-	void trimEdgesStepSix(__global const uint4 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges) {
+	__kernel void trimEdgesStepSix(__global const uint4 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *remainingEdges) {
 #endif
 
 	// Declare index

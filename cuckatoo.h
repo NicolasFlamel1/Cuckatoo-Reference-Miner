@@ -40,7 +40,7 @@ thread_local static uint32_t cuckatooRootNode;
 // Function prototypes
 
 // Initialize cuckatoo thread local global variables
-static inline void initializeCuckatooThreadLocalGlobalVariables() noexcept;
+static inline bool initializeCuckatooThreadLocalGlobalVariables() noexcept;
 
 // Get cuckatoo solution
 static inline bool getCuckatooSolution(uint32_t solution[SOLUTION_SIZE], CuckatooNodeConnectionsLink *nodeConnections, const uint32_t *edges, const uint64_t numberOfEdges) noexcept;
@@ -55,14 +55,24 @@ static inline bool searchNodeConnectionsForCuckatooSolutionSecondPartition(const
 // Supporting function implementation
 
 // Initialize cuckatoo thread local global variables
-void initializeCuckatooThreadLocalGlobalVariables() noexcept {
+bool initializeCuckatooThreadLocalGlobalVariables() noexcept {
 
-	// Access thread local global variables so that they are created
+	// Check if creating thread local global variables failed
+	if(!cuckatooUNewestNodeConnections || !cuckatooVNewestNodeConnections || !cuckatooUVisitedNodePairs || !cuckatooVVisitedNodePairs) {
+	
+		// Return false
+		return false;
+	}
+	
+	// Reset thread local global variables
 	cuckatooUNewestNodeConnections.clear();
 	cuckatooVNewestNodeConnections.clear();
 	cuckatooUVisitedNodePairs.clear();
 	cuckatooVVisitedNodePairs.clear();
 	cuckatooRootNode = 0;
+	
+	// Retrn true
+	return true;
 }
 
 // Get cuckatoo solution

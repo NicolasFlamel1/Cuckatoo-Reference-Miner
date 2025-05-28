@@ -18,6 +18,9 @@ template<typename ValueType, const uint32_t size> class HashTable final {
 		// Constructor
 		inline explicit HashTable() noexcept;
 		
+		// Bool operator
+		inline explicit operator bool() const noexcept;
+		
 		// Set unique
 		inline void setUnique(const uint32_t key, const ValueType *value) noexcept;
 		
@@ -66,14 +69,25 @@ template<typename ValueType, const uint32_t size> class HashTable final {
 template<typename ValueType, const uint32_t size> HashTable<ValueType, size>::HashTable() noexcept :
 
 	// Create entries
-	entries(make_unique<HashTableEntry[]>(bitCeilingConstantExpression(size + 1)))
+	entries(new(nothrow) HashTableEntry[bitCeilingConstantExpression(size + 1)])
 {
 
 	// Throw error is size is invalid
 	static_assert(size <= bitCeilingConstantExpression(UINT32_MAX >> 1) - 1, "Hash table's size is invalid");
 	
-	// Clear entries
-	memset(entries.get(), 0, sizeof(HashTableEntry) * bitCeilingConstantExpression(size + 1));
+	// Check if creating entries was successful
+	if(entries) {
+	
+		// Clear entries
+		memset(entries.get(), 0, sizeof(HashTableEntry) * bitCeilingConstantExpression(size + 1));
+	}
+}
+
+// Bool operator
+template<typename ValueType, const uint32_t size> HashTable<ValueType, size>::operator bool() const noexcept {
+
+	// Return if creating entries was successful
+	return entries.get();
 }
 
 // Set unique

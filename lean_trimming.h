@@ -28,7 +28,7 @@ using namespace std;
 	static inline MTL::Device *createLeanTrimmingContext(const unsigned int deviceIndex) noexcept;
 	
 	// Perform lean trimming loop
-	static inline bool performLeanTrimmingLoop(MTL::Device *device, const unsigned int deviceIndex) noexcept;
+	static inline bool performLeanTrimmingLoop(MTL::Device *device) noexcept;
 	
 // Otherwise
 #else
@@ -37,7 +37,7 @@ using namespace std;
 	static inline cl_context createLeanTrimmingContext(const cl_platform_id platforms[], const cl_uint numberOfPlatforms, const unsigned int deviceIndex) noexcept;
 	
 	// Perform lean trimming loop
-	static inline bool performLeanTrimmingLoop(const cl_context context, const unsigned int deviceIndex) noexcept;
+	static inline bool performLeanTrimmingLoop(const cl_context context) noexcept;
 #endif
 
 
@@ -98,7 +98,21 @@ using namespace std;
 							
 								// Check if device's memory size is large enough
 								if(device->recommendedMaxWorkingSetSize() >= LEAN_TRIMMING_REQUIRED_RAM_BYTES) {
-							
+								
+									// Check if device index is specified
+									if(deviceIndex != ALL_DEVICES) {
+									
+										// Display message
+										cout << "Using the GPU for lean trimming." << endl;
+									}
+									
+									// Otherwise
+									else {
+									
+										// Display message
+										cout << "Using " << utf8String << " for lean trimming." << endl;
+									}
+									
 									// Don't free device when devices is freed
 									device->retain();
 									
@@ -170,6 +184,20 @@ using namespace std;
 												cl_context context = clCreateContext(unmove((const cl_context_properties[]){CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties>(platforms[i]), 0}), 1, &devices[j], nullptr, nullptr, nullptr);
 												if(context) {
 												
+													// Check if device index is specified
+													if(deviceIndex != ALL_DEVICES) {
+													
+														// Display message
+														cout << "Using the GPU for lean trimming." << endl;
+													}
+													
+													// Otherwise
+													else {
+													
+														// Display message
+														cout << "Using " << name << " for lean trimming." << endl;
+													}
+													
 													// Return context
 													return context;
 												}
@@ -193,46 +221,10 @@ using namespace std;
 #if defined __APPLE__ && !defined USE_OPENCL
 
 	// Perform lean trimming loop
-	bool performLeanTrimmingLoop(MTL::Device *device, const unsigned int deviceIndex) noexcept {
+	bool performLeanTrimmingLoop(MTL::Device *device) noexcept {
 	
-		// Check if device index is specified
-		if(deviceIndex != ALL_DEVICES) {
-		
-			// Display message
-			cout << "Using the GPU for lean trimming" << endl;
-		}
-		
-		// Otherwise
-		else {
-		
-			// Check if device's name doesn't exist
-			const NS::String *name = device->name();
-			if(!name) {
-			
-				// Display message
-				cout << "Getting GPU's name failed" << endl;
-				
-				// Return false
-				return false;
-			}
-			
-			// Check if name's UTF-8 string doesn't exist
-			const char *utf8String = name->utf8String();
-			if(!utf8String) {
-			
-				// Display message
-				cout << "Getting GPU's name failed" << endl;
-				
-				// Return false
-				return false;
-			}
-			
-			// Display message
-			cout << "Using " << utf8String << " for lean trimming" << endl;
-		}
-		
 		// Check if creating preprocessor macros failed
-		static const unique_ptr<NS::Dictionary, void(*)(NS::Dictionary *)> preprocessorMacros(NS::Dictionary::alloc()->init((const NS::Object *[]){
+		const unique_ptr<NS::Dictionary, void(*)(NS::Dictionary *)> preprocessorMacros(NS::Dictionary::alloc()->init((const NS::Object *[]){
 		
 			// Edge bits value
 			MTLSTR(TO_STRING(EDGE_BITS)),
@@ -261,14 +253,14 @@ using namespace std;
 		if(!preprocessorMacros) {
 		
 			// Display message
-			cout << "Creating preprocessor macros for the kernels failed" << endl;
+			cout << "Creating preprocessor macros for the kernels failed." << endl;
 			
 			// Return false
 			return false;
 		}
 		
 		// Check if creating compile options for the kernels failed
-		static const unique_ptr<MTL::CompileOptions, void(*)(MTL::CompileOptions *)> compileOptions(MTL::CompileOptions::alloc()->init(), [](MTL::CompileOptions *compileOptions) noexcept {
+		const unique_ptr<MTL::CompileOptions, void(*)(MTL::CompileOptions *)> compileOptions(MTL::CompileOptions::alloc()->init(), [](MTL::CompileOptions *compileOptions) noexcept {
 		
 			// Free compile options
 			compileOptions->release();
@@ -276,7 +268,7 @@ using namespace std;
 		if(!compileOptions) {
 		
 			// Display message
-			cout << "Creating compile options for the kernels failed" << endl;
+			cout << "Creating compile options for the kernels failed." << endl;
 			
 			// Return false
 			return false;
@@ -291,7 +283,7 @@ using namespace std;
 			#include "./lean_trimming.metal"
 		);
 		NS::Error *createLibraryError;
-		static const unique_ptr<MTL::Library, void(*)(MTL::Library *)> library(device->newLibrary(source, compileOptions.get(), &createLibraryError), [](MTL::Library *library) noexcept {
+		const unique_ptr<MTL::Library, void(*)(MTL::Library *)> library(device->newLibrary(source, compileOptions.get(), &createLibraryError), [](MTL::Library *library) noexcept {
 		
 			// Free library
 			library->release();
@@ -299,7 +291,7 @@ using namespace std;
 		if(!library) {
 		
 			// Display message
-			cout << "Creating library for the GPU failed" << endl;
+			cout << "Creating library for the GPU failed." << endl;
 			
 			// Check if an error exists
 			if(createLibraryError) {
@@ -323,27 +315,27 @@ using namespace std;
 		}
 		
 		// Check if getting kernels from the library failed
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepOneKernel(library->newFunction(MTLSTR("trimEdgesStepOne")), [](MTL::Function *stepOneKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepOneKernel(library->newFunction(MTLSTR("trimEdgesStepOne")), [](MTL::Function *stepOneKernel) noexcept {
 		
 			// Free step one kernel
 			stepOneKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwoKernel(library->newFunction(MTLSTR("trimEdgesStepTwo")), [](MTL::Function *stepTwoKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepTwoKernel(library->newFunction(MTLSTR("trimEdgesStepTwo")), [](MTL::Function *stepTwoKernel) noexcept {
 		
 			// Free step two kernel
 			stepTwoKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThreeKernel(library->newFunction(MTLSTR("trimEdgesStepThree")), [](MTL::Function *stepThreeKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepThreeKernel(library->newFunction(MTLSTR("trimEdgesStepThree")), [](MTL::Function *stepThreeKernel) noexcept {
 		
 			// Free step three kernel
 			stepThreeKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFourKernel(library->newFunction(MTLSTR("trimEdgesStepFour")), [](MTL::Function *stepFourKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> stepFourKernel(library->newFunction(MTLSTR("trimEdgesStepFour")), [](MTL::Function *stepFourKernel) noexcept {
 		
 			// Free step four kernel
 			stepFourKernel->release();
 		});
-		static const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNodesBitmapKernel(library->newFunction(MTLSTR("clearNodesBitmap")), [](MTL::Function *clearNodesBitmapKernel) noexcept {
+		const unique_ptr<MTL::Function, void(*)(MTL::Function *)> clearNodesBitmapKernel(library->newFunction(MTLSTR("clearNodesBitmap")), [](MTL::Function *clearNodesBitmapKernel) noexcept {
 		
 			// Free clear nodes bitmap kernel
 			clearNodesBitmapKernel->release();
@@ -351,7 +343,7 @@ using namespace std;
 		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel || !clearNodesBitmapKernel) {
 		
 			// Display message
-			cout << "Getting kernels from the library failed" << endl;
+			cout << "Getting kernels from the library failed." << endl;
 			
 			// Return false
 			return false;
@@ -359,31 +351,31 @@ using namespace std;
 		
 		// Check if creating pipelines for the device failed
 		NS::Error *createPipelineOneError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepOnePipeline(device->newComputePipelineState(stepOneKernel.get(), &createPipelineOneError), [](MTL::ComputePipelineState *stepOnePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepOnePipeline(device->newComputePipelineState(stepOneKernel.get(), &createPipelineOneError), [](MTL::ComputePipelineState *stepOnePipeline) noexcept {
 		
 			// Free step one pipeline
 			stepOnePipeline->release();
 		});
 		NS::Error *createPipelineTwoError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwoPipeline(device->newComputePipelineState(stepTwoKernel.get(), &createPipelineTwoError), [](MTL::ComputePipelineState *stepTwoPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepTwoPipeline(device->newComputePipelineState(stepTwoKernel.get(), &createPipelineTwoError), [](MTL::ComputePipelineState *stepTwoPipeline) noexcept {
 		
 			// Free step two pipeline
 			stepTwoPipeline->release();
 		});
 		NS::Error *createPipelineThreeError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThreePipeline(device->newComputePipelineState(stepThreeKernel.get(), &createPipelineThreeError), [](MTL::ComputePipelineState *stepThreePipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepThreePipeline(device->newComputePipelineState(stepThreeKernel.get(), &createPipelineThreeError), [](MTL::ComputePipelineState *stepThreePipeline) noexcept {
 		
 			// Free step three pipeline
 			stepThreePipeline->release();
 		});
 		NS::Error *createPipelineFourError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFourPipeline(device->newComputePipelineState(stepFourKernel.get(), &createPipelineFourError), [](MTL::ComputePipelineState *stepFourPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> stepFourPipeline(device->newComputePipelineState(stepFourKernel.get(), &createPipelineFourError), [](MTL::ComputePipelineState *stepFourPipeline) noexcept {
 		
 			// Free step four pipeline
 			stepFourPipeline->release();
 		});
 		NS::Error *createPipelineClearNodesBitmapError;
-		static unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNodesBitmapPipeline(device->newComputePipelineState(clearNodesBitmapKernel.get(), &createPipelineClearNodesBitmapError), [](MTL::ComputePipelineState *clearNodesBitmapPipeline) noexcept {
+		unique_ptr<MTL::ComputePipelineState, void(*)(MTL::ComputePipelineState *)> clearNodesBitmapPipeline(device->newComputePipelineState(clearNodesBitmapKernel.get(), &createPipelineClearNodesBitmapError), [](MTL::ComputePipelineState *clearNodesBitmapPipeline) noexcept {
 		
 			// Free clear nodes bitmap pipeline
 			clearNodesBitmapPipeline->release();
@@ -391,7 +383,7 @@ using namespace std;
 		if(!stepOnePipeline || !stepTwoPipeline || !stepThreePipeline || !stepFourPipeline || !clearNodesBitmapPipeline) {
 		
 			// Display message
-			cout << "Creating pipelines for the GPU failed" << endl;
+			cout << "Creating pipelines for the GPU failed." << endl;
 			
 			// Check if creating pipeline one failed and an error exists
 			if(!stepOnePipeline && createPipelineOneError) {
@@ -521,27 +513,27 @@ using namespace std;
 		};
 		
 		// Check if creating pipeline descriptors failed
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepOnePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepOnePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepOnePipelineDescriptor) noexcept {
 		
 			// Free step one pipeline descriptor
 			stepOnePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwoPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepTwoPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepTwoPipelineDescriptor) noexcept {
 		
 			// Free step two pipeline descriptor
 			stepTwoPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThreePipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepThreePipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepThreePipelineDescriptor) noexcept {
 		
 			// Free step three pipeline descriptor
 			stepThreePipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFourPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> stepFourPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *stepFourPipelineDescriptor) noexcept {
 		
 			// Free step four pipeline descriptor
 			stepFourPipelineDescriptor->release();
 		});
-		static const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNodesBitmapPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNodesBitmapPipelineDescriptor) noexcept {
+		const unique_ptr<MTL::ComputePipelineDescriptor, void(*)(MTL::ComputePipelineDescriptor *)> clearNodesBitmapPipelineDescriptor(MTL::ComputePipelineDescriptor::alloc()->init(), [](MTL::ComputePipelineDescriptor *clearNodesBitmapPipelineDescriptor) noexcept {
 		
 			// Free clear nodes bitmap pipeline descriptor
 			clearNodesBitmapPipelineDescriptor->release();
@@ -549,7 +541,7 @@ using namespace std;
 		if(!stepOnePipelineDescriptor || !stepTwoPipelineDescriptor || !stepThreePipelineDescriptor || !stepFourPipelineDescriptor || !clearNodesBitmapPipelineDescriptor) {
 		
 			// Display message
-			cout << "Creating pipeline descriptors failed" << endl;
+			cout << "Creating pipeline descriptors failed." << endl;
 			
 			// Return false
 			return false;
@@ -605,7 +597,7 @@ using namespace std;
 		if(!stepOnePipeline || !stepTwoPipeline || !stepThreePipeline || !stepFourPipeline || !clearNodesBitmapPipeline) {
 		
 			// Display message
-			cout << "Creating pipelines for the GPU failed" << endl;
+			cout << "Creating pipelines for the GPU failed." << endl;
 			
 			// Check if recreating pipeline one failed and an error exists
 			if(!stepOnePipeline && createPipelineOneError) {
@@ -697,17 +689,17 @@ using namespace std;
 		}
 		
 		// Check if allocating memory on the device failed
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> edgesBitmapOne(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModeShared | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *edgesBitmapOne) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> edgesBitmapOne(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModeShared | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *edgesBitmapOne) noexcept {
 		
 			// Free edges bitmap one
 			edgesBitmapOne->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> edgesBitmapTwo(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModeShared | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *edgesBitmapTwo) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> edgesBitmapTwo(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModeShared | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *edgesBitmapTwo) noexcept {
 		
 			// Free edges bitmap two
 			edgesBitmapTwo->release();
 		});
-		static const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> nodesBitmap(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *nodesBitmap) noexcept {
+		const unique_ptr<MTL::Buffer, void(*)(MTL::Buffer *)> nodesBitmap(device->newBuffer(NUMBER_OF_EDGES / BITS_IN_A_BYTE, MTL::ResourceStorageModePrivate | MTL::ResourceHazardTrackingModeUntracked), [](MTL::Buffer *nodesBitmap) noexcept {
 		
 			// Free nodes bitmap
 			nodesBitmap->release();
@@ -715,14 +707,14 @@ using namespace std;
 		if(!edgesBitmapOne || !edgesBitmapTwo || !nodesBitmap) {
 		
 			// Display message
-			cout << "Allocating memory on the GPU failed" << endl;
+			cout << "Allocating memory on the GPU failed." << endl;
 			
 			// Return false
 			return false;
 		}
 		
 		// Check if creating command queue for the device failed
-		static const unique_ptr<MTL::CommandQueue, void(*)(MTL::CommandQueue *)> commandQueue(device->newCommandQueue(), [](MTL::CommandQueue *commandQueue) noexcept {
+		const unique_ptr<MTL::CommandQueue, void(*)(MTL::CommandQueue *)> commandQueue(device->newCommandQueue(), [](MTL::CommandQueue *commandQueue) noexcept {
 		
 			// Free command queue
 			commandQueue->release();
@@ -730,7 +722,7 @@ using namespace std;
 		if(!commandQueue) {
 		
 			// Display message
-			cout << "Creating command queue for the GPU failed" << endl;
+			cout << "Creating command queue for the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -756,7 +748,7 @@ using namespace std;
 		chrono::high_resolution_clock::time_point startTime = previousGraphProcessedTime;
 		
 		// Check if creating autorelease pool failed
-		static unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
+		unique_ptr<NS::AutoreleasePool, void(*)(NS::AutoreleasePool *)> autoreleasePool(NS::AutoreleasePool::alloc()->init(), [](NS::AutoreleasePool *autoreleasePool) noexcept {
 		
 			// Free autorelease pool
 			autoreleasePool->release();
@@ -764,7 +756,7 @@ using namespace std;
 		if(!autoreleasePool) {
 		
 			// Display message
-			cout << "Creating autorelease pool failed" << endl;
+			cout << "Creating autorelease pool failed." << endl;
 			
 			// Return false
 			return false;
@@ -775,7 +767,7 @@ using namespace std;
 		if(!commandBuffer) {
 		
 			// Display message
-			cout << "Creating command queue's command buffer failed" << endl;
+			cout << "Creating command queue's command buffer failed." << endl;
 			
 			// Return false
 			return false;
@@ -786,7 +778,7 @@ using namespace std;
 		if(!computePassEncoder) {
 		
 			// Display message
-			cout << "Creating command buffer's compute pass encoder failed" << endl;
+			cout << "Creating command buffer's compute pass encoder failed." << endl;
 			
 			// Return false
 			return false;
@@ -844,6 +836,9 @@ using namespace std;
 		// Run the compute pass
 		commandBuffer->commit();
 		
+		// Wait until the compute pass has finished
+		commandBuffer->waitUntilCompleted();
+		
 		// Check if closing
 		if(closing) {
 			
@@ -851,14 +846,11 @@ using namespace std;
 			return true;
 		}
 		
-		// Wait until the compute pass has finished
-		commandBuffer->waitUntilCompleted();
-		
 		// Check if running compute pass failed
 		if(commandBuffer->error()) {
 		
 			// Display message
-			cout << "Running compute pass failed" << endl;
+			cout << "Running compute pass failed." << endl;
 			
 			// Return false
 			return false;
@@ -882,7 +874,7 @@ using namespace std;
 		if(!autoreleasePool) {
 		
 			// Display message
-			cout << "Creating autorelease pool failed" << endl;
+			cout << "Creating autorelease pool failed." << endl;
 			
 			// Return false
 			return false;
@@ -893,7 +885,7 @@ using namespace std;
 		if(!commandBuffer) {
 		
 			// Display message
-			cout << "Creating command queue's command buffer failed" << endl;
+			cout << "Creating command queue's command buffer failed." << endl;
 			
 			// Return false
 			return false;
@@ -904,7 +896,7 @@ using namespace std;
 		if(!computePassEncoder) {
 		
 			// Display message
-			cout << "Creating command buffer's compute pass encoder failed" << endl;
+			cout << "Creating command buffer's compute pass encoder failed." << endl;
 			
 			// Return false
 			return false;
@@ -965,17 +957,17 @@ using namespace std;
 		// Trimming finished
 		trimmingFinished(edgesBitmapOne->contents(), sipHashKeysOne, heightOne, idOne, nonceOne);
 		
+		// Wait until the compute pass has finished
+		commandBuffer->waitUntilCompleted();
+		
 		// While not closing
 		while(!closing) {
 		
-			// Wait until the compute pass has finished
-			commandBuffer->waitUntilCompleted();
-			
 			// Check if running compute pass failed
 			if(commandBuffer->error()) {
 			
 				// Display message
-				cout << "Running compute pass failed" << endl;
+				cout << "Running compute pass failed." << endl;
 				
 				// Return false
 				return false;
@@ -999,7 +991,7 @@ using namespace std;
 			if(!autoreleasePool) {
 			
 				// Display message
-				cout << "Creating autorelease pool failed" << endl;
+				cout << "Creating autorelease pool failed." << endl;
 				
 				// Return false
 				return false;
@@ -1010,7 +1002,7 @@ using namespace std;
 			if(!commandBuffer) {
 			
 				// Display message
-				cout << "Creating command queue's command buffer failed" << endl;
+				cout << "Creating command queue's command buffer failed." << endl;
 				
 				// Return false
 				return false;
@@ -1021,7 +1013,7 @@ using namespace std;
 			if(!computePassEncoder) {
 			
 				// Display message
-				cout << "Creating command buffer's compute pass encoder failed" << endl;
+				cout << "Creating command buffer's compute pass encoder failed." << endl;
 				
 				// Return false
 				return false;
@@ -1081,6 +1073,9 @@ using namespace std;
 			// Trimming finished
 			trimmingFinished(edgesBitmapTwo->contents(), sipHashKeysTwo, heightTwo, idTwo, nonceTwo);
 			
+			// Wait until the compute pass has finished
+			commandBuffer->waitUntilCompleted();
+			
 			// Check if closing
 			if(closing) {
 			
@@ -1088,14 +1083,11 @@ using namespace std;
 				return true;
 			}
 			
-			// Wait until the compute pass has finished
-			commandBuffer->waitUntilCompleted();
-			
 			// Check if running compute pass failed
 			if(commandBuffer->error()) {
 			
 				// Display message
-				cout << "Running compute pass failed" << endl;
+				cout << "Running compute pass failed." << endl;
 				
 				// Return false
 				return false;
@@ -1119,7 +1111,7 @@ using namespace std;
 			if(!autoreleasePool) {
 			
 				// Display message
-				cout << "Creating autorelease pool failed" << endl;
+				cout << "Creating autorelease pool failed." << endl;
 				
 				// Return false
 				return false;
@@ -1130,7 +1122,7 @@ using namespace std;
 			if(!commandBuffer) {
 			
 				// Display message
-				cout << "Creating command queue's command buffer failed" << endl;
+				cout << "Creating command queue's command buffer failed." << endl;
 				
 				// Return false
 				return false;
@@ -1141,7 +1133,7 @@ using namespace std;
 			if(!computePassEncoder) {
 			
 				// Display message
-				cout << "Creating command buffer's compute pass encoder failed" << endl;
+				cout << "Creating command buffer's compute pass encoder failed." << endl;
 				
 				// Return false
 				return false;
@@ -1200,6 +1192,9 @@ using namespace std;
 			
 			// Trimming finished
 			trimmingFinished(edgesBitmapOne->contents(), sipHashKeysOne, heightOne, idOne, nonceOne);
+			
+			// Wait until the compute pass has finished
+			commandBuffer->waitUntilCompleted();
 		}
 		
 		// Return true
@@ -1210,14 +1205,14 @@ using namespace std;
 #else
 
 	// Perform lean trimming loop
-	bool performLeanTrimmingLoop(const cl_context context, const unsigned int deviceIndex) noexcept {
+	bool performLeanTrimmingLoop(const cl_context context) noexcept {
 	
 		// Check if getting context's device failed
 		cl_device_id device;
 		if(clGetContextInfo(context, CL_CONTEXT_DEVICES, sizeof(device), &device, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Getting OpenCL context's GPU failed" << endl;
+			cout << "Getting OpenCL context's GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1228,46 +1223,10 @@ using namespace std;
 		if(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, nullptr) != CL_SUCCESS || !maxWorkGroupSize) {
 		
 			// Display message
-			cout << "Getting GPU's info failed" << endl;
+			cout << "Getting GPU's info failed." << endl;
 			
 			// Return false
 			return false;
-		}
-		
-		// Check if device index is specified
-		if(deviceIndex != ALL_DEVICES) {
-		
-			// Display message
-			cout << "Using the GPU for lean trimming" << endl;
-		}
-		
-		// Otherwise
-		else {
-		
-			// Check if getting device's name size failed or its name exists
-			size_t nameSize;
-			if(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &nameSize) != CL_SUCCESS || !nameSize) {
-			
-				// Display message
-				cout << "Getting GPU's name failed" << endl;
-				
-				// Return false
-				return false;
-			}
-			
-			// Check if getting device's name failed
-			char name[nameSize];
-			if(clGetDeviceInfo(device, CL_DEVICE_NAME, nameSize, name, nullptr) != CL_SUCCESS) {
-			
-				// Display message
-				cout << "Getting GPU's name failed" << endl;
-				
-				// Return false
-				return false;
-			}
-			
-			// Display message
-			cout << "Using " << name << " for lean trimming" << endl;
 		}
 		
 		// Check if creating program for the device failed
@@ -1275,11 +1234,11 @@ using namespace std;
 			#include "./lean_trimming.cl"
 		);
 		const size_t sourceSize = strlen(source);
-		static unique_ptr<remove_pointer<cl_program>::type, decltype(&clReleaseProgram)> program(clCreateProgramWithSource(context, 1, &source, &sourceSize, nullptr), clReleaseProgram);
+		unique_ptr<remove_pointer<cl_program>::type, decltype(&clReleaseProgram)> program(clCreateProgramWithSource(context, 1, &source, &sourceSize, nullptr), clReleaseProgram);
 		if(!program) {
 		
 			// Display message
-			cout << "Creating program for the GPU failed" << endl;
+			cout << "Creating program for the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1289,7 +1248,7 @@ using namespace std;
 		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM)).c_str(), nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Building program for the GPU failed" << endl;
+			cout << "Building program for the GPU failed." << endl;
 			
 			// Check if getting log size for building the program was successful
 			size_t logSize;
@@ -1309,14 +1268,14 @@ using namespace std;
 		}
 		
 		// Check if creating kernels for the device failed
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepOneKernel(clCreateKernel(program.get(), "trimEdgesStepOne", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwoKernel(clCreateKernel(program.get(), "trimEdgesStepTwo", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThreeKernel(clCreateKernel(program.get(), "trimEdgesStepThree", nullptr), clReleaseKernel);
-		static unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFourKernel(clCreateKernel(program.get(), "trimEdgesStepFour", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepOneKernel(clCreateKernel(program.get(), "trimEdgesStepOne", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepTwoKernel(clCreateKernel(program.get(), "trimEdgesStepTwo", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepThreeKernel(clCreateKernel(program.get(), "trimEdgesStepThree", nullptr), clReleaseKernel);
+		unique_ptr<remove_pointer<cl_kernel>::type, decltype(&clReleaseKernel)> stepFourKernel(clCreateKernel(program.get(), "trimEdgesStepFour", nullptr), clReleaseKernel);
 		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel) {
 		
 			// Display message
-			cout << "Creating kernels for the GPU failed" << endl;
+			cout << "Creating kernels for the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1365,7 +1324,7 @@ using namespace std;
 		if(!program) {
 		
 			// Display message
-			cout << "Creating program for the GPU failed" << endl;
+			cout << "Creating program for the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1375,7 +1334,7 @@ using namespace std;
 		if(clBuildProgram(program.get(), 1, &device, ("-cl-std=CL1.2 -Werror -DEDGE_BITS=" TO_STRING(EDGE_BITS) " -DNUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM=" + to_string(LEAN_TRIMMING_NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM) + " -DTRIM_EDGES_STEP_ONE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[0]) + " -DTRIM_EDGES_STEP_TWO_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[1]) + " -DTRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[2]) + " -DTRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP=" + to_string(workItemsPerWorkGroup[3])).c_str(), nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Building program for the GPU failed" << endl;
+			cout << "Building program for the GPU failed." << endl;
 			
 			// Check if getting log size for building the program was successful
 			size_t logSize;
@@ -1402,38 +1361,75 @@ using namespace std;
 		if(!stepOneKernel || !stepTwoKernel || !stepThreeKernel || !stepFourKernel) {
 		
 			// Display message
-			cout << "Creating kernels for the GPU failed" << endl;
+			cout << "Creating kernels for the GPU failed." << endl;
 			
 			// Return false
 			return false;
 		}
 		
 		// Check if allocating memory on the device failed
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapOne(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapTwo(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
-		static const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> nodesBitmap(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
+		static unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapOne(nullptr, clReleaseMemObject);
+		edgesBitmapOne = unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)>(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
+		static unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> edgesBitmapTwo(nullptr, clReleaseMemObject);
+		edgesBitmapTwo = unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)>(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_READ_ONLY | CL_MEM_ALLOC_HOST_PTR, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
+		const unique_ptr<remove_pointer<cl_mem>::type, decltype(&clReleaseMemObject)> nodesBitmap(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, NUMBER_OF_EDGES / BITS_IN_A_BYTE, nullptr, nullptr), clReleaseMemObject);
 		if(!edgesBitmapOne || !edgesBitmapTwo || !nodesBitmap) {
 		
 			// Display message
-			cout << "Allocating memory on the GPU failed" << endl;
+			cout << "Allocating memory on the GPU failed." << endl;
+			
+			// Free edges bitmap one and two
+			edgesBitmapOne.reset();
+			edgesBitmapTwo.reset();
 			
 			// Return false
 			return false;
 		}
 		
 		// Check if creating command queue for the device failed
-		static const unique_ptr<remove_pointer<cl_command_queue>::type, void(*)(cl_command_queue)> commandQueue(clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, nullptr), [](cl_command_queue commandQueue) noexcept {
+		static uint64_t *resultOne = nullptr;
+		static uint64_t *resultTwo = nullptr;
+		const unique_ptr<remove_pointer<cl_command_queue>::type, void(*)(cl_command_queue)> commandQueue(clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, nullptr), [](cl_command_queue commandQueue) noexcept {
 		
+			// Wait for all commands in the queue to finish
+			clFinish(commandQueue);
+			
+			// Check if result one exists
+			if(resultOne) {
+			
+				// Queue unmapping result one
+				clEnqueueUnmapMemObject(commandQueue, edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr);
+			}
+			
+			// Check if result two exists
+			if(resultTwo) {
+			
+				// Queue unmapping result two
+				clEnqueueUnmapMemObject(commandQueue, edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), 0, nullptr, nullptr);
+			}
+			
 			// Wait for all commands in the queue to finish
 			clFinish(commandQueue);
 			
 			// Free command queue
 			clReleaseCommandQueue(commandQueue);
+			
+			// Reset result one and two
+			resultOne = nullptr;
+			resultTwo = nullptr;
+			
+			// Free edges bitmap one and two
+			edgesBitmapOne.reset();
+			edgesBitmapTwo.reset();
 		});
 		if(!commandQueue) {
 		
 			// Display message
-			cout << "Creating command queue for the GPU failed" << endl;
+			cout << "Creating command queue for the GPU failed." << endl;
+			
+			// Free edges bitmap one and two
+			edgesBitmapOne.reset();
+			edgesBitmapTwo.reset();
 			
 			// Return false
 			return false;
@@ -1443,7 +1439,7 @@ using namespace std;
 		if(clSetKernelArg(stepOneKernel.get(), 0, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 1, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 1, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 1, sizeof(nodesBitmap.get()), &unmove(nodesBitmap.get())) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1466,11 +1462,11 @@ using namespace std;
 		previousGraphProcessedTime = chrono::high_resolution_clock::now();
 		
 		// Check if queuing clearing nodes bitmap on the device failed
-		static Event firstCommandEvent;
+		Event firstCommandEvent;
 		if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Preparing program's arguments on the GPU failed" << endl;
+			cout << "Preparing program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1487,7 +1483,7 @@ using namespace std;
 		if(clSetKernelArg(stepOneKernel.get(), 1, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1497,7 +1493,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1507,7 +1503,7 @@ using namespace std;
 		if(clSetKernelArg(stepTwoKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1517,7 +1513,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1527,7 +1523,7 @@ using namespace std;
 		if(clSetKernelArg(stepThreeKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1540,7 +1536,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1550,7 +1546,7 @@ using namespace std;
 			if(clSetKernelArg(stepThreeKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1560,7 +1556,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1570,7 +1566,7 @@ using namespace std;
 			if(clSetKernelArg(stepFourKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1580,7 +1576,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1588,27 +1584,16 @@ using namespace std;
 		}
 		
 		// Check if queuing map result failed
-		static Event mapEvent;
-		static uint64_t *resultOne = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapOne.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
+		Event mapEvent;
+		resultOne = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapOne.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
 		if(!resultOne) {
 		
 			// Display message
-			cout << "Getting result from the GPU failed" << endl;
+			cout << "Getting result from the GPU failed." << endl;
 			
 			// Return false
 			return false;
 		}
-		
-		// Automatically unmap result one when done
-		static const unique_ptr<uint64_t, void(*)(uint64_t *)> resultOneUniquePointer(resultOne, [](__attribute__((unused)) uint64_t *unused) noexcept {
-		
-			// Check if result one exists
-			if(resultOne) {
-			
-				// Queue unmapping result one
-				clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), nullptr);
-			}
-		});
 		
 		// Check if closing
 		if(closing) {
@@ -1621,7 +1606,7 @@ using namespace std;
 		if(clWaitForEvents(1, mapEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Getting result from the GPU failed" << endl;
+			cout << "Getting result from the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1633,7 +1618,7 @@ using namespace std;
 		if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Getting GPU trimming time failed" << endl;
+			cout << "Getting GPU trimming time failed." << endl;
 			
 			// Return false
 			return false;
@@ -1647,7 +1632,7 @@ using namespace std;
 		if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Preparing program's arguments on the GPU failed" << endl;
+			cout << "Preparing program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1664,7 +1649,7 @@ using namespace std;
 		if(clSetKernelArg(stepOneKernel.get(), 1, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1674,7 +1659,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1684,7 +1669,7 @@ using namespace std;
 		if(clSetKernelArg(stepTwoKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1694,7 +1679,7 @@ using namespace std;
 		if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Running program on the GPU failed" << endl;
+			cout << "Running program on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1704,7 +1689,7 @@ using namespace std;
 		if(clSetKernelArg(stepThreeKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Setting program's arguments on the GPU failed" << endl;
+			cout << "Setting program's arguments on the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1717,7 +1702,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1727,7 +1712,7 @@ using namespace std;
 			if(clSetKernelArg(stepThreeKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1737,7 +1722,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1747,7 +1732,7 @@ using namespace std;
 			if(clSetKernelArg(stepFourKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1757,7 +1742,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1766,26 +1751,15 @@ using namespace std;
 		
 		// Check if queuing map result failed
 		mapEvent.free();
-		static uint64_t *resultTwo = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapTwo.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
+		resultTwo = reinterpret_cast<uint64_t *>(clEnqueueMapBuffer(commandQueue.get(), edgesBitmapTwo.get(), CL_FALSE, CL_MAP_READ, 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, mapEvent.getAddress(), nullptr));
 		if(!resultTwo) {
 		
 			// Display message
-			cout << "Getting result from the GPU failed" << endl;
+			cout << "Getting result from the GPU failed." << endl;
 			
 			// Return false
 			return false;
 		}
-		
-		// Automatically unmap result two when done
-		static const unique_ptr<uint64_t, void(*)(uint64_t *)> resultTwoUniquePointer(resultTwo, [](__attribute__((unused)) uint64_t *unused) noexcept {
-		
-			// Check if result two exists
-			if(resultTwo) {
-			
-				// Queue unmapping result two
-				clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), mapEvent.get() ? 1 : 0, mapEvent.getAddress(), nullptr);
-			}
-		});
 		
 		// Trimming finished
 		trimmingFinished(resultOne, sipHashKeysOne, heightOne, idOne, nonceOne);
@@ -1794,7 +1768,7 @@ using namespace std;
 		if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr) != CL_SUCCESS) {
 		
 			// Display message
-			cout << "Getting result from the GPU failed" << endl;
+			cout << "Getting result from the GPU failed." << endl;
 			
 			// Return false
 			return false;
@@ -1810,7 +1784,7 @@ using namespace std;
 			if(clWaitForEvents(1, mapEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1820,7 +1794,7 @@ using namespace std;
 			if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting GPU trimming time failed" << endl;
+				cout << "Getting GPU trimming time failed." << endl;
 				
 				// Return false
 				return false;
@@ -1834,7 +1808,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1850,7 +1824,7 @@ using namespace std;
 			if(clSetKernelArg(stepOneKernel.get(), 1, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1860,7 +1834,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1870,7 +1844,7 @@ using namespace std;
 			if(clSetKernelArg(stepTwoKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1880,7 +1854,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1890,7 +1864,7 @@ using namespace std;
 			if(clSetKernelArg(stepThreeKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(edgesBitmapOne.get()), &unmove(edgesBitmapOne.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(sipHashKeysOne), &sipHashKeysOne) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1903,7 +1877,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -1913,7 +1887,7 @@ using namespace std;
 				if(clSetKernelArg(stepThreeKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -1923,7 +1897,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -1933,7 +1907,7 @@ using namespace std;
 				if(clSetKernelArg(stepFourKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -1943,7 +1917,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -1956,7 +1930,7 @@ using namespace std;
 			if(!resultOne) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1969,7 +1943,7 @@ using namespace std;
 			if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapTwo.get(), reinterpret_cast<void *>(resultTwo), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1989,7 +1963,7 @@ using namespace std;
 			if(clWaitForEvents(1, mapEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -1999,7 +1973,7 @@ using namespace std;
 			if(clGetEventProfilingInfo(firstCommandEvent.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(startTime), &startTime, nullptr) != CL_SUCCESS || clGetEventProfilingInfo(mapEvent.get(), CL_PROFILING_COMMAND_END, sizeof(endTime), &endTime, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting GPU trimming time failed" << endl;
+				cout << "Getting GPU trimming time failed." << endl;
 				
 				// Return false
 				return false;
@@ -2013,7 +1987,7 @@ using namespace std;
 			if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, firstCommandEvent.getAddress()) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Preparing program's arguments on the GPU failed" << endl;
+				cout << "Preparing program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -2029,7 +2003,7 @@ using namespace std;
 			if(clSetKernelArg(stepOneKernel.get(), 1, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -2039,7 +2013,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepOneKernel.get(), 1, nullptr, &totalNumberOfWorkItems[0], &workItemsPerWorkGroup[0], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -2049,7 +2023,7 @@ using namespace std;
 			if(clSetKernelArg(stepTwoKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepTwoKernel.get(), 2, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -2059,7 +2033,7 @@ using namespace std;
 			if(clEnqueueNDRangeKernel(commandQueue.get(), stepTwoKernel.get(), 1, nullptr, &totalNumberOfWorkItems[1], &workItemsPerWorkGroup[1], 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Running program on the GPU failed" << endl;
+				cout << "Running program on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -2069,7 +2043,7 @@ using namespace std;
 			if(clSetKernelArg(stepThreeKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepThreeKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 0, sizeof(edgesBitmapTwo.get()), &unmove(edgesBitmapTwo.get())) != CL_SUCCESS || clSetKernelArg(stepFourKernel.get(), 3, sizeof(sipHashKeysTwo), &sipHashKeysTwo) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Setting program's arguments on the GPU failed" << endl;
+				cout << "Setting program's arguments on the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -2082,7 +2056,7 @@ using namespace std;
 				if(clEnqueueFillBuffer(commandQueue.get(), nodesBitmap.get(), (const cl_ulong[]){0}, sizeof(cl_ulong), 0, NUMBER_OF_EDGES / BITS_IN_A_BYTE, 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Preparing program's arguments on the GPU failed" << endl;
+					cout << "Preparing program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -2092,7 +2066,7 @@ using namespace std;
 				if(clSetKernelArg(stepThreeKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -2102,7 +2076,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepThreeKernel.get(), 1, nullptr, &totalNumberOfWorkItems[2], &workItemsPerWorkGroup[2], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -2112,7 +2086,7 @@ using namespace std;
 				if(clSetKernelArg(stepFourKernel.get(), 2, sizeof(cl_uchar), &unmove(static_cast<cl_uchar>(i % 2))) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Setting program's arguments on the GPU failed" << endl;
+					cout << "Setting program's arguments on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -2122,7 +2096,7 @@ using namespace std;
 				if(clEnqueueNDRangeKernel(commandQueue.get(), stepFourKernel.get(), 1, nullptr, &totalNumberOfWorkItems[3], &workItemsPerWorkGroup[3], 0, nullptr, nullptr) != CL_SUCCESS) {
 				
 					// Display message
-					cout << "Running program on the GPU failed" << endl;
+					cout << "Running program on the GPU failed." << endl;
 					
 					// Return false
 					return false;
@@ -2135,7 +2109,7 @@ using namespace std;
 			if(!resultTwo) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
@@ -2148,7 +2122,7 @@ using namespace std;
 			if(clEnqueueUnmapMemObject(commandQueue.get(), edgesBitmapOne.get(), reinterpret_cast<void *>(resultOne), 0, nullptr, nullptr) != CL_SUCCESS) {
 			
 				// Display message
-				cout << "Getting result from the GPU failed" << endl;
+				cout << "Getting result from the GPU failed." << endl;
 				
 				// Return false
 				return false;
