@@ -47,6 +47,9 @@ class RedirectCout final : public streambuf {
 
 // Function prototypes
 
+// Prepare miner
+void prepareMiner() noexcept;
+
 // Start miner
 bool startMiner(const int argc, char *argv[]) noexcept;
 
@@ -56,8 +59,11 @@ void stopMiner() noexcept;
 // Check if using Android
 #ifdef __ANDROID__
 
+	// Prepare miner
+	extern "C" JNIEXPORT void JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_prepareMiner(const JNIEnv *environment, const jobject object) noexcept;
+	
 	// Start miner
-	extern "C" JNIEXPORT jboolean JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_startMiner(JNIEnv *environment, const jobject object, const jint argc, const jobjectArray argv) noexcept;
+	extern "C" JNIEXPORT jboolean JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_startMiner(JNIEnv *environment, const jobject object, const jobjectArray argv) noexcept;
 	
 	// Stop miner
 	extern "C" JNIEXPORT void JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_stopMiner(const JNIEnv *environment, const jobject object) noexcept;

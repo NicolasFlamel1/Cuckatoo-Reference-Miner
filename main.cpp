@@ -74,14 +74,8 @@
 	#include <poll.h>
 	#include <unistd.h>
 	
-	// Check if using Android
-	#ifdef __ANDROID__
-	
-		// Header files
-		#include <android/log.h>
-		
-	// Otherwise
-	#else
+	// Check if not using Android
+	#ifndef __ANDROID__
 	
 		// Header files
 		#include <dbus/dbus.h>
@@ -309,7 +303,10 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 
 	// Main function
 	int main(const int argc, char *argv[]) noexcept {
-
+	
+		// Prepare miner
+		prepareMiner();
+		
 		// Return success if starting miner was successful otherwise return failure
 		return startMiner(argc, argv) ? EXIT_SUCCESS : EXIT_FAILURE;
 	}
@@ -353,12 +350,16 @@ RedirectCout::traits_type::int_type RedirectCout::overflow(const traits_type::in
 	return traits_type::not_eof(character);
 }
 
-// Start miner
-bool startMiner(const int argc, char *argv[]) noexcept {
+// Prepare miner
+void prepareMiner() noexcept {
 
 	// Set closing to false
 	closing = false;
-	
+}
+
+// Start miner
+bool startMiner(const int argc, char *argv[]) noexcept {
+
 	// Set start searching threads trigger toggle to false
 	startSearchingThreadsTriggerToggle = false;
 	
@@ -629,6 +630,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 	
 	// Go through all options while not displaying help
 	int option;
+	optind = 0;
 	while((option = getopt_long(argc, argv, (static_cast<string>("va:p:u:w:dg:meslt:i:h") + (currentAdjustableGpuMemoryAmount ? "r:" : "")).c_str(), options, nullptr)) != -1 && !displayHelp) {
 	
 		// Check option
@@ -1370,8 +1372,12 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 		// Display message
 		cout << "Setting thread's priority and affinity failed." << endl;
 		
-		// Return false
-		return false;
+		// Check if not using an Apple device or using macOS and not using Android
+		#if (!defined __APPLE__ || TARGET_OS_OSX == 1) && !defined __ANDROID__
+		
+			// Return false
+			return false;
+		#endif
 	}
 	
 	// Check if not using other main function
@@ -1428,12 +1434,16 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 			}
 		#endif
 		
+		// Automatically free socket descriptor when done
+		const unique_ptr<unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)>, void(*)(unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)> *)> socketDescriptorUniquePointerUniquePointer(&socketDescriptorUniquePointer, [](unique_ptr<decltype(socketDescriptor), void(*)(decltype(socketDescriptor) *)> *socketDescriptorUniquePointer) noexcept {
+		
+			// Free socket descriptor
+			socketDescriptorUniquePointer->reset();
+		});
+		
 		// Check if connecting to the server failed
 		if(!connectToServer()) {
 		
-			// Free socket descriptor
-			socketDescriptorUniquePointer.reset();
-			
 			// Return false
 			return false;
 		}
@@ -1507,12 +1517,24 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 			// Create searching thread
 			searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 			
-				// Set searching thread's priority and affinity
-				const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
-				
-				// Check if setting searching thread's priority and affinity failed, creating edges failed, creating node connections failed, or initializing thread local global variables failed
+				// Check if using an Apple device and not using macOS or using Android
 				unique_lock lock(searchingThreadsMutex);
-				const bool initializingFailed = !setThreadPriorityAndAffinityResult || !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+				#if (defined __APPLE__ && TARGET_OS_OSX == 0) || defined __ANDROID__
+				
+					// Set thread's priority and affinity
+					setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
+					
+					// Set initialized failed to if creating edges failed, creating node connections failed, or initializing thread local global variables failed
+					const bool initializingFailed = !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+					
+				// Otherwise
+				#else
+				
+					// Set initialized failed to if setting searching thread's priority and affinity failed, creating edges failed, creating node connections failed, or initializing thread local global variables failed
+					const bool initializingFailed = !setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores) || !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+				#endif
+				
+				// Check if initializing failed
 				if(initializingFailed) {
 				
 					// Set searching threads initialized successfully to false
@@ -1768,13 +1790,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 		// Lock searching threads lock
 		searchingThreadsLock.lock();
 		
-		// Check if not tuning
-		#ifndef TUNING
-		
-			// Free socket descriptor
-			socketDescriptorUniquePointer.reset();
-		#endif
-		
 		// Return if searching threads initialized successfully and creating edges bitmap was successful
 		return searchingThreadsInitializedSuccessfully && edgesBitmap;
 		
@@ -1915,13 +1930,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 				// Display message
 				cout << "GPU at the specified index doesn't exist." << endl;
 				
-				// Check if not tuning
-				#ifndef TUNING
-				
-					// Free socket descriptor
-					socketDescriptorUniquePointer.reset();
-				#endif
-				
 				// Return false
 				return false;
 			}
@@ -2061,12 +2069,24 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 					// Create searching thread
 					searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 					
-						// Set searching thread's priority and affinity
-						const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
-						
-						// Check if setting searching thread's priority and affinity failed, creating node connections failed, or initializing thread local global variables failed
+						// Check if using an Apple device and not using macOS or using Android
 						unique_lock lock(searchingThreadsMutex);
-						const bool initializingFailed = !setThreadPriorityAndAffinityResult || !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
+						#if (defined __APPLE__ && TARGET_OS_OSX == 0) || defined __ANDROID__
+						
+							// Set thread's priority and affinity
+							setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
+							
+							// Set initialized failed to if creating edges failed, creating node connections failed, or initializing thread local global variables failed
+							const bool initializingFailed = !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
+							
+						// Otherwise
+						#else
+						
+							// Set initialized failed to if setting searching thread's priority and affinity failed, creating node connections failed, or initializing thread local global variables failed
+							const bool initializingFailed = !setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores) || !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
+						#endif
+						
+						// Check if initializing failed
 						if(initializingFailed) {
 						
 							// Set searching threads initialized successfully to false
@@ -2263,13 +2283,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 				// Lock searching threads lock
 				searchingThreadsLock.lock();
 				
-				// Check if not tuning
-				#ifndef TUNING
-				
-					// Free socket descriptor
-					socketDescriptorUniquePointer.reset();
-				#endif
-				
 				// Return if searching threads initialized successfully and performing trimming loop was successful
 				return searchingThreadsInitializedSuccessfully && performingTrimmingLoopResult;
 			}
@@ -2390,12 +2403,24 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 					// Create searching thread
 					searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 					
-						// Set searching thread's priority and affinity
-						const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
-						
-						// Check if setting searching thread's priority and affinity failed, creating node connections failed, or initializing thread local global variables failed
+						// Check if using an Apple device and not using macOS or using Android
 						unique_lock lock(searchingThreadsMutex);
-						const bool initializingFailed = !setThreadPriorityAndAffinityResult || !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
+						#if (defined __APPLE__ && TARGET_OS_OSX == 0) || defined __ANDROID__
+						
+							// Set thread's priority and affinity
+							setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
+							
+							// Set initialized failed to if creating edges failed, creating node connections failed, or initializing thread local global variables failed
+							const bool initializingFailed = !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
+							
+						// Otherwise
+						#else
+						
+							// Set initialized failed to if setting searching thread's priority and affinity failed, creating node connections failed, or initializing thread local global variables failed
+							const bool initializingFailed = !setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores) || !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
+						#endif
+						
+						// Check if initializing failed
 						if(initializingFailed) {
 						
 							// Set searching threads initialized successfully to false
@@ -2592,13 +2617,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 				// Lock searching threads lock
 				searchingThreadsLock.lock();
 				
-				// Check if not tuning
-				#ifndef TUNING
-				
-					// Free socket descriptor
-					socketDescriptorUniquePointer.reset();
-				#endif
-				
 				// Return if searching threads initialized successfully and performing trimming loop was successful
 				return searchingThreadsInitializedSuccessfully && performingTrimmingLoopResult;
 			}
@@ -2743,12 +2761,24 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 					// Create searching thread
 					searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 					
-						// Set searching thread's priority and affinity
-						const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
-						
-						// Check if setting searching thread's priority and affinity failed, creating edges failed, creating node connections failed, or initializing thread local global variables failed
+						// Check if using an Apple device and not using macOS or using Android
 						unique_lock lock(searchingThreadsMutex);
-						const bool initializingFailed = !setThreadPriorityAndAffinityResult || !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+						#if (defined __APPLE__ && TARGET_OS_OSX == 0) || defined __ANDROID__
+						
+							// Set thread's priority and affinity
+							setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
+							
+							// Set initialized failed to if creating edges failed, creating node connections failed, or initializing thread local global variables failed
+							const bool initializingFailed = !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+							
+						// Otherwise
+						#else
+						
+							// Set initialized failed to if setting searching thread's priority and affinity failed, creating edges failed, creating node connections failed, or initializing thread local global variables failed
+							const bool initializingFailed = !setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores) || !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+						#endif
+						
+						// Check if initializing failed
 						if(initializingFailed) {
 						
 							// Set searching threads initialized successfully to false
@@ -3065,13 +3095,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 				// Lock searching threads lock
 				searchingThreadsLock.lock();
 				
-				// Check if not tuning
-				#ifndef TUNING
-				
-					// Free socket descriptor
-					socketDescriptorUniquePointer.reset();
-				#endif
-				
 				// Return if searching threads initialized successfully and performing trimming loop was successful
 				return searchingThreadsInitializedSuccessfully && performingTrimmingLoopResult;
 			}
@@ -3209,12 +3232,24 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 					// Create searching thread
 					searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 					
-						// Set searching thread's priority and affinity
-						const bool setThreadPriorityAndAffinityResult = setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
-						
-						// Check if setting searching thread's priority and affinity failed, creating edges failed, creating node connections failed, or initializing thread local global variables failed
+						// Check if using an Apple device and not using macOS or using Android
 						unique_lock lock(searchingThreadsMutex);
-						const bool initializingFailed = !setThreadPriorityAndAffinityResult || !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+						#if (defined __APPLE__ && TARGET_OS_OSX == 0) || defined __ANDROID__
+						
+							// Set thread's priority and affinity
+							setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
+							
+							// Set initialized failed to if creating edges failed, creating node connections failed, or initializing thread local global variables failed
+							const bool initializingFailed = !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+							
+						// Otherwise
+						#else
+						
+							// Set initialized failed to if setting searching thread's priority and affinity failed, creating edges failed, creating node connections failed, or initializing thread local global variables failed
+							const bool initializingFailed = !setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores) || !edges || !nodeConnections || (searchingThreadIndex < numberOfSearchingThreadsSearchingEdges && !initializeCuckatooThreadLocalGlobalVariables());
+						#endif
+						
+						// Check if initializing failed
 						if(initializingFailed) {
 						
 							// Set searching threads initialized successfully to false
@@ -3531,13 +3566,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 				// Lock searching threads lock
 				searchingThreadsLock.lock();
 				
-				// Check if not tuning
-				#ifndef TUNING
-				
-					// Free socket descriptor
-					socketDescriptorUniquePointer.reset();
-				#endif
-				
 				// Return if searching threads initialized successfully and performing trimming loop was successful
 				return searchingThreadsInitializedSuccessfully && performingTrimmingLoopResult;
 			}
@@ -3581,13 +3609,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 			}
 		}
 		
-		// Check if not tuning
-		#ifndef TUNING
-		
-			// Free socket descriptor
-			socketDescriptorUniquePointer.reset();
-		#endif
-		
 		// Return true
 		return true;
 	#endif
@@ -3603,70 +3624,70 @@ void stopMiner() noexcept {
 // Check if using Android
 #ifdef __ANDROID__
 
-	// Start miner
-	jboolean Java_com_Cuckatoo_1Reference_1Miner_MainActivity_startMiner(JNIEnv *environment, const jobject object, const jint argc, const jobjectArray argv) noexcept {
+	// Prepare miner
+	void Java_com_Cuckatoo_1Reference_1Miner_MainActivity_prepareMiner(__attribute__((unused)) const JNIEnv *environment, __attribute__((unused)) const jobject object) noexcept {
 	
-		// Check if getting object's class failed
-		const jclass objectClass = environment->GetObjectClass(object);
-		if(!objectClass) {
+		// Prepare miner
+		prepareMiner();
+	}
+	
+	// Start miner
+	jboolean Java_com_Cuckatoo_1Reference_1Miner_MainActivity_startMiner(JNIEnv *environment, const jobject object, const jobjectArray argv) noexcept {
+	
+		// Check if getting class's append to text view method failed
+		const jmethodID appendToTextViewMethod = environment->GetMethodID(environment->GetObjectClass(object), "appendToTextView", "(Ljava/lang/String;)V");
+		if(environment->ExceptionCheck() == JNI_TRUE || !appendToTextViewMethod) {
 		
-			// Return false
-			return JNI_FALSE;
-		}
-		
-		// Check if getting class's get package name method failed
-		const jmethodID getPackageName = environment->GetMethodID(objectClass, "getPackageName", "()Ljava/lang/String;");
-		if(!getPackageName) {
-		
-			// Return false
-			return JNI_FALSE;
-		}
-		
-		// Check if calling get package name method on the object failed
-		const jstring packageName = reinterpret_cast<jstring>(environment->CallObjectMethod(object, getPackageName));
-		if(!packageName) {
-		
-			// Return false
-			return JNI_FALSE;
-		}
-		
-		// Check if getting package name as a C string failed
-		const auto freePackageNameChar = [environment, packageName](const char *packageNameChar) {
-		
-			// Free package name as a C string
-			environment->ReleaseStringUTFChars(packageName, packageNameChar);
-		};
-		const unique_ptr<const char, decltype(freePackageNameChar)> packageNameChar(environment->GetStringUTFChars(packageName, nullptr), freePackageNameChar);
-		if(!packageNameChar) {
-		
+			// Clear exceptions
+			environment->ExceptionClear();
+			
 			// Return false
 			return JNI_FALSE;
 		}
 		
 		// Redirect cout
-		char buffer[BYTES_IN_A_KILOBYTE];
-		size_t bufferSize = 0;
-		const RedirectCout redirectCout([&buffer, &bufferSize, packageNameChar = packageNameChar.get()](const char character) {
+		static char buffer[BYTES_IN_A_KILOBYTE];
+		static size_t bufferSize;
+		bufferSize = 0;
+		static thread::id currentThreadId;
+		currentThreadId = this_thread::get_id();
+		const RedirectCout redirectCout([environment, object, appendToTextViewMethod](const char character) {
 		
-			// Check if character isn't a newline
-			if(character != '\n') {
+			// Check if buffer isn't full and character isn't a tab
+			if(bufferSize != sizeof(buffer) - sizeof('\0') && character != '\t') {
 			
-				// Check if buffer isn't full
-				if(bufferSize != sizeof(buffer) - sizeof('\0')) {
-				
-					// Append character in buffer
-					buffer[bufferSize++] = character;
-				}
+				// Append character in buffer
+				buffer[bufferSize++] = character;
 			}
 			
-			// Otherwise
-			else {
+			// Check if thread is the current thread and the character is a newline
+			if(this_thread::get_id() == currentThreadId && character == '\n') {
 			
 				// Null terminate buffer
 				buffer[bufferSize] = '\0';
 				
-				// Log buffer
-				__android_log_write(ANDROID_LOG_INFO, packageNameChar, buffer);
+				// Check if getting buffer as a Java string failed
+				const jstring bufferJava = environment->NewStringUTF(buffer);
+				if(environment->ExceptionCheck() == JNI_TRUE || !bufferJava) {
+				
+					// Clear exceptions
+					environment->ExceptionClear();
+				}
+				
+				// Otherwise
+				else {
+				
+					// Check if calling append to text view method with the buffer as a Java string failed
+					environment->CallVoidMethod(object, appendToTextViewMethod, bufferJava);
+					if(environment->ExceptionCheck() == JNI_TRUE) {
+					
+						// Clear exceptions
+						environment->ExceptionClear();
+					}
+					
+					// Free buffer as a Java string
+					environment->DeleteLocalRef(bufferJava);
+				}
 				
 				// Set buffer size to zero
 				bufferSize = 0;
@@ -3674,18 +3695,18 @@ void stopMiner() noexcept {
 		});
 		
 		// Go through all arguments
-		char *argvChar[argc];
-		for(jint i = 0; i < argc; ++i) {
+		char *argvC[environment->GetArrayLength(argv)];
+		for(jsize i = 0; i < environment->GetArrayLength(argv); ++i) {
 		
 			// Check if getting argument as a C string failed
-			argvChar[i] = const_cast<char *>(environment->GetStringUTFChars(reinterpret_cast<jstring>(environment->GetObjectArrayElement(argv, i)), nullptr));
-			if(!argvChar[i]) {
+			argvC[i] = const_cast<char *>(environment->GetStringUTFChars(reinterpret_cast<jstring>(environment->GetObjectArrayElement(argv, i)), nullptr));
+			if(!argvC[i]) {
 			
 				// Go through all previous arguments
-				for(jint j = 0; j < i; ++j) {
+				for(jsize j = 0; j < i; ++j) {
 				
 					// Free argument as a C string
-					environment->ReleaseStringUTFChars(reinterpret_cast<jstring>(environment->GetObjectArrayElement(argv, j)), argvChar[j]);
+					environment->ReleaseStringUTFChars(reinterpret_cast<jstring>(environment->GetObjectArrayElement(argv, j)), argvC[j]);
 				}
 				
 				// Return false
@@ -3694,13 +3715,13 @@ void stopMiner() noexcept {
 		}
 		
 		// Get result of starting miner
-		const bool result = startMiner(argc, argvChar);
+		const bool result = startMiner(environment->GetArrayLength(argv), argvC);
 		
 		// Go through all arguments
-		for(jint i = 0; i < argc; ++i) {
+		for(jsize i = 0; i < environment->GetArrayLength(argv); ++i) {
 		
 			// Free argument as a C string
-			environment->ReleaseStringUTFChars(reinterpret_cast<jstring>(environment->GetObjectArrayElement(argv, i)), argvChar[i]);
+			environment->ReleaseStringUTFChars(reinterpret_cast<jstring>(environment->GetObjectArrayElement(argv, i)), argvC[i]);
 		}
 		
 		// Return result
@@ -4007,6 +4028,9 @@ void stopMiner() noexcept {
 	// Connect to server
 	bool connectToServer() noexcept {
 	
+		// Free socket descriptor
+		socketDescriptorUniquePointer.reset();
+		
 		// Display message
 		cout << "Connecting to the stratum server at: stratum+tcp://";
 		
@@ -4030,9 +4054,6 @@ void stopMiner() noexcept {
 		
 		// Display message
 		cout << ':' << stratumServerPort << endl;
-		
-		// Free socket descriptor
-		socketDescriptorUniquePointer.reset();
 		
 		// Check if getting address info for the stratum server failed
 		const addrinfo addressInfoHints = {
