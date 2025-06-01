@@ -126,7 +126,7 @@ using namespace std;
 		// Redirect cout
 		const RedirectCout redirectCout([](const char character) {
 		
-			// Run function on the UI thread
+			// Run on the UI thread
 			dispatch_async(dispatch_get_main_queue(), ^{
 			
 				// Append character to text view

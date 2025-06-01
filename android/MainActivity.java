@@ -218,7 +218,7 @@ public final class MainActivity extends Activity {
 					// Start miner with arguments
 					startMiner(argv);
 					
-					// Run on UI thread
+					// Run on the UI thread
 					runOnUiThread(() -> {
 					
 						// Set button's text to start miner
@@ -323,7 +323,7 @@ public final class MainActivity extends Activity {
 		// Precompute text view's text
 		final PrecomputedText precomputedText = PrecomputedText.create(textViewText, textViewParams);
 		
-		// Run on UI thread
+		// Run on the UI thread
 		runOnUiThread(() -> {
 		
 			// Set text view's text to the precomputed text

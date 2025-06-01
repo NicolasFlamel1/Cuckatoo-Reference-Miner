@@ -1,79 +1,79 @@
 # Cuckatoo Reference Miner
 
 ### Description
-Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean, slean then mean, slean, and lean edge trimming on the GPU using OpenCL and Metal. It can also run on Linux, macOS, iOS, Windows, and Android.
+Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean, slean then mean, slean, and lean edge trimming on the GPU using OpenCL and Metal. It can run on Linux, macOS, iOS, Windows, and Android.
 
 ### Building
 If you're building this program for a desktop operating system then it's recommended that you build this program on the same system that you'll be running it on since it uses the `-march=native` and `-mtune=native` compiler flags to optimize itself for the current system's available features. Because of this, I don't recommend using the prebuilt versions of this program for desktop operating systems.
 
 #### Linux
-This program can be built and ran with Linux with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
+This program can be built and ran with Linux with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev
-make EDGE_BITS=30
+make EDGE_BITS=31
 make run
 ```
 
 #### macOS
-After installing [Xcode](https://developer.apple.com/xcode), this program can be built and ran with macOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
+After installing [Xcode](https://developer.apple.com/xcode), this program can be built and ran with macOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-make EDGE_BITS=30
+make EDGE_BITS=31
 make run
 ```
 This program will use Metal as the GPU backend on macOS by default, however it can be configured to use OpenCL as the GPU backend instead by providing a `USE_OPENCL=1` setting when building it. Keep in mind that Apple has deprecated OpenCL on macOS and their OpenCL implementation may not conform to the standard, so this program may not function correctly under macOS when using OpenCL as the GPU backend.
 ```
-make EDGE_BITS=30 USE_OPENCL=1
+make EDGE_BITS=31 USE_OPENCL=1
 ```
 
 #### iOS
-After installing [Xcode](https://developer.apple.com/xcode), this program can be built for iOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
+After installing [Xcode](https://developer.apple.com/xcode), this program can be built for iOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 sudo xcode-select --switch "/Applications/Xcode.app"
-make CC="$(xcrun --sdk iphoneos --find g++)" SDK="$(xcrun --sdk iphoneos --show-sdk-path)" EDGE_BITS=30
+make CC="$(xcrun --sdk iphoneos --find g++)" SDK="$(xcrun --sdk iphoneos --show-sdk-path)" EDGE_BITS=31
 ```
 The resulting ipa file is unsigned, so you'll need to sign and provision it if you want to install it on an iPhone.
 
-This program can also be built for and ran with Xcode's iOS simulator with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
+This program can also be built for and ran with Xcode's iOS simulator with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 sudo xcode-select --switch "/Applications/Xcode.app"
-make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)" EDGE_BITS=30
+make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)" EDGE_BITS=31
 make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)" run
 ```
 
 #### Windows
-After installing [MinGW-w64](https://winlibs.com), this program can be built and ran with Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
+After installing [MinGW-w64](https://winlibs.com), this program can be built and ran with Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-mingw32-make EDGE_BITS=30
+mingw32-make EDGE_BITS=31
 mingw32-make run
 ```
 
 #### Android
-After installing [Android Studio](https://developer.android.com/studio) and [Android NDK](https://developer.android.com/ndk), this program can be built for and ran with Android with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30), `CC` is set to the location of the Android NDK compiler that you want to use which is also used to determine the Android ABI and API level to use, `BUILD_TOOLS` is set to the location of the Android SDK build tools that you want to use, `ANDROID_JAR` is set to the location of the Android Java library that you want to use, `JBR_BIN` is set to the location of an Android JetBrains Runtime, and `ADB` is set to the location of an Android ADB platform tool:
+After installing [Android Studio](https://developer.android.com/studio) and [Android NDK](https://developer.android.com/ndk), this program can be built for and ran with Android with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `CC` is set to the location of the Android NDK compiler that you want to use which is also used to determine the Android ABI and API level to use, `BUILD_TOOLS` is set to the location of the Android SDK build tools that you want to use, `ANDROID_JAR` is set to the location of the Android Java library that you want to use, `JBR_BIN` is set to the location of an Android JetBrains Runtime, and `ADB` is set to the location of an Android ADB platform tool:
 
 If using Linux:
 ```
-~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" EDGE_BITS=30
+~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" EDGE_BITS=31
 ~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" run
 ```
 
 If using macOS:
 ```
-~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" EDGE_BITS=30
+~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" EDGE_BITS=31
 ~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" run
 ```
 
 If using Windows:
 ```
-"%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android28-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" EDGE_BITS=30
+"%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android28-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" EDGE_BITS=31
 "%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android28-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" run
 ```
 
 #### Cross-compiling for Windows
-This program can be built with Linux for Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=30` for cuckatoo30):
+This program can be built with Linux for Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 sudo apt install make g++-mingw-w64 cmake
 make CC=x86_64-w64-mingw32-g++-posix crossCompilingDependencies
-make CC=x86_64-w64-mingw32-g++-posix EDGE_BITS=30
+make CC=x86_64-w64-mingw32-g++-posix EDGE_BITS=31
 ```
 
 ### Usage
@@ -105,23 +105,23 @@ This program will try to use mean trimming, followed by slean then mean trimming
 ### Tuning
 A `TRIMMING_ROUNDS` setting can be provided when building this program that can be adjusted to make the `Searching time` displayed when running this program as close to, but not greater than, the `Trimming time` displayed to maximize this program's performance (without regard for power usage). Increasing the `TRIMMING_ROUNDS` setting decreases the `Searching time` and increases the `Trimming time`, and decreasing the `TRIMMING_ROUNDS` setting increases the `Searching time` and decreases the `Trimming time`.
 ```
-make EDGE_BITS=30 TRIMMING_ROUNDS=25
+make EDGE_BITS=31 TRIMMING_ROUNDS=90
 ```
 You can provide a `SLEAN_TRIMMING_PARTS` setting when building this program to adjust the number of parts used by slean then mean trimming and slean trimming. This value must be a power of two, and lower values for this result in faster trimming. Decreasing this will increase the trimming type's GPU RAM requirement while increasing it will decrease the trimming type's GPU RAM requirement.
 ```
-make EDGE_BITS=30 SLEAN_TRIMMING_PARTS=4
+make EDGE_BITS=31 SLEAN_TRIMMING_PARTS=4
 ```
 You can provide a `SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS` setting when building this program to adjust the number of trimming rounds that are performed by slean trimming before the remaining trimming rounds are performed by mean trimming when using slean then mean trimming. Lower values for this result in faster trimming. Decreasing this value will increase the trimming type's GPU RAM requirement while increasing it will decrease the trimming type's GPU RAM requirement. You should first increase the `SLEAN_TRIMMING_PARTS` setting while this setting's value is `1` until slean trimming runs on your system, then you can increase this setting's value until slean then mean trimming runs on your system to maximize its performance.
 ```
-make EDGE_BITS=30 SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=2
+make EDGE_BITS=31 SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=2
 ```
 You can provide a `LOCAL_RAM_KILOBYTES` setting when building this program to adjust the targeted GPU local RAM size in kilobytes used by mean trimming, slean then mean trimming, and slean trimming. This value must be a power of two, and it should be as close to your GPU's local RAM size for potentially better performance.
 ```
-make EDGE_BITS=30 LOCAL_RAM_KILOBYTES=64
+make EDGE_BITS=31 LOCAL_RAM_KILOBYTES=64
 ```
 A `TUNING=1` setting can be provided when building this program which will make it skip connecting to a stratum server. This is only useful for tuning the software since it can't mine blocks without being connected to a stratum server.
 ```
-make EDGE_BITS=30 TRIMMING_ROUNDS=25 SLEAN_TRIMMING_PARTS=4 SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=2 LOCAL_RAM_KILOBYTES=64 TUNING=1
+make EDGE_BITS=31 TRIMMING_ROUNDS=90 SLEAN_TRIMMING_PARTS=4 SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=2 LOCAL_RAM_KILOBYTES=64 TUNING=1
 ```
 Also be sure to set your operating system's power mode to best performance when running this program.
 
