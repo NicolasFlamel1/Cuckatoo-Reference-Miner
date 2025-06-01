@@ -10297,6 +10297,9 @@ using namespace std;
 			return false;
 		}
 		
+		// Perform commands in queue
+		clFlush(commandQueue.get());
+		
 		// Trimming finished
 		trimmingFinished(resultOne, sipHashKeysOne, heightOne, idOne, nonceOne);
 		
@@ -12133,6 +12136,9 @@ using namespace std;
 				// Return false
 				return false;
 			}
+			
+			// Perform commands in queue
+			clFlush(commandQueue.get());
 			
 			// Trimming finished
 			trimmingFinished(resultTwo, sipHashKeysTwo, heightTwo, idTwo, nonceTwo);
@@ -13974,6 +13980,9 @@ using namespace std;
 				// Return false
 				return false;
 			}
+			
+			// Perform commands in queue
+			clFlush(commandQueue.get());
 			
 			// Trimming finished
 			trimmingFinished(resultOne, sipHashKeysOne, heightOne, idOne, nonceOne);

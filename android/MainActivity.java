@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.text.InputType;
 import android.text.method.ScrollingMovementMethod;
 import android.text.PrecomputedText;
 import android.view.Gravity;
@@ -23,7 +24,12 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import org.json.JSONObject;
 
 
 // Classes
@@ -68,6 +74,7 @@ public final class MainActivity extends Activity {
 		stratumServerInput.setHint("Stratum Server");
 		stratumServerInput.setSingleLine();
 		stratumServerInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+		stratumServerInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
 		
 		// Create username input
 		usernameInput = new EditText(this);
@@ -86,6 +93,7 @@ public final class MainActivity extends Activity {
 		passwordInput.setHint("Password");
 		passwordInput.setSingleLine();
 		passwordInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
+		passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
 		passwordInput.setOnEditorActionListener((TextView view, int actionId, KeyEvent event) -> {
 		
 			// Check if done was pressed
@@ -255,14 +263,97 @@ public final class MainActivity extends Activity {
 		textView.setTypeface(Typeface.MONOSPACE);
 		textView.setMovementMethod(new ScrollingMovementMethod());
 		
-		// Get text view's params
-		textViewParams = textView.getTextMetricsParams();
+		// Get text view's parameters
+		textViewParameters = textView.getTextMetricsParams();
 		
 		// Set text view's number of lines to zero
 		textViewNumberOfLines = 0;
 		
 		// Set text view's text to nothing
 		textViewText = "";
+		
+		// Try
+		try {
+		
+			// Open settings file
+			final File file = new File(getFilesDir(), SETTINGS_FILE_NAME);
+			final FileInputStream settingsFile = new FileInputStream(file);
+			
+			// Read data from settings file
+			final byte[] data = new byte[(int)file.length()];
+			settingsFile.read(data);
+			
+			// Close settings file
+			settingsFile.close();
+			
+			// Get settings from data
+			final JSONObject settings = new JSONObject(new String(data, StandardCharsets.UTF_8));
+			
+			// Restore stratum server if setting exists
+			if(settings.has("Stratum Server")) {
+				stratumServerInput.setText(settings.getString("Stratum Server"));
+			}
+			
+			// Restore username if setting exists
+			if(settings.has("Username")) {
+				usernameInput.setText(settings.getString("Username"));
+			}
+			
+			// Restore password if setting exists
+			if(settings.has("Password")) {
+				passwordInput.setText(settings.getString("Password"));
+			}
+			
+			// Restore trimming type if setting exists
+			if(settings.has("Trimming Type")) {
+				trimmingTypeSelection.setSelection(trimmingTypesAdapter.getPosition(settings.getString("Trimming Type")));
+			}
+		}
+		
+		// Catch errors
+		catch(Exception exception) {
+		
+		}
+	}
+	
+	// On pause
+	@Override protected final void onPause() {
+	
+		// call parent function
+		super.onPause();
+		
+		// Try
+		try {
+		
+			// Create settings
+			final JSONObject settings = new JSONObject();
+			
+			// Add stratum server to settings
+			settings.put("Stratum Server", stratumServerInput.getText().toString());
+			
+			// Add username to settings
+			settings.put("Username", usernameInput.getText().toString());
+			
+			// Add password to settings
+			settings.put("Password", passwordInput.getText().toString());
+			
+			// Add trimming type to settings
+			settings.put("Trimming Type", trimmingTypeSelection.getSelectedItem().toString());
+			
+			// Create settings file
+			final FileOutputStream settingsFile = openFileOutput(SETTINGS_FILE_NAME, Context.MODE_PRIVATE);
+			
+			// Write settings to settings file
+			settingsFile.write(settings.toString().getBytes(StandardCharsets.UTF_8));
+			
+			// Close settings file
+			settingsFile.close();
+		}
+		
+		// Catch errors
+		catch(Exception exception) {
+		
+		}
 	}
 	
 	// Dispatch touch event
@@ -321,7 +412,7 @@ public final class MainActivity extends Activity {
 		textViewText = textViewText.substring(lineIndex);
 		
 		// Precompute text view's text
-		final PrecomputedText precomputedText = PrecomputedText.create(textViewText, textViewParams);
+		final PrecomputedText precomputedText = PrecomputedText.create(textViewText, textViewParameters);
 		
 		// Run on the UI thread
 		runOnUiThread(() -> {
@@ -337,6 +428,9 @@ public final class MainActivity extends Activity {
 			}
 		});
 	}
+	
+	// Settings file name
+	private static final String SETTINGS_FILE_NAME = "settings";
 	
 	// Max number of text view lines
 	private static final int MAX_NUMBER_OF_TEXT_VIEW_LINES = 200;
@@ -356,8 +450,8 @@ public final class MainActivity extends Activity {
 	// Text view
 	private TextView textView;
 	
-	// Text view params
-	private PrecomputedText.Params textViewParams;
+	// Text view parameters
+	private PrecomputedText.Params textViewParameters;
 	
 	// Text view number of lines
 	private int textViewNumberOfLines;

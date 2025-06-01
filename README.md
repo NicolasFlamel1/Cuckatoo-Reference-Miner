@@ -52,20 +52,20 @@ After installing [Android Studio](https://developer.android.com/studio) and [And
 
 If using Linux:
 ```
-~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" EDGE_BITS=31
-~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" run
+~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" EDGE_BITS=31
+~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" run
 ```
 
 If using macOS:
 ```
-~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" EDGE_BITS=31
-~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android28-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" run
+~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android29-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" EDGE_BITS=31
+~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android29-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" run
 ```
 
 If using Windows:
 ```
-"%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android28-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" EDGE_BITS=31
-"%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android28-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" run
+"%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android29-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" EDGE_BITS=31
+"%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android29-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" run
 ```
 
 #### Cross-compiling for Windows
