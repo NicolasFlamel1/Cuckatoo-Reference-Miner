@@ -262,6 +262,7 @@ public final class MainActivity extends Activity {
 		textView.setTextColor(Color.WHITE);
 		textView.setTypeface(Typeface.MONOSPACE);
 		textView.setMovementMethod(new ScrollingMovementMethod());
+		textView.setGravity(Gravity.BOTTOM);
 		
 		// Get text view's parameters
 		textViewParameters = textView.getTextMetricsParams();
@@ -419,13 +420,6 @@ public final class MainActivity extends Activity {
 		
 			// Set text view's text to the precomputed text
 			textView.setText(precomputedText);
-			
-			// Check if text view can scroll down
-			if(textView.canScrollVertically(1)) {
-			
-				// Set text view's gravity to bottom
-				textView.setGravity(Gravity.BOTTOM);
-			}
 		});
 	}
 	

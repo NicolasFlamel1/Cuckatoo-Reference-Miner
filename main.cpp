@@ -93,11 +93,11 @@
 #include <iostream>
 #include <random>
 #include <thread>
+#include "./main.h"
 #include "./common.h"
 #include "./bitmap.h"
 #include "./blake2b.h"
 #include "./hash_table.h"
-#include "./main.h"
 #include "./siphash.h"
 #include "./cuckatoo.h"
 
@@ -3656,7 +3656,7 @@ void stopMiner() noexcept {
 			// Check if buffer isn't full and character isn't a tab
 			if(bufferSize != sizeof(buffer) - sizeof('\0') && character != '\t') {
 			
-				// Append character in buffer
+				// Append character to buffer
 				buffer[bufferSize++] = character;
 			}
 			

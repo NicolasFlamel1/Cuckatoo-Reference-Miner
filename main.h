@@ -17,6 +17,13 @@
 using namespace std;
 
 
+// Constants
+
+// To string
+#define STRINGIFY(a) #a
+#define TO_STRING(a) STRINGIFY(a)
+
+
 // Classes
 
 // Redirect cout class

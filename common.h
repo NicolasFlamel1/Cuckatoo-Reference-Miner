@@ -127,10 +127,6 @@ static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_
 // GNOME inhibit suspending session
 #define GNOME_INHIBIT_SUSPENDING_SESSION (1 << 2)
 
-// To string
-#define STRINGIFY(a) #a
-#define TO_STRING(a) STRINGIFY(a)
-
 
 // Classes
 
