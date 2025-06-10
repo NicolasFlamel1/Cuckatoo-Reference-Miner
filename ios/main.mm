@@ -16,22 +16,26 @@
 	// Hit test
 	-(UIView *) hitTest:(const CGPoint) point withEvent:(UIEvent *) event {
 	
-		// Go through all windows
-		for(const UIWindow *window in [UIApplication sharedApplication].windows) {
+		// Create autorelease pool
+		@autoreleasepool {
 		
-			// Check if window is key window
-			if(window.isKeyWindow) {
+			// Go through all windows
+			for(const UIWindow *window in [UIApplication sharedApplication].windows) {
 			
-				// End editing for window
-				[window.rootViewController.view endEditing:YES];
+				// Check if window is key window
+				if(window.isKeyWindow) {
 				
-				// Break
-				break;
+					// End editing for window
+					[window.rootViewController.view endEditing:YES];
+					
+					// Break
+					break;
+				}
 			}
+			
+			// Return calling parent function
+			return [super hitTest:point withEvent:event];
 		}
-		
-		// Return calling parent function
-		return [super hitTest:point withEvent:event];
 	}
 @end
 
@@ -238,51 +242,63 @@
 	// Save settings
 	-(void) saveSettings {
 	
-		// Check if creating settings was successful
-		const NSArray *settings = [NSArray arrayWithObjects:stratumServerInput.text, usernameInput.text, passwordInput.text, [@([trimmingTypeSelection selectedRowInComponent:0]) stringValue], nil];
-		if(settings) {
+		// Create autorelease pool
+		@autoreleasepool {
 		
-			// Save settings
-			[[NSUserDefaults standardUserDefaults] setObject:settings forKey:SETTINGS_KEY];
+			// Check if creating settings was successful
+			const NSArray *settings = [NSArray arrayWithObjects:stratumServerInput.text, usernameInput.text, passwordInput.text, [@([trimmingTypeSelection selectedRowInComponent:0]) stringValue], nil];
+			if(settings) {
 			
-			// Synchronize settings
-			[[NSUserDefaults standardUserDefaults] synchronize];
+				// Save settings
+				[[NSUserDefaults standardUserDefaults] setObject:settings forKey:SETTINGS_KEY];
+				
+				// Synchronize settings
+				[[NSUserDefaults standardUserDefaults] synchronize];
+			}
 		}
 	}
 	
 	// Text field should return
 	-(BOOL) textFieldShouldReturn:(const UITextField *) textField {
 	
-		// Check if text field is stratum server input
-		if(textField == stratumServerInput) {
+		// Create autorelease pool
+		@autoreleasepool {
 		
-			// Focus on username input
-			[usernameInput becomeFirstResponder];
+			// Check if text field is stratum server input
+			if(textField == stratumServerInput) {
+			
+				// Focus on username input
+				[usernameInput becomeFirstResponder];
+			}
+			
+			// Otherwise check if text field is username input
+			else if(textField == usernameInput) {
+			
+				// Focus on password input
+				[passwordInput becomeFirstResponder];
+			}
+			
+			// Otherwise check if text field is password input
+			else if(textField == passwordInput) {
+			
+				// Clear focus
+				[passwordInput resignFirstResponder];
+			}
+			
+			// Return no
+			return NO;
 		}
-		
-		// Otherwise check if text field is username input
-		else if(textField == usernameInput) {
-		
-			// Focus on password input
-			[passwordInput becomeFirstResponder];
-		}
-		
-		// Otherwise check if text field is password input
-		else if(textField == passwordInput) {
-		
-			// Clear focus
-			[passwordInput resignFirstResponder];
-		}
-		
-		// Return no
-		return NO;
 	}
 	
 	// Touches began
 	-(void) touchesBegan:(const NSSet *) touches withEvent:(const UIEvent *) event {
 	
-		// End editing
-		[self.view endEditing:YES];
+		// Create autorelease pool
+		@autoreleasepool {
+		
+			// End editing
+			[self.view endEditing:YES];
+		}
 	}
 	
 	// Number of components in picker view
@@ -342,112 +358,116 @@
 	// Button clicked
 	-(void) buttonClicked {
 	
-		// Disable button
-		button.enabled = NO;
+		// Create autorelease pool
+		@autoreleasepool {
 		
-		// Check if button is to start miner
-		if([button.currentTitle isEqualToString:@"Start Miner"]) {
-		
-			// Disable inputs
-			stratumServerInput.enabled = NO;
-			usernameInput.enabled = NO;
-			passwordInput.enabled = NO;
-			trimmingTypeSelection.userInteractionEnabled = NO;
-			trimmingTypeSelection.alpha = 0.5;
+			// Disable button
+			button.enabled = NO;
 			
-			// Check if creating arguments failed
-			const NSMutableArray *arguments = [[NSMutableArray alloc] init];
-			if(!arguments) {
+			// Check if button is to start miner
+			if([button.currentTitle isEqualToString:@"Start Miner"]) {
 			
-				// Exit failure
-				exit(EXIT_FAILURE);
-			}
-			
-			// Append program's name to list
-			[arguments addObject:@TO_STRING(NAME)];
-			
-			// Check if stratum server exists
-			if(stratumServerInput.text.length) {
-			
-				// Append stratum server arguments to list
-				[arguments addObject:@"--stratum_server_address"];
-				[arguments addObject:stratumServerInput.text];
-			}
-			
-			// Check if username exists
-			if(usernameInput.text.length) {
-			
-				// Append username arguments to list
-				[arguments addObject:@"--stratum_server_username"];
-				[arguments addObject:usernameInput.text];
-			}
-			
-			// Check if password exists
-			if(passwordInput.text.length) {
-			
-				// Append password arguments to list
-				[arguments addObject:@"--stratum_server_password"];
-				[arguments addObject:passwordInput.text];
-			}
-			
-			// Check selected trimming type index
-			switch([trimmingTypeSelection selectedRowInComponent:0]) {
-			
-				// Zero
-				case 0:
+				// Disable inputs
+				stratumServerInput.enabled = NO;
+				usernameInput.enabled = NO;
+				passwordInput.enabled = NO;
+				trimmingTypeSelection.userInteractionEnabled = NO;
+				trimmingTypeSelection.alpha = 0.5;
 				
-					// Append mean trimming argument to list
-					[arguments addObject:@"--mean_trimming"];
-					
-					// Break
-					break;
-					
-				// One
-				case 1:
+				// Check if creating arguments failed
+				const NSMutableArray *arguments = [[NSMutableArray alloc] init];
+				if(!arguments) {
 				
-					// Append slean then mean trimming argument to list
-					[arguments addObject:@"--slean_then_mean_trimming"];
-					
-					// Break
-					break;
-					
-				// Two
-				case 2:
+					// Exit failure
+					exit(EXIT_FAILURE);
+				}
 				
-					// Append slean trimming argument to list
-					[arguments addObject:@"--slean_trimming"];
-					
-					// Break
-					break;
-					
-				// Three
-				case 3:
+				// Append program's name to list
+				[arguments addObject:@TO_STRING(NAME)];
 				
-					// Append lean trimming argument to list
-					[arguments addObject:@"--lean_trimming"];
+				// Check if stratum server exists
+				if(stratumServerInput.text.length) {
+				
+					// Append stratum server arguments to list
+					[arguments addObject:@"--stratum_server_address"];
+					[arguments addObject:stratumServerInput.text];
+				}
+				
+				// Check if username exists
+				if(usernameInput.text.length) {
+				
+					// Append username arguments to list
+					[arguments addObject:@"--stratum_server_username"];
+					[arguments addObject:usernameInput.text];
+				}
+				
+				// Check if password exists
+				if(passwordInput.text.length) {
+				
+					// Append password arguments to list
+					[arguments addObject:@"--stratum_server_password"];
+					[arguments addObject:passwordInput.text];
+				}
+				
+				// Check selected trimming type index
+				switch([trimmingTypeSelection selectedRowInComponent:0]) {
+				
+					// Zero
+					case 0:
 					
-					// Break
-					break;
+						// Append mean trimming argument to list
+						[arguments addObject:@"--mean_trimming"];
+						
+						// Break
+						break;
+						
+					// One
+					case 1:
+					
+						// Append slean then mean trimming argument to list
+						[arguments addObject:@"--slean_then_mean_trimming"];
+						
+						// Break
+						break;
+						
+					// Two
+					case 2:
+					
+						// Append slean trimming argument to list
+						[arguments addObject:@"--slean_trimming"];
+						
+						// Break
+						break;
+						
+					// Three
+					case 3:
+					
+						// Append lean trimming argument to list
+						[arguments addObject:@"--lean_trimming"];
+						
+						// Break
+						break;
+				}
+				
+				// Prepare miner
+				prepareMiner();
+				
+				// Set button's text to stop miner
+				[button setTitle:@"Stop Miner" forState:UIControlStateNormal];
+				
+				// Enable button
+				button.enabled = YES;
+				
+				// Start miner thread
+				[self performSelectorInBackground:@selector(startMinerThread:) withObject:arguments];
 			}
 			
-			// Prepare miner
-			prepareMiner();
+			// Otherwise
+			else {
 			
-			// Set button's text to stop miner
-			[button setTitle:@"Stop Miner" forState:UIControlStateNormal];
-			
-			// Enable button
-			button.enabled = YES;
-			
-			// Start miner thread
-			[self performSelectorInBackground:@selector(startMinerThread:) withObject:arguments];
-		}
-		
-		// Otherwise
-		else {
-		
-			// Stop miner
-			stopMiner();
+				// Stop miner
+				stopMiner();
+			}
 		}
 	}
 	
@@ -497,11 +517,15 @@
 							// Run on the UI thread
 							dispatch_async(dispatch_get_main_queue(), ^{
 							
-								// Set text view's text to the resulting text
-								textView.text = resultingText;
+								// Create autorelease pool
+								@autoreleasepool {
 								
-								// Scroll text view to bottom
-								[textView setContentOffset:CGPointMake(0, textView.contentSize.height - textView.bounds.size.height) animated:NO];
+									// Set text view's text to the resulting text
+									textView.text = resultingText;
+									
+									// Scroll text view to bottom
+									[textView setContentOffset:CGPointMake(0, textView.contentSize.height - textView.bounds.size.height) animated:NO];
+								}
 							});
 						}
 					}
@@ -522,18 +546,22 @@
 			// Run on the UI thread
 			dispatch_async(dispatch_get_main_queue(), ^{
 			
-				// Set button's text to start miner
-				[button setTitle:@"Start Miner" forState:UIControlStateNormal];
+				// Create autorelease pool
+				@autoreleasepool {
 				
-				// Enable button
-				button.enabled = YES;
-				
-				// Enable inputs
-				stratumServerInput.enabled = YES;
-				usernameInput.enabled = YES;
-				passwordInput.enabled = YES;
-				trimmingTypeSelection.userInteractionEnabled = YES;
-				trimmingTypeSelection.alpha = 1;
+					// Set button's text to start miner
+					[button setTitle:@"Start Miner" forState:UIControlStateNormal];
+					
+					// Enable button
+					button.enabled = YES;
+					
+					// Enable inputs
+					stratumServerInput.enabled = YES;
+					usernameInput.enabled = YES;
+					passwordInput.enabled = YES;
+					trimmingTypeSelection.userInteractionEnabled = YES;
+					trimmingTypeSelection.alpha = 1;
+				}
 			});
 		}
 	}
@@ -541,18 +569,26 @@
 	// Orientation changed
 	-(void) orientationChanged {
 	
-		// Scroll text view to bottom
-		[self scrollTextViewToBottom];
+		// Create autorelease pool
+		@autoreleasepool {
 		
-		// Scroll text view to bottom again after the orientation is done changing
-		[self performSelector:@selector(scrollTextViewToBottom) withObject:nil afterDelay:0];
+			// Scroll text view to bottom
+			[self scrollTextViewToBottom];
+			
+			// Scroll text view to bottom again after the orientation is done changing
+			[self performSelector:@selector(scrollTextViewToBottom) withObject:nil afterDelay:0];
+		}
 	}
 	
 	// Scroll text view to bottom
 	-(void) scrollTextViewToBottom {
 	
-		// Scroll text view to bottom
-		[textView setContentOffset:CGPointMake(0, textView.contentSize.height - textView.bounds.size.height) animated:NO];
+		// Create autorelease pool
+		@autoreleasepool {
+		
+			// Scroll text view to bottom
+			[textView setContentOffset:CGPointMake(0, textView.contentSize.height - textView.bounds.size.height) animated:NO];
+		}
 	}
 @end
 
