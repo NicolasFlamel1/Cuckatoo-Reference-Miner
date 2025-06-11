@@ -81,6 +81,24 @@ A stratum server address, port, username, and password can be provided when runn
 ```
 "./Cuckatoo Reference Miner" --stratum_server_address 127.0.0.1 --stratum_server_port 3416 --stratum_server_username username --stratum_server_password password
 ```
+Here's commands that can be used to mine to some  of the MimbleWimble Coin (MWC) mining pools.
+
+[2Miners](https://2miners.com/mwc-mining-pool) (Replace `YOUR_WALLETS_TOR_OR_MWCMQS_ADDRESS.RIG_ID` with your values, for example `rvscna33zmif2j4fz65wmvjvjevhywrlezzfm2q7jxyg5hejmpfuhcid.device_1`)
+```
+"./Cuckatoo Reference Miner" -a mwc.2miners.com:7575 -u YOUR_WALLETS_TOR_OR_MWCMQS_ADDRESS.RIG_ID
+```
+[WoolyPooly](https://woolypooly.com/en/coin/mwc) (Replace `YOUR_USERNAME_GENERATED_BY_WOOLYPOOLY.RIG_ID` with your values, for example `WPHaHR0cDovL3J2c2NuYTMzem1pZjJqNGZ6NjV3bXZqdmpldmh5d3JsZXp6Zm0ycTdqeHlnNWhlam1wZnVoY2lkLm9uaW9u.device_1`)
+```
+"./Cuckatoo Reference Miner" -a pool.woolypooly.com:11000 -u YOUR_USERNAME_GENERATED_BY_WOOLYPOOLY.RIG_ID
+```
+[MWC Pool](https://mwcpool.com) (Replace `YOUR_MWC_POOL_USERNAME` with your values, for example `nicolasflamel`)
+```
+"./Cuckatoo Reference Miner" -a stratum+tcp://stratum2.mwcpool.com:2222 -u YOUR_MWC_POOL_USERNAME
+```
+[Pacific Pool](https://pacificpool.ws) (Replace `YOUR_PACIFIC_POOL_USERNAME.RIG_ID` with your values, for example `nicolasflamel.device_1`)
+```
+"./Cuckatoo Reference Miner" -a stratum+tcp://stratum2.pacificpool.ws:2222 -u YOUR_PACIFIC_POOL_USERNAME.RIG_ID
+```
 You can display all your available GPUs and their indices that this program can use by running it with the `--display_gpus` command line argument.
 ```
 "./Cuckatoo Reference Miner" --display_gpus
