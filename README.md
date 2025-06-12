@@ -91,9 +91,9 @@ Here's commands that can be used to mine to some  of the MimbleWimble Coin (MWC)
 ```
 "./Cuckatoo Reference Miner" -a pool.woolypooly.com:11000 -u YOUR_USERNAME_GENERATED_BY_WOOLYPOOLY.RIG_ID
 ```
-* [MWC Pool](https://mwcpool.com) (Replace `YOUR_MWC_POOL_USERNAME` with your values, for example `nicolasflamel`)
+* [MWC Pool](https://mwcpool.com) (Replace `YOUR_MWC_POOL_USERNAME.RIG_ID` with your values, for example `nicolasflamel.device_1`)
 ```
-"./Cuckatoo Reference Miner" -a stratum+tcp://stratum2.mwcpool.com:2222 -u YOUR_MWC_POOL_USERNAME
+"./Cuckatoo Reference Miner" -a stratum+tcp://stratum2.mwcpool.com:2222 -u YOUR_MWC_POOL_USERNAME.RIG_ID
 ```
 * [Pacific Pool](https://pacificpool.ws) (Replace `YOUR_PACIFIC_POOL_USERNAME.RIG_ID` with your values, for example `nicolasflamel.device_1`)
 ```
