@@ -9,7 +9,7 @@ If you're building this program for a desktop operating system then it's recomme
 #### Linux
 This program can be built and ran with Linux with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev
+sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev coreutils
 make EDGE_BITS=31
 make run
 ```
@@ -52,6 +52,7 @@ After installing [Android Studio](https://developer.android.com/studio) and [And
 
 If using Linux:
 ```
+sudo apt install coreutils
 ~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" EDGE_BITS=31
 ~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++" BUILD_TOOLS="~/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="~/android-studio/jbr/bin" ADB="~/Android/Sdk/platform-tools/adb" run
 ```
@@ -71,7 +72,7 @@ If using Windows:
 #### Cross-compiling for Windows
 This program can be built with Linux for Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-sudo apt install make g++-mingw-w64 cmake
+sudo apt install make g++-mingw-w64 cmake coreutils wget tar
 make CC=x86_64-w64-mingw32-g++-posix crossCompilingDependencies
 make CC=x86_64-w64-mingw32-g++-posix EDGE_BITS=31
 ```
