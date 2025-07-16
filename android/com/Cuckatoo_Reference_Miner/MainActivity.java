@@ -8,6 +8,7 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
+import android.Manifest;
 import android.os.Bundle;
 import android.text.InputType;
 import android.text.method.ScrollingMovementMethod;
@@ -48,13 +49,13 @@ public final class MainActivity extends Activity {
 	private native void prepareMiner();
 	
 	// Start miner
-	private native boolean startMiner(String[] argv);
+	private native boolean startMiner(final String[] argv);
 	
 	// Stop miner
 	private native void stopMiner();
 	
 	// On create
-	@Override protected final void onCreate(Bundle savedInstanceState) {
+	@Override protected final void onCreate(final Bundle savedInstanceState) {
 	
 		// Call parent function
 		super.onCreate(savedInstanceState);
@@ -94,7 +95,7 @@ public final class MainActivity extends Activity {
 		passwordInput.setSingleLine();
 		passwordInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
 		passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-		passwordInput.setOnEditorActionListener((TextView view, int actionId, KeyEvent event) -> {
+		passwordInput.setOnEditorActionListener((final TextView view, final int actionId, final KeyEvent event) -> {
 		
 			// Check if done was pressed
 			if(actionId == EditorInfo.IME_ACTION_DONE) {
@@ -125,13 +126,13 @@ public final class MainActivity extends Activity {
 		layout.addView(button);
 		button.setText("Start Miner");
 		button.setAllCaps(false);
-		button.setOnClickListener((View view) -> {
+		button.setOnClickListener((final View view) -> {
 		
 			// Disable button
 			button.setEnabled(false);
 			
 			// Check if button is to start miner
-			if(button.getText() == "Start Miner") {
+			if(button.getText().equals("Start Miner")) {
 			
 				// Disable inputs
 				stratumServerInput.setEnabled(false);
@@ -141,10 +142,10 @@ public final class MainActivity extends Activity {
 				
 				// Create arguments
 				final ArrayList<String> arguments = new ArrayList<String>();
-				arguments.add(this.getClass().getCanonicalName());
+				arguments.add(getClass().getCanonicalName());
 				
 				// Check if stratum server exists
-				if(stratumServerInput.getText().toString().length() != 0) {
+				if(!stratumServerInput.getText().toString().isEmpty()) {
 				
 					// Append stratum server arguments to list
 					arguments.add("--stratum_server_address");
@@ -152,7 +153,7 @@ public final class MainActivity extends Activity {
 				}
 				
 				// Check if username exists
-				if(usernameInput.getText().toString().length() != 0) {
+				if(!usernameInput.getText().toString().isEmpty()) {
 				
 					// Append username arguments to list
 					arguments.add("--stratum_server_username");
@@ -160,7 +161,7 @@ public final class MainActivity extends Activity {
 				}
 				
 				// Check if password exists
-				if(passwordInput.getText().toString().length() != 0) {
+				if(!passwordInput.getText().toString().isEmpty()) {
 				
 					// Append password arguments to list
 					arguments.add("--stratum_server_password");
@@ -312,8 +313,34 @@ public final class MainActivity extends Activity {
 		}
 		
 		// Catch errors
-		catch(Exception exception) {
+		catch(final Exception exception) {
 		
+		}
+		
+		// Request internet permission
+		requestPermissions(new String[]{Manifest.permission.INTERNET}, REQUEST_INTERNET_PERMISSION);
+	}
+	
+	// On request permissions result
+	@Override public final void onRequestPermissionsResult(final int requestCode, final String[] permissions, final int[] grantResults) {
+	
+		// Check request code
+		switch(requestCode) {
+		
+			// Request internet permission
+			case REQUEST_INTERNET_PERMISSION:
+			
+				// break
+				break;
+				
+			// Default
+			default:
+			
+				// Call parent function
+				super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+				
+				// Break
+				break;
 		}
 	}
 	
@@ -352,20 +379,20 @@ public final class MainActivity extends Activity {
 		}
 		
 		// Catch errors
-		catch(Exception exception) {
+		catch(final Exception exception) {
 		
 		}
 	}
 	
 	// Dispatch touch event
-	@Override public final boolean dispatchTouchEvent(MotionEvent event) {
+	@Override public final boolean dispatchTouchEvent(final MotionEvent event) {
 	
 		// Check if start of touch
-		if(event.getAction() == MotionEvent.ACTION_DOWN) {
+		if(event != null && event.getAction() == MotionEvent.ACTION_DOWN) {
 		
 			// Check if an input has focus
 			final View view = getCurrentFocus();
-			if(view instanceof EditText) {
+			if(view != null && view instanceof EditText) {
 			
 				// Check if not touching the input with focus
 				final Rect rectangle = new Rect();
@@ -386,48 +413,55 @@ public final class MainActivity extends Activity {
 	}
 	
 	// Append to text view
-	private void appendToTextView(String text) {
+	private void appendToTextView(final String text) {
 	
-		// Append text to the text view's text
-		textViewText += text;
+		// Check if text exists
+		if(text != null) {
 		
-		// Go through all lines in the text
-		for(int i = text.indexOf('\n'); i != -1; i = text.indexOf('\n', i + 1)) {
-		
-			// Increment text view's number of lines
-			++textViewNumberOfLines;
-		}
-		
-		// Loop while text view's number of lines is greater than the max number of lines
-		int lineIndex = 0;
-		while(textViewNumberOfLines > MAX_NUMBER_OF_TEXT_VIEW_LINES) {
-		
-			// Get next line's index
-			lineIndex = textViewText.indexOf('\n', lineIndex) + 1;
+			// Append text to the text view's text
+			textViewText += text;
 			
-			// Decrement text view's number of lines
-			--textViewNumberOfLines;
+			// Go through all lines in the text
+			for(int i = text.indexOf('\n'); i != -1; i = text.indexOf('\n', i + 1)) {
+			
+				// Increment text view's number of lines
+				++textViewNumberOfLines;
+			}
+			
+			// Loop while text view's number of lines is greater than the max number of lines
+			int lineIndex = 0;
+			while(textViewNumberOfLines > MAX_NUMBER_OF_TEXT_VIEW_LINES) {
+			
+				// Get next line's index
+				lineIndex = textViewText.indexOf('\n', lineIndex) + 1;
+				
+				// Decrement text view's number of lines
+				--textViewNumberOfLines;
+			}
+			
+			// Remove text view's starting lines
+			textViewText = textViewText.substring(lineIndex);
+			
+			// Precompute text view's text
+			final PrecomputedText precomputedText = PrecomputedText.create(textViewText, textViewParameters);
+			
+			// Run on the UI thread
+			runOnUiThread(() -> {
+			
+				// Set text view's text to the precomputed text
+				textView.setText(precomputedText);
+			});
 		}
-		
-		// Remove text view's starting lines
-		textViewText = textViewText.substring(lineIndex);
-		
-		// Precompute text view's text
-		final PrecomputedText precomputedText = PrecomputedText.create(textViewText, textViewParameters);
-		
-		// Run on the UI thread
-		runOnUiThread(() -> {
-		
-			// Set text view's text to the precomputed text
-			textView.setText(precomputedText);
-		});
 	}
 	
 	// Settings file name
-	private static final String SETTINGS_FILE_NAME = "settings";
+	static private final String SETTINGS_FILE_NAME = "settings";
 	
 	// Max number of text view lines
-	private static final int MAX_NUMBER_OF_TEXT_VIEW_LINES = 200;
+	static private final int MAX_NUMBER_OF_TEXT_VIEW_LINES = 200;
+	
+	// Request internet permission
+	static private final int REQUEST_INTERNET_PERMISSION = 1;
 	
 	// Stratum server input
 	private EditText stratumServerInput;

@@ -48,7 +48,7 @@ mingw32-make run
 ```
 
 #### Android
-After installing [Android Studio](https://developer.android.com/studio) and [Android NDK](https://developer.android.com/ndk), this program can be built for and ran with Android with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `CC` is set to the location of the Android NDK compiler that you want to use which is also used to determine the Android ABI and API level to use, `BUILD_TOOLS` is set to the location of the Android SDK build tools that you want to use, `ANDROID_JAR` is set to the location of the Android Java library that you want to use, `JBR_BIN` is set to the location of an Android JetBrains Runtime, and `ADB` is set to the location of an Android ADB platform tool:
+After installing [Android Studio](https://developer.android.com/studio) and [Android NDK](https://developer.android.com/ndk), this program can be built for and ran with Android with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `CC` is set to the location of the Android NDK compiler that you want to use which is also used to determine the Android ABI and minimum API level to use, `BUILD_TOOLS` is set to the location of the Android SDK build tools that you want to use, `ANDROID_JAR` is set to the location of the Android Java library that you want to use, `JBR_BIN` is set to the location of an Android JetBrains Runtime, and `ADB` is set to the location of an Android ADB platform tool:
 
 If using Linux:
 ```
@@ -81,7 +81,7 @@ A stratum server address, port, username, and password can be provided when runn
 ```
 "./Cuckatoo Reference Miner" --stratum_server_address 127.0.0.1 --stratum_server_port 3416 --stratum_server_username username --stratum_server_password password
 ```
-Here's commands that can be used to mine to some  of the MimbleWimble Coin (MWC) mining pools:
+Here's commands that can be used to mine to some of the MimbleWimble Coin (MWC) mining pools:
 
 * [2Miners](https://2miners.com/mwc-mining-pool) (Replace `YOUR_WALLETS_TOR_OR_MWCMQS_ADDRESS.RIG_ID` with your values, for example `rvscna33zmif2j4fz65wmvjvjevhywrlezzfm2q7jxyg5hejmpfuhcid.device_1`)
 ```
