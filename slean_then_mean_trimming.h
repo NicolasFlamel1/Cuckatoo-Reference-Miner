@@ -52,6 +52,7 @@ using namespace std;
 #define SLEAN_THEN_MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_REMAINING_EDGES_BUCKET ((static_cast<uint32_t>(SLEAN_THEN_MEAN_TRIMMING_NUMBER_OF_ITEMS_PER_REMAINING_EDGES_BUCKET * 0.38) / SLEAN_TRIMMING_PARTS) * SLEAN_TRIMMING_PARTS)
 
 // Slean then mean trimming number of edges after slean trimming
+// TODO
 #define SLEAN_THEN_MEAN_TRIMMING_NUMBER_OF_EDGES_AFTER_SLEAN_TRIMMING NUMBER_OF_EDGES
 
 // Slean then mean trimming number of mean bitmap bytes
@@ -334,6 +335,7 @@ using namespace std;
 		moreThanMaxMemoryAllocation.reset();
 		
 		// Set buckets one number of buckets based on if enforcing max memory allocation size
+		// TODO
 		const size_t bucketsOneNumberOfBuckets = (enforceMaxMemoryAllocationSize && static_cast<uint64_t>(SLEAN_THEN_MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET) * SLEAN_THEN_MEAN_TRIMMING_NUMBER_OF_BUCKETS * sizeof(uint32_t) > device->maxBufferLength()) ? (SLEAN_THEN_MEAN_TRIMMING_AFTER_TRIMMING_ROUND_MAX_NUMBER_OF_EDGES_PER_BUCKET * SLEAN_THEN_MEAN_TRIMMING_NUMBER_OF_BUCKETS + SLEAN_THEN_MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET - 1) / SLEAN_THEN_MEAN_TRIMMING_INITIAL_MAX_NUMBER_OF_EDGES_PER_BUCKET : SLEAN_THEN_MEAN_TRIMMING_NUMBER_OF_BUCKETS;
 		
 		// Set local buckets size based on the device's work group memory size

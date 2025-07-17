@@ -6,9 +6,11 @@ package com.Cuckatoo_Reference_Miner;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.Manifest;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.text.method.ScrollingMovementMethod;
@@ -19,6 +21,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup.MarginLayoutParams;
+import android.view.WindowInsets;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -81,6 +85,33 @@ public final class MainActivity extends Activity {
 		setContentView(layout);
 		layout.setOrientation(LinearLayout.VERTICAL);
 		
+		// Check if API level is at least Vanilla Ice Cream
+		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+		
+			// Layout on apply window insets
+			layout.setOnApplyWindowInsetsListener((final View view, final WindowInsets insets) -> {
+			
+				// Check if getting system bar insets was successful
+				final Insets systemBarInsets = insets.getInsets(WindowInsets.Type.systemBars());
+				if(systemBarInsets != null) {
+				
+					// Check if getting view's layout parameters was successful
+					final MarginLayoutParams layoutParameters = (MarginLayoutParams)view.getLayoutParams();
+					if(layoutParameters != null) {
+					
+						// Set layout parameter's to use system bar insets as margins
+						layoutParameters.setMargins(systemBarInsets.left, systemBarInsets.top, systemBarInsets.right, systemBarInsets.bottom);
+						
+						// Set view's layout parameters
+						view.setLayoutParams(layoutParameters);
+					}
+				}
+				
+				// Return consumed
+				return WindowInsets.CONSUMED;
+			});
+		}
+		
 		// Check if loading library failed
 		if(!libraryLoaded) {
 		
@@ -106,6 +137,13 @@ public final class MainActivity extends Activity {
 		stratumServerInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
 		stratumServerInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
 		
+		// Check if API level is at least Tiramisu
+		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+		
+			// Disable stratum server input's handwriting
+			stratumServerInput.setAutoHandwritingEnabled(false);
+		}
+		
 		// Create username input
 		usernameInput = new EditText(this);
 		
@@ -114,6 +152,13 @@ public final class MainActivity extends Activity {
 		usernameInput.setHint("Username");
 		usernameInput.setSingleLine();
 		usernameInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+		
+		// Check if API level is at least Tiramisu
+		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+		
+			// Disable username input's handwriting
+			usernameInput.setAutoHandwritingEnabled(false);
+		}
 		
 		// Create password input
 		passwordInput = new EditText(this);
@@ -136,6 +181,13 @@ public final class MainActivity extends Activity {
 			// Return false
 			return false;
 		});
+		
+		// Check if API level is at least Tiramisu
+		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+		
+			// Disable password input's handwriting
+			passwordInput.setAutoHandwritingEnabled(false);
+		}
 		
 		// Create trimming type selection
 		trimmingTypeSelection = new Spinner(this, Spinner.MODE_DIALOG);
@@ -310,12 +362,20 @@ public final class MainActivity extends Activity {
 			final File file = new File(getFilesDir(), SETTINGS_FILE_NAME);
 			final FileInputStream settingsFile = new FileInputStream(file);
 			
-			// Read data from settings file
+			// Try
 			final byte[] data = new byte[(int)file.length()];
-			settingsFile.read(data);
+			try {
 			
-			// Close settings file
-			settingsFile.close();
+				// Read data from settings file
+				settingsFile.read(data);
+			}
+			
+			// Finally
+			finally {
+			
+				// Close settings file
+				settingsFile.close();
+			}
 			
 			// Get settings from data
 			final JSONObject settings = new JSONObject(new String(data, StandardCharsets.UTF_8));
@@ -403,11 +463,19 @@ public final class MainActivity extends Activity {
 				// Create settings file
 				final FileOutputStream settingsFile = openFileOutput(SETTINGS_FILE_NAME, Context.MODE_PRIVATE);
 				
-				// Write settings to settings file
-				settingsFile.write(settings.toString().getBytes(StandardCharsets.UTF_8));
+				// Try
+				try {
 				
-				// Close settings file
-				settingsFile.close();
+					// Write settings to settings file
+					settingsFile.write(settings.toString().getBytes(StandardCharsets.UTF_8));
+				}
+				
+				// Finally
+				finally {
+				
+					// Close settings file
+					settingsFile.close();
+				}
 			}
 			
 			// Catch errors
