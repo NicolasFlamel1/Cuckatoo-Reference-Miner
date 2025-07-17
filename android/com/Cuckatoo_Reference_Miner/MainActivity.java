@@ -38,21 +38,35 @@ import org.json.JSONObject;
 // Main activity class
 public final class MainActivity extends Activity {
 
+	// Set library loaded to true
+	static private boolean libraryLoaded = true;
+	
 	// Static
 	static {
 	
-		// Load library
-		System.loadLibrary("Cuckatoo_Reference_Miner");
+		// Try
+		try {
+		
+			// Load library
+			System.loadLibrary("Cuckatoo_Reference_Miner");
+		}
+		
+		// Catch errors
+		catch(final Throwable error) {
+		
+			// Set library loaded to false
+			libraryLoaded = false;
+		}
 	}
 	
 	// Prepare miner
-	private native void prepareMiner();
+	native private void prepareMiner();
 	
 	// Start miner
-	private native boolean startMiner(final String[] argv);
+	native private boolean startMiner(final String[] argv);
 	
 	// Stop miner
-	private native void stopMiner();
+	native private void stopMiner();
 	
 	// On create
 	@Override protected final void onCreate(final Bundle savedInstanceState) {
@@ -66,6 +80,21 @@ public final class MainActivity extends Activity {
 		// Configure layout
 		setContentView(layout);
 		layout.setOrientation(LinearLayout.VERTICAL);
+		
+		// Check if loading library failed
+		if(!libraryLoaded) {
+		
+			// Create message
+			final TextView message = new TextView(this);
+			
+			// Configure message
+			layout.addView(message, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 1));
+			message.setText("Device isn't compatible");
+			message.setGravity(Gravity.CENTER);
+			
+			// Return
+			return;
+		}
 		
 		// Create stratum server input
 		stratumServerInput = new EditText(this);
@@ -313,7 +342,7 @@ public final class MainActivity extends Activity {
 		}
 		
 		// Catch errors
-		catch(final Exception exception) {
+		catch(final Throwable error) {
 		
 		}
 		
@@ -350,37 +379,41 @@ public final class MainActivity extends Activity {
 		// call parent function
 		super.onPause();
 		
-		// Try
-		try {
+		// Check if loading library was successful
+		if(libraryLoaded) {
 		
-			// Create settings
-			final JSONObject settings = new JSONObject();
+			// Try
+			try {
 			
-			// Add stratum server to settings
-			settings.put("Stratum Server", stratumServerInput.getText().toString());
+				// Create settings
+				final JSONObject settings = new JSONObject();
+				
+				// Add stratum server to settings
+				settings.put("Stratum Server", stratumServerInput.getText().toString());
+				
+				// Add username to settings
+				settings.put("Username", usernameInput.getText().toString());
+				
+				// Add password to settings
+				settings.put("Password", passwordInput.getText().toString());
+				
+				// Add trimming type to settings
+				settings.put("Trimming Type", trimmingTypeSelection.getSelectedItem().toString());
+				
+				// Create settings file
+				final FileOutputStream settingsFile = openFileOutput(SETTINGS_FILE_NAME, Context.MODE_PRIVATE);
+				
+				// Write settings to settings file
+				settingsFile.write(settings.toString().getBytes(StandardCharsets.UTF_8));
+				
+				// Close settings file
+				settingsFile.close();
+			}
 			
-			// Add username to settings
-			settings.put("Username", usernameInput.getText().toString());
+			// Catch errors
+			catch(final Throwable error) {
 			
-			// Add password to settings
-			settings.put("Password", passwordInput.getText().toString());
-			
-			// Add trimming type to settings
-			settings.put("Trimming Type", trimmingTypeSelection.getSelectedItem().toString());
-			
-			// Create settings file
-			final FileOutputStream settingsFile = openFileOutput(SETTINGS_FILE_NAME, Context.MODE_PRIVATE);
-			
-			// Write settings to settings file
-			settingsFile.write(settings.toString().getBytes(StandardCharsets.UTF_8));
-			
-			// Close settings file
-			settingsFile.close();
-		}
-		
-		// Catch errors
-		catch(final Exception exception) {
-		
+			}
 		}
 	}
 	
