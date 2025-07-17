@@ -137,13 +137,6 @@ public final class MainActivity extends Activity {
 		stratumServerInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
 		stratumServerInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
 		
-		// Check if API level is at least Tiramisu
-		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-		
-			// Disable stratum server input's handwriting
-			stratumServerInput.setAutoHandwritingEnabled(false);
-		}
-		
 		// Create username input
 		usernameInput = new EditText(this);
 		
@@ -152,13 +145,6 @@ public final class MainActivity extends Activity {
 		usernameInput.setHint("Username");
 		usernameInput.setSingleLine();
 		usernameInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
-		
-		// Check if API level is at least Tiramisu
-		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-		
-			// Disable username input's handwriting
-			usernameInput.setAutoHandwritingEnabled(false);
-		}
 		
 		// Create password input
 		passwordInput = new EditText(this);
@@ -181,13 +167,6 @@ public final class MainActivity extends Activity {
 			// Return false
 			return false;
 		});
-		
-		// Check if API level is at least Tiramisu
-		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-		
-			// Disable password input's handwriting
-			passwordInput.setAutoHandwritingEnabled(false);
-		}
 		
 		// Create trimming type selection
 		trimmingTypeSelection = new Spinner(this, Spinner.MODE_DIALOG);
