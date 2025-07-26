@@ -26,12 +26,12 @@ make EDGE_BITS=31 USE_OPENCL=1
 ```
 
 #### iOS
-After installing [Xcode](https://developer.apple.com/xcode), this program can be built for iOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+After installing [Xcode](https://developer.apple.com/xcode), this program can be built for iOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `PROVISIONING_PROFILE` is set to the location of the provisioning profile that you want to use to provision the app which can be obtained from [Apple's developer site](https://developer.apple.com) and is also used to determine the app's identifier, and `SIGNING_IDENTITY` is set to signing identity that you want to use to sign the app which can be obtained by running `security find-identity -v -p codesigning` in a terminal:
 ```
 sudo xcode-select --switch "/Applications/Xcode.app"
-make CC="$(xcrun --sdk iphoneos --find g++)" SDK="$(xcrun --sdk iphoneos --show-sdk-path)" EDGE_BITS=31
+make CC="$(xcrun --sdk iphoneos --find g++)" SDK="$(xcrun --sdk iphoneos --show-sdk-path)" PROVISIONING_PROFILE="~/Desktop/embedded.mobileprovision" SIGNING_IDENTITY="4FAF7C8AC62BBAEE46ACF3E761B54F557D93974B" EDGE_BITS=31
 ```
-The resulting ipa file is unsigned, so you'll need to sign and provision it if you want to install it on an iPhone.
+The resulting ipa file can be ran by installing it on an iPhone and running it.
 
 This program can also be built for and ran with Xcode's iOS simulator with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```

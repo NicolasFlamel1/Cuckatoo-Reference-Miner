@@ -113,7 +113,7 @@ else ifneq (,$(findstring iPhoneOS,$(SDK)))
 	PROGRAM_NAME = $(NAME)
 	
 	# Run command
-	RUN_COMMAND = echo Sign and provision \"./$(NAME).ipa\" and install it on an iPhone to run it
+	RUN_COMMAND = echo Install \"./$(NAME).ipa\" on an iPhone to run it
 	
 	# Set flags and link libraries
 	CFLAGS += -DUSE_OTHER_MAIN_FUNCTION -isysroot "$(shell echo $(SDK))" -mios-version-min=14 -fobjc-arc -arch arm64
@@ -127,7 +127,7 @@ else ifneq (,$(findstring iPhoneOS,$(SDK)))
 	NULL_LOCATION = "/dev/null"
 	
 	# Package command
-	PACKAGE_COMMAND = && rm -rf "./Payload" && mkdir -p "./Payload/$(NAME).app" && mv "./$(PROGRAM_NAME)" "./Payload/$(NAME).app" && echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n<key>CFBundleExecutable</key>\n<string>$(NAME)</string>\n<key>CFBundleName</key>\n<string>$(NAME)</string>\n<key>CFBundleIdentifier</key>\n<string>$(NAME)</string>\n<key>CFBundleVersion</key>\n<string>$(VERSION)</string>\n<key>CFBundleShortVersionString</key>\n<string>$(VERSION)</string>\n<key>MinimumOSVersion</key>\n<string>14.0</string>\n<key>UILaunchScreen</key>\n<dict>\n</dict>\n</dict>\n</plist>" > "./Payload/$(NAME).app/Info.plist" && zip -rq "./$(NAME).ipa" "./Payload" && rm -r "./Payload"
+	PACKAGE_COMMAND = && rm -rf "./Payload" && mkdir -p "./Payload/$(NAME).app" && mv "./$(PROGRAM_NAME)" "./Payload/$(NAME).app" && echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n<key>CFBundleExecutable</key>\n<string>$(NAME)</string>\n<key>CFBundleName</key>\n<string>$(NAME)</string>\n<key>CFBundleIdentifier</key>\n<string>$(shell cat $(PROVISIONING_PROFILE) | grep -a "<key>application-identifier</key>" -A1 | grep -o "<string>.*</string>" | cut -d"." -f2-)\n<key>CFBundleVersion</key>\n<string>$(VERSION)</string>\n<key>CFBundleShortVersionString</key>\n<string>$(VERSION)</string>\n<key>MinimumOSVersion</key>\n<string>14.0</string>\n<key>UILaunchScreen</key>\n<dict/>\n</dict>\n</plist>" > "./Payload/$(NAME).app/Info.plist" && echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n<key>application-identifier</key>\n$(shell cat $(PROVISIONING_PROFILE) | grep -a "<key>application-identifier</key>" -A1 | grep -o "<string>.*</string>")\n</dict>\n</plist>" > "./Payload/entitlements.plist" && cp "$(shell echo $(PROVISIONING_PROFILE))" "./Payload/$(NAME).app/embedded.mobileprovision" && codesign -s "$(SIGNING_IDENTITY)" --entitlements "./Payload/entitlements.plist" "./Payload/$(NAME).app" && rm "./Payload/entitlements.plist" && zip -rq "./$(NAME).ipa" "./Payload" && rm -r "./Payload"
 	
 # Otherwise check if compiling for iOS simulator
 else ifneq (,$(findstring iPhoneSimulator,$(SDK)))
@@ -136,7 +136,7 @@ else ifneq (,$(findstring iPhoneSimulator,$(SDK)))
 	PROGRAM_NAME = $(NAME)
 	
 	# Run command
-	RUN_COMMAND = xcrun simctl install booted "./$(NAME).app" && xcrun simctl launch --console booted "$(NAME)"
+	RUN_COMMAND = xcrun simctl install booted "./$(NAME).app" && xcrun simctl launch --console booted "com.$(subst $\ ,_,$(NAME))"
 	
 	# Set flags and link libraries
 	CFLAGS += -DUSE_OTHER_MAIN_FUNCTION -isysroot "$(shell echo $(SDK))" -mios-version-min=14 -fobjc-arc
@@ -150,7 +150,7 @@ else ifneq (,$(findstring iPhoneSimulator,$(SDK)))
 	NULL_LOCATION = "/dev/null"
 	
 	# Package command
-	PACKAGE_COMMAND = && rm -rf "./$(NAME).app" && mkdir "./$(NAME).app" && mv "./$(PROGRAM_NAME)" "./$(NAME).app" && echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n<key>CFBundleExecutable</key>\n<string>$(NAME)</string>\n<key>CFBundleName</key>\n<string>$(NAME)</string>\n<key>CFBundleIdentifier</key>\n<string>$(NAME)</string>\n<key>CFBundleVersion</key>\n<string>$(VERSION)</string>\n<key>CFBundleShortVersionString</key>\n<string>$(VERSION)</string>\n<key>MinimumOSVersion</key>\n<string>14.0</string>\n<key>UILaunchScreen</key>\n<dict>\n</dict>\n</dict>\n</plist>" > "./$(NAME).app/Info.plist"
+	PACKAGE_COMMAND = && rm -rf "./$(NAME).app" && mkdir "./$(NAME).app" && mv "./$(PROGRAM_NAME)" "./$(NAME).app" && echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n<key>CFBundleExecutable</key>\n<string>$(NAME)</string>\n<key>CFBundleName</key>\n<string>$(NAME)</string>\n<key>CFBundleIdentifier</key>\n<string>com.$(subst $\ ,_,$(NAME))</string>\n<key>CFBundleVersion</key>\n<string>$(VERSION)</string>\n<key>CFBundleShortVersionString</key>\n<string>$(VERSION)</string>\n<key>MinimumOSVersion</key>\n<string>14.0</string>\n<key>UILaunchScreen</key>\n<dict/>\n</dict>\n</plist>" > "./$(NAME).app/Info.plist"
 	
 # Otherwise check if compiling for macOS
 else ifeq ($(shell uname),Darwin)
