@@ -40,9 +40,6 @@ static_assert(TRIMMING_ROUNDS >= 0 && TRIMMING_ROUNDS <= 1000 && static_cast<dou
 static_assert(SLEAN_TRIMMING_PARTS >= 2 && SLEAN_TRIMMING_PARTS <= MAX_SLEAN_TRIMMING_PARTS, "Slean trimming parts is outside of the accepted range");
 static_assert(has_single_bit(static_cast<unsigned int>(SLEAN_TRIMMING_PARTS)), "Slean trimming parts isn't a power of two");
 
-// Throw error if slean then mean slean trimming rounds is invalid
-static_assert(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS >= 1 && (SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS < TRIMMING_ROUNDS || !TRIMMING_ROUNDS), "Slean then mean slean trimming rounds is outside of the accepted range");
-
 // Throw error if local RAM kilobytes is invalid
 static_assert(LOCAL_RAM_KILOBYTES >= MIN_LOCAL_RAM_KILOBYTES && LOCAL_RAM_KILOBYTES <= 256, "Local RAM kilobytes is outside of the accepted range");
 static_assert(has_single_bit(static_cast<unsigned int>(LOCAL_RAM_KILOBYTES)), "Local RAM kilobytes isn't a power of two");

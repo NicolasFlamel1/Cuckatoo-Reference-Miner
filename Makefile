@@ -4,10 +4,9 @@ VERSION = 0.3.0
 EDGE_BITS = 31
 TRIMMING_ROUNDS = 90
 SLEAN_TRIMMING_PARTS = 2
-SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS = 1
 LOCAL_RAM_KILOBYTES = 32
 CC = g++
-CFLAGS = -O3 -ffast-math -Wall -Wextra -Wno-unknown-warning-option -Wno-vla -Wno-vla-cxx-extension -Wno-type-limits -Wno-missing-field-initializers -Wno-nan-infinity-disabled -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME="$(NAME)" -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS) -DSLEAN_TRIMMING_PARTS=$(SLEAN_TRIMMING_PARTS) -DSLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=$(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS) -DLOCAL_RAM_KILOBYTES=$(LOCAL_RAM_KILOBYTES)
+CFLAGS = -O3 -ffast-math -Wall -Wextra -Wno-unknown-warning-option -Wno-vla -Wno-vla-cxx-extension -Wno-type-limits -Wno-missing-field-initializers -Wno-nan-infinity-disabled -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME="$(NAME)" -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS) -DSLEAN_TRIMMING_PARTS=$(SLEAN_TRIMMING_PARTS) -DLOCAL_RAM_KILOBYTES=$(LOCAL_RAM_KILOBYTES)
 LIBS = -lm
 SRCS = "./main.cpp"
 

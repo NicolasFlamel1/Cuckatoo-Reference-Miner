@@ -167,14 +167,11 @@ enum TrimmingType {
 	// Mean trimming type
 	MEAN_TRIMMING_TYPE = 1 << 0,
 	
-	// Slean then mean trimming type
-	SLEAN_THEN_MEAN_TRIMMING_TYPE = 1 << 1,
-	
 	// Slean trimming type
-	SLEAN_TRIMMING_TYPE = 1 << 2,
+	SLEAN_TRIMMING_TYPE = 1 << 1,
 	
 	// Lean trimming type
-	LEAN_TRIMMING_TYPE = 1 << 3
+	LEAN_TRIMMING_TYPE = 1 << 2
 };
 
 
@@ -294,7 +291,6 @@ static inline void trimmingFinished(const void *data, const uint64_t __attribute
 // Header files
 #include "./lean_trimming.h"
 #include "./mean_trimming.h"
-#include "./slean_then_mean_trimming.h"
 #include "./slean_trimming.h"
 
 
@@ -389,7 +385,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 	#if TRIMMING_ROUNDS != 0
 	
 		// Display message
-		cout << ", " TO_STRING(SLEAN_TRIMMING_PARTS) " slean trimming part(s), " TO_STRING(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS) " slean then mean slean trimming round(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory";
+		cout << ", " TO_STRING(SLEAN_TRIMMING_PARTS) " slean trimming part(s), targeting " TO_STRING(LOCAL_RAM_KILOBYTES) " KB of GPU local memory";
 		
 		// Check if using an Apple device and not using OpenCL
 		#if defined __APPLE__ && !defined USE_OPENCL
@@ -565,9 +561,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 		
 		// Mean trimming
 		{"mean_trimming", no_argument, nullptr, 'm'},
-		
-		// Slean then mean trimming
-		{"slean_then_mean_trimming", no_argument, nullptr, 'e'},
 		
 		// Slean trimming
 		{"slean_trimming", no_argument, nullptr, 's'},
@@ -1148,18 +1141,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 					// Break
 					break;
 				
-				// Slean then mean trimming
-				case 'e':
-				
-					// Set exit after options to false
-					exitAfterOptions = false;
-					
-					// Enable slean then mean trimming type
-					trimmingTypes |= SLEAN_THEN_MEAN_TRIMMING_TYPE;
-					
-					// Break
-					break;
-				
 				// Slean trimming
 				case 's':
 				
@@ -1340,7 +1321,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 			
 			// Display message
 			cout << "\t-m, --mean_trimming\t\tUse only mean trimming" << endl;
-			cout << "\t-e, --slean_then_mean_trimming\tUse only slean then mean trimming" << endl;
 			cout << "\t-s, --slean_trimming\t\tUse only slean trimming" << endl;
 			cout << "\t-l, --lean_trimming\t\tUse only lean trimming" << endl;
 		#endif
@@ -1951,16 +1931,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 			trimmingTypeDisplay = true;
 		}
 		
-		// Check if using all trimming types or slean then mean trimming is enabled
-		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_THEN_MEAN_TRIMMING_TYPE) {
-		
-			// Display message
-			cout << (trimmingTypeDisplay ? "," : "") << " slean then mean";
-			
-			// Set trimming type displayed to true
-			trimmingTypeDisplay = true;
-		}
-		
 		// Check if using all trimming types or slean trimming is enabled
 		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_TRIMMING_TYPE) {
 		
@@ -2329,354 +2299,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 				
 					// Display message
 					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce mean trimming's GPU local memory requirement by half." << endl;
-				}
-			}
-		}
-		
-		// Check if using all trimming types or slean then mean trimming is enabled
-		if(trimmingTypes == ALL_TRIMMING_TYPES || trimmingTypes & SLEAN_THEN_MEAN_TRIMMING_TYPE) {
-		
-			// Check if using an Apple device and not using OpenCL
-			#if defined __APPLE__ && !defined USE_OPENCL
-			
-				// Create slean then mean trimming context
-				context = unique_ptr<MTL::Device, void(*)(MTL::Device *)>(createSleanThenMeanTrimmingContext(deviceIndex), [](MTL::Device *context) noexcept {
-				
-					// Free context
-					context->release();
-				});
-				
-			// Otherwise
-			#else
-				
-				// Create slean then mean trimming context
-				context = unique_ptr<remove_pointer<cl_context>::type, decltype(&clReleaseContext)>(createSleanThenMeanTrimmingContext(platforms, numberOfPlatforms, deviceIndex), clReleaseContext);
-			#endif
-			
-			// Check if creating slean then mean trimming context was successful
-			if(context) {
-				
-				// Get number of searching threads
-				const unsigned int numberOfSearchingThreads = min(min(numberOfThreads, static_cast<unsigned int>(MAX_NUMBER_OF_SEARCHING_THREADS_SEARCHING_EDGES)), static_cast<unsigned int>(1 + ceil(log2((1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) * MAX_NUMBER_OF_EDGES_AFTER_TRIMMING))));
-				
-				// Display message
-				cout << "Using " << numberOfSearchingThreads << " CPU core(s) for searching: ";
-				
-				// Go through all searching threads
-				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
-				
-					// Check if using Windows
-					#ifdef _WIN32
-					
-						// Display message
-						cout << (i ? ", " : "") << "CPU " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + cpuCoresNameOffset);
-						
-					// Otherwise check if using an Apple device
-					#elif defined __APPLE__
-					
-						// Display message
-						cout << (i ? ", " : "") << "Core " << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
-						
-					// Otherwise
-					#else
-					
-						// Display message
-						cout << (i ? ", " : "") << "CPU" << ((firstThreadIndex + i) % numberOfApplicableCpuCores + 1 + cpuCoresNameOffset);
-					#endif
-				}
-				
-				// Display new line
-				cout << endl;
-				
-				// Go through all searching threads
-				thread searchingThreads[numberOfSearchingThreads];
-				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreads];
-				unsigned int numberOfSearchingThreadsFinished = 0;
-				bool closeSearchingThreads = false;
-				bool searchingThreadsInitializedSuccessfully = true;
-				
-				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
-				
-					// Create searching thread's node connections
-					nodeConnections[i] = unique_ptr<CuckatooNodeConnectionsLink[]>(new(nothrow) CuckatooNodeConnectionsLink[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * 2]);
-					
-					// Create searching thread
-					searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, nodeConnections = nodeConnections[i].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
-					
-						// Check if using an Apple device and not using macOS or using Android
-						unique_lock lock(searchingThreadsMutex);
-						#if (defined __APPLE__ && TARGET_OS_OSX == 0) || defined __ANDROID__
-						
-							// Set thread's priority and affinity
-							setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores);
-							
-							// Set initialized failed to if creating edges failed, creating node connections failed, or initializing thread local global variables failed
-							const bool initializingFailed = !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
-							
-						// Otherwise
-						#else
-						
-							// Set initialized failed to if setting searching thread's priority and affinity failed, creating node connections failed, or initializing thread local global variables failed
-							const bool initializingFailed = !setThreadPriorityAndAffinity((firstThreadIndex + searchingThreadIndex) % numberOfApplicableCpuCores) || !nodeConnections || !initializeCuckatooThreadLocalGlobalVariables();
-						#endif
-						
-						// Check if initializing failed
-						if(initializingFailed) {
-						
-							// Set searching threads initialized successfully to false
-							searchingThreadsInitializedSuccessfully = false;
-						}
-						
-						// Check if all searching threads have initialized
-						if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
-						
-							// Reset number of searching threads finished
-							numberOfSearchingThreadsFinished = 0;
-							
-							// Notify that searching threads have initialized
-							searchingThreadsFinished = true;
-							lock.unlock();
-							searchingThreadsFinishedConditionalVariable->notify_one();
-						}
-						
-						// Otherwise
-						else {
-						
-							// Unlock
-							lock.unlock();
-						}
-						
-						// Check if initializing failed
-						if(initializingFailed) {
-						
-							// Return
-							return;
-						}
-						
-						// Loop forever
-						for(bool startTriggerTrue = true;; startTriggerTrue = !startTriggerTrue) {
-						
-							// Wait until starting searching threads
-							lock.lock();
-							startSearchingThreadsConditionalVariable->wait(lock, [startTriggerTrue]() noexcept -> bool {
-							
-								// Return if starting searching threads
-								return startSearchingThreadsTriggerToggle == startTriggerTrue;
-							});
-							
-							// Get if closing thread
-							const bool closeThread = closeSearchingThreads;
-							lock.unlock();
-							
-							// Check if closing thread
-							if(closeThread) {
-							
-								// Return
-								return;
-							}
-							
-							// Get number of edges
-							const uint32_t &numberOfEdges = reinterpret_cast<const uint32_t *>(searchingThreadsData)[0];
-							
-							// Get total number of edges
-							const uint32_t totalNumberOfEdges = min(numberOfEdges, MAX_NUMBER_OF_EDGES_AFTER_TRIMMING);
-							
-							// Get edges
-							const uint32_t *edges = &reinterpret_cast<const uint32_t *>(searchingThreadsData)[1];
-							
-							// Check if not the first searching thread
-							if(searchingThreadIndex) {
-							
-								// Set first searching edges
-								const uint64_t firstSearchingEdge = (1 - 1 / pow(2, searchingThreadIndex - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT));
-								
-								// Go through all previous edges
-								for(uint64_t nodeConnectionsIndex = 0, edgesIndex = 0; nodeConnectionsIndex < firstSearchingEdge * 2; nodeConnectionsIndex += 2, edgesIndex += EDGE_NUMBER_OF_COMPONENTS) {
-								
-									// Replace newest node connection for the node on the first partition and add node connection to list
-									nodeConnections[nodeConnectionsIndex] = {cuckatooUNewestNodeConnections.replace(edges[edgesIndex + 1], &nodeConnections[nodeConnectionsIndex]), edges[edgesIndex + 1], edges[edgesIndex]};
-									
-									// Replace newest node connection for the node on the second partition and add node connection to list
-									nodeConnections[nodeConnectionsIndex + 1] = {cuckatooVNewestNodeConnections.replace(edges[edgesIndex + 2], &nodeConnections[nodeConnectionsIndex + 1]), edges[edgesIndex + 2], edges[edgesIndex]};
-								}
-								
-								// Check if getting solution was successful
-								uint32_t solution[SOLUTION_SIZE];
-								if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
-								
-									// Lock
-									lock.lock();
-									
-									// Set searching threads solution to the solution
-									memcpy(searchingThreadsSolution, solution, sizeof(solution));
-									
-									// Unlock
-									lock.unlock();
-								}
-							}
-							
-							// Otherwise
-							else {
-							
-								// Check if too may edges exist
-								if(numberOfEdges > MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
-								
-									// Check if there's too many trimming rounds
-									if(MAX_NUMBER_OF_EDGES_AFTER_TRIMMING <= TOO_MANY_TRIMMING_ROUNDS_MAX_REMAINING_NUMBER_OF_EDGES) {
-									
-										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Decrease the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS - 1) << " if this happens frequently." << endl;
-									}
-									
-									// Otherwise
-									else {
-									
-										// Display message
-										cout << "Too many edges exist after trimming, so some edges weren't searched. Increase the number of trimming rounds by building this program with TRIMMING_ROUNDS=" << (TRIMMING_ROUNDS + 1) << " if this happens frequently." << endl;
-									}
-								}
-								
-								// Check if getting solution was successful
-								uint32_t solution[SOLUTION_SIZE];
-								if(getCuckatooSolution(solution, nodeConnections, edges, ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)))) {
-								
-									// Lock
-									lock.lock();
-									
-									// Set searching threads solution to the solution
-									memcpy(searchingThreadsSolution, solution, sizeof(solution));
-									
-									// Unlock
-									lock.unlock();
-								}
-							}
-							
-							// Reset node connections
-							cuckatooUNewestNodeConnections.clear();
-							cuckatooVNewestNodeConnections.clear();
-							
-							// Check if all searching threads have finished
-							lock.lock();
-							if(++numberOfSearchingThreadsFinished == numberOfSearchingThreads) {
-							
-								// Reset number of searching threads finished
-								numberOfSearchingThreadsFinished = 0;
-								
-								// Notify that searching threads have finished
-								searchingThreadsFinished = true;
-								lock.unlock();
-								searchingThreadsFinishedConditionalVariable->notify_one();
-							}
-							
-							// Otherwise
-							else {
-							
-								// Unlock
-								lock.unlock();
-							}
-						}	
-					});
-				}
-				
-				// Wait until searching threads have initialized
-				searchingThreadsFinished = false;
-				searchingThreadsFinishedConditionalVariable->wait(searchingThreadsLock, []() noexcept -> bool {
-				
-					// Return if searching threads have initialized
-					return searchingThreadsFinished;
-				});
-				
-				// Check if searching threads didn't initialized successfully
-				bool performingTrimmingLoopResult = false;
-				if(!searchingThreadsInitializedSuccessfully) {
-				
-					// Display message
-					cout << "Allocating memory failed." << endl;
-				}
-				
-				// Otherwise
-				else {
-				
-					// Perform slean then mean trimming loop
-					performingTrimmingLoopResult = performSleanThenMeanTrimmingLoop(context.get());
-				}
-				
-				// Close searching threads
-				closeSearchingThreads = true;
-				startSearchingThreadsTriggerToggle = !startSearchingThreadsTriggerToggle;
-				searchingThreadsLock.unlock();
-				startSearchingThreadsConditionalVariable->notify_all();
-				
-				// Go through all searching threads
-				for(unsigned int i = 0; i < numberOfSearchingThreads; ++i) {
-				
-					// Join searching thread
-					searchingThreads[i].join();
-				}
-				
-				// Lock searching threads lock
-				searchingThreadsLock.lock();
-				
-				// Return if searching threads initialized successfully and performing trimming loop was successful
-				return searchingThreadsInitializedSuccessfully && performingTrimmingLoopResult;
-			}
-			
-			// Otherwise
-			else {
-			
-				// Display message
-				cout << ((deviceIndex == ALL_DEVICES) ? "No applicable GPU found for slean then mean trimming" : "GPU isn't applicable for slean then mean trimming") << ". Slean then mean trimming requires ";
-				
-				// Check if RAM requirement can be expressed in bytes
-				if(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE / 2) {
-				
-					// Display message
-					cout << SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES << " bytes";
-				}
-				
-				// Otherwise check if RAM requirement can be expressed in kilobytes
-				else if(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE / 2) {
-				
-					// Display message
-					cout << (ceil(static_cast<double>(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE * 100) / 100) << " KB";
-				}
-				
-				// Otherwise check if RAM requirement can be expressed in megabytes
-				else if(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES < BYTES_IN_A_KILOBYTE * KILOBYTES_IN_A_MEGABYTE * MEGABYTES_IN_A_GIGABYTE / 2) {
-				
-					// Display message
-					cout << (ceil(static_cast<double>(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE * 100) / 100) << " MB";
-				}
-				
-				// Otherwise
-				else {
-				
-					// Display message
-					cout << (ceil(static_cast<double>(SLEAN_THEN_MEAN_TRIMMING_REQUIRED_RAM_BYTES) / BYTES_IN_A_KILOBYTE / KILOBYTES_IN_A_MEGABYTE / MEGABYTES_IN_A_GIGABYTE * 100) / 100) << " GB";
-				}
-				
-				// Display message
-				cout << " of RAM and " << (SLEAN_THEN_MEAN_TRIMMING_REQUIRED_WORK_GROUP_RAM_BYTES / BYTES_IN_A_KILOBYTE) << " KB of local memory." << endl;
-				
-				// Check if slean trimming parts is less than its max value
-				if(SLEAN_TRIMMING_PARTS < MAX_SLEAN_TRIMMING_PARTS) {
-				
-					// Display message
-					cout << "Build this program with SLEAN_TRIMMING_PARTS=" << (SLEAN_TRIMMING_PARTS * 2) << " to reduce slean then mean trimming's GPU RAM requirement by about half." << endl;
-				}
-				
-				// Check if slean then mean slean trimming rounds is less than its max value
-				if(SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS < TRIMMING_ROUNDS - 1) {
-				
-					// Display message
-					cout << "Build this program with SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS=" << (SLEAN_THEN_MEAN_SLEAN_TRIMMING_ROUNDS + 1) << " to reduce slean then mean trimming's GPU RAM requirement." << endl;
-				}
-				
-				// Check if local RAM kilobytes is greater than its min value
-				if(LOCAL_RAM_KILOBYTES > MIN_LOCAL_RAM_KILOBYTES) {
-				
-					// Display message
-					cout << "Build this program with LOCAL_RAM_KILOBYTES=" << (LOCAL_RAM_KILOBYTES / 2) << " to reduce slean then mean trimming's GPU local memory requirement by half." << endl;
 				}
 			}
 		}

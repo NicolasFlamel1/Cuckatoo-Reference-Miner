@@ -91,19 +91,23 @@ public final class MainActivity extends Activity {
 			// Layout on apply window insets
 			layout.setOnApplyWindowInsetsListener((final View view, final WindowInsets insets) -> {
 			
-				// Check if getting system bar insets was successful
-				final Insets systemBarInsets = insets.getInsets(WindowInsets.Type.systemBars());
-				if(systemBarInsets != null) {
+				// Check if view and insets exist
+				if(view != null && insets != null) {
 				
-					// Check if getting view's layout parameters was successful
-					final MarginLayoutParams layoutParameters = (MarginLayoutParams)view.getLayoutParams();
-					if(layoutParameters != null) {
+					// Check if getting system bar insets was successful
+					final Insets systemBarInsets = insets.getInsets(WindowInsets.Type.systemBars());
+					if(systemBarInsets != null) {
 					
-						// Set layout parameter's to use system bar insets as margins
-						layoutParameters.setMargins(systemBarInsets.left, systemBarInsets.top, systemBarInsets.right, systemBarInsets.bottom);
+						// Check if getting view's layout parameters was successful
+						final MarginLayoutParams layoutParameters = (MarginLayoutParams)view.getLayoutParams();
+						if(layoutParameters != null) {
 						
-						// Set view's layout parameters
-						view.setLayoutParams(layoutParameters);
+							// Set layout parameter's to use system bar insets as margins
+							layoutParameters.setMargins(systemBarInsets.left, systemBarInsets.top, systemBarInsets.right, systemBarInsets.bottom);
+							
+							// Set view's layout parameters
+							view.setLayoutParams(layoutParameters);
+						}
 					}
 				}
 				
@@ -173,7 +177,7 @@ public final class MainActivity extends Activity {
 		
 		// Configure trimming type selection
 		layout.addView(trimmingTypeSelection);
-		final String[] trimmingTypes = {"Mean Trimming", "Slean Then Mean Trimming", "Slean Trimming", "Lean Trimming"};
+		final String[] trimmingTypes = {"Mean Trimming", "Slean Trimming", "Lean Trimming"};
 		final ArrayAdapter<String> trimmingTypesAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, trimmingTypes);
 		trimmingTypesAdapter.setDropDownViewResource(android.R.layout.select_dialog_singlechoice);
 		trimmingTypeSelection.setAdapter(trimmingTypesAdapter);
@@ -236,15 +240,6 @@ public final class MainActivity extends Activity {
 					
 						// Append mean trimming argument to list
 						arguments.add("--mean_trimming");
-						
-						// Break
-						break;
-						
-					// Slean then mean trimming
-					case "Slean Then Mean Trimming":
-					
-						// Append slean then mean trimming argument to list
-						arguments.add("--slean_then_mean_trimming");
 						
 						// Break
 						break;

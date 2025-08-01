@@ -311,8 +311,8 @@
 	// Picker view number of rows in components
 	-(NSInteger) pickerView:(const UIPickerView *) pickerView numberOfRowsInComponent:(const NSInteger) component {
 	
-		// Return four
-		return 4;
+		// Return three
+		return 3;
 	}
 	
 	// Picker view title for row
@@ -331,16 +331,10 @@
 			case 1:
 			
 				// Return row's title
-				return @"Slean Then Mean Trimming";
-				
-			// Two
-			case 2:
-			
-				// Return row's title
 				return @"Slean Trimming";
 				
-			// Three or default
-			case 3:
+			// Two or default
+			case 2:
 			default:
 			
 				// Return row's title
@@ -424,23 +418,14 @@
 					// One
 					case 1:
 					
-						// Append slean then mean trimming argument to list
-						[arguments addObject:@"--slean_then_mean_trimming"];
-						
-						// Break
-						break;
-						
-					// Two
-					case 2:
-					
 						// Append slean trimming argument to list
 						[arguments addObject:@"--slean_trimming"];
 						
 						// Break
 						break;
 						
-					// Three
-					case 3:
+					// Two
+					case 2:
 					
 						// Append lean trimming argument to list
 						[arguments addObject:@"--lean_trimming"];
