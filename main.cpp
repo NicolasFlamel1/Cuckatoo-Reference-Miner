@@ -262,8 +262,12 @@ static uint64_t jobId;
 // Job header
 static uint8_t jobHeader[HEADER_SIZE] = {};
 
-// Job is applicable
-static bool jobIsApplicable = true;
+// Check if not tuning
+#ifndef TUNING
+
+	// Job is applicable
+	static bool jobIsApplicable = true;
+#endif
 
 // Job nonce
 static uint64_t jobNonce = 0;
