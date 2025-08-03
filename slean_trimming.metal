@@ -16,6 +16,8 @@ Trimming round 7: clear number of edges per bucket one, step thirty-two, clear n
 Trimming round n - 1: clear number of edges per bucket one, step thirty-two, clear number of edges per bucket two, step thirty-three, step thirty-four
 Trimming round n: clear number of edges per bucket one, step thirty-two, clear number of edges per bucket two, step thirty-three, step thirty-four
 Get result from edges bitmap
+
+This trimming algorithm can be made faster by switching to mean trimming once the number of trimming parts has been reduced to one.
 */
 
 

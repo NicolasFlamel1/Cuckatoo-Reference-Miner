@@ -11,6 +11,8 @@ Trimming round 5: clear number of edges per bucket two, step five
 Trimming round n - 1: clear number of edges per bucket one, step five
 Trimming round n: clear number of edges per bucket two, step five, clear first remaining edge, step six
 Get result from remaining edges
+
+This trimming algorithm can be made faster by storing the edge's index and both its nodes in step one instead of just storing the edge's index. This would require 3x more memory though, but then steps two, three, and four could be skipped.
 */
 
 
