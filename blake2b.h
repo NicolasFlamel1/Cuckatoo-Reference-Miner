@@ -58,6 +58,9 @@ static inline void blake2bStep(uint64_t __attribute__((vector_size(sizeof(uint64
 // BLAKE2b
 void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &result, const uint8_t header[HEADER_SIZE], uint64_t nonce) noexcept {
 
+	// Throw error if header size is invalid
+	static_assert(HEADER_SIZE + sizeof(nonce) > BLAKE2B_BUFFER_SIZE && HEADER_SIZE + sizeof(nonce) <= BLAKE2B_BUFFER_SIZE * 3, "Header's size is invalid");
+	
 	// Set buffer to beginning of header
 	uint64_t buffer[BLAKE2B_BUFFER_SIZE / sizeof(uint64_t)] = {};
 	memcpy(buffer, header, sizeof(buffer));
@@ -119,9 +122,6 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 		#endif
 	}
 	
-	// Set buffer to end of header
-	memcpy(buffer, &header[sizeof(buffer)], HEADER_SIZE - sizeof(buffer));
-	
 	// Check if using Windows
 	#ifdef _WIN32
 	
@@ -141,19 +141,107 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 		nonce = htobe64(nonce);
 	#endif
 	
-	// Append nonce in big endian to buffer
-	memcpy(&reinterpret_cast<uint8_t *>(buffer)[HEADER_SIZE - sizeof(buffer)], &nonce, sizeof(nonce));
+	// Check if stratum server uses one mining algorithm
+	#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS == 1
 	
-	// Pad buffer with zeros
-	memset(&reinterpret_cast<uint8_t *>(buffer)[HEADER_SIZE - sizeof(buffer) + sizeof(nonce)], 0, sizeof(buffer) - (HEADER_SIZE - sizeof(buffer) + sizeof(nonce)));
+		// Set buffer to end of header
+		memcpy(buffer, &header[sizeof(buffer)], HEADER_SIZE - sizeof(buffer));
+		
+		// Append nonce in big endian to buffer
+		memcpy(&reinterpret_cast<uint8_t *>(buffer)[HEADER_SIZE - sizeof(buffer)], &nonce, sizeof(nonce));
+		
+		// Pad buffer with zeros
+		memset(&reinterpret_cast<uint8_t *>(buffer)[HEADER_SIZE - sizeof(buffer) + sizeof(nonce)], 0, sizeof(buffer) - (HEADER_SIZE - sizeof(buffer) + sizeof(nonce)));
+		
+		// Prepare values for next rounds
+		a ^= BLAKE2B_INITIAL_STATE_FIRST_HALF ^ c;
+		b ^= BLAKE2B_INITIAL_STATE_SECOND_HALF ^ d;
+		const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) initialStateCurrentPartFirstHalf = a;
+		
+	// Otherwise
+	#else
+	
+		// Set buffer to next part of header
+		memcpy(buffer, &header[sizeof(buffer)], sizeof(buffer));
+		
+		// Go through all rounds
+		a ^= BLAKE2B_INITIAL_STATE_FIRST_HALF ^ c;
+		b ^= BLAKE2B_INITIAL_STATE_SECOND_HALF ^ d;
+		c = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){BLAKE2B_INITIAL_WORKING_STATE[8], BLAKE2B_INITIAL_WORKING_STATE[9], BLAKE2B_INITIAL_WORKING_STATE[10], BLAKE2B_INITIAL_WORKING_STATE[11]};
+		d = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){BLAKE2B_INITIAL_WORKING_STATE[12] ^ (sizeof(buffer) ^ (sizeof(buffer) * 2)), BLAKE2B_INITIAL_WORKING_STATE[13], BLAKE2B_INITIAL_WORKING_STATE[14], BLAKE2B_INITIAL_WORKING_STATE[15]};
+		uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) initialStateCurrentPartFirstHalf = a;
+		const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) initialStateCurrentPartSecondHalf = b;
+		
+		for(uint_fast8_t i = 0; i < BLAKE2B_NUMBER_OF_ROUNDS; ++i) {
+		
+			// Set x and y for column step
+			uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) x = {buffer[BLAKE2B_SIGMA[i][0]], buffer[BLAKE2B_SIGMA[i][2]], buffer[BLAKE2B_SIGMA[i][4]], buffer[BLAKE2B_SIGMA[i][6]]};
+			uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) y = {buffer[BLAKE2B_SIGMA[i][1]], buffer[BLAKE2B_SIGMA[i][3]], buffer[BLAKE2B_SIGMA[i][5]], buffer[BLAKE2B_SIGMA[i][7]]};
+			
+			// Perform column step
+			blake2bStep(a, b, c, d, x, y);
+			
+			// Check if using Clang
+			#ifdef __clang__
+			
+				// Update b, c, and d for diagonal step
+				b = __builtin_shufflevector(b, b, 1, 2, 3, 0);
+				c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
+				d = __builtin_shufflevector(d, d, 3, 0, 1, 2);
+			
+			// Otherwise
+			#else
+			
+				// Update b, c, and d for diagonal step
+				b = __builtin_shuffle(b, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){1, 2, 3, 0});
+				c = __builtin_shuffle(c, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){2, 3, 0, 1});
+				d = __builtin_shuffle(d, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){3, 0, 1, 2});
+			#endif
+			
+			// Set x, and y for diagonal step
+			x = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){buffer[BLAKE2B_SIGMA[i][8]], buffer[BLAKE2B_SIGMA[i][10]], buffer[BLAKE2B_SIGMA[i][12]], buffer[BLAKE2B_SIGMA[i][14]]};
+			y = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){buffer[BLAKE2B_SIGMA[i][9]], buffer[BLAKE2B_SIGMA[i][11]], buffer[BLAKE2B_SIGMA[i][13]], buffer[BLAKE2B_SIGMA[i][15]]};
+			
+			// Perform diagonal step
+			blake2bStep(a, b, c, d, x, y);
+			
+			// Check if using Clang
+			#ifdef __clang__
+			
+				// Update b, c, and d for column step
+				b = __builtin_shufflevector(b, b, 3, 0, 1, 2);
+				c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
+				d = __builtin_shufflevector(d, d, 1, 2, 3, 0);
+			
+			// Otherwise
+			#else
+			
+				// Update b, c, and d for column step
+				b = __builtin_shuffle(b, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){3, 0, 1, 2});
+				c = __builtin_shuffle(c, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){2, 3, 0, 1});
+				d = __builtin_shuffle(d, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){1, 2, 3, 0});
+			#endif
+		}
+		
+		// Set buffer to end of header
+		memcpy(buffer, &header[sizeof(buffer) * 2], HEADER_SIZE - sizeof(buffer) * 2);
+		
+		// Append nonce in big endian to buffer
+		memcpy(&reinterpret_cast<uint8_t *>(buffer)[HEADER_SIZE - sizeof(buffer) * 2], &nonce, sizeof(nonce));
+		
+		// Pad buffer with zeros
+		memset(&reinterpret_cast<uint8_t *>(buffer)[HEADER_SIZE - sizeof(buffer) * 2 + sizeof(nonce)], 0, sizeof(buffer) - (HEADER_SIZE - sizeof(buffer) * 2 + sizeof(nonce)));
+		
+		// Prepare values for next rounds
+		a ^= initialStateCurrentPartFirstHalf ^ c;
+		b ^= initialStateCurrentPartSecondHalf ^ d;
+		initialStateCurrentPartFirstHalf = a;
+	#endif
 	
 	// Go through all rounds
-	a ^= BLAKE2B_INITIAL_STATE_FIRST_HALF ^ c;
-	b ^= BLAKE2B_INITIAL_STATE_SECOND_HALF ^ d;
 	c = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){BLAKE2B_INITIAL_WORKING_STATE[8], BLAKE2B_INITIAL_WORKING_STATE[9], BLAKE2B_INITIAL_WORKING_STATE[10], BLAKE2B_INITIAL_WORKING_STATE[11]};
-	d = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){BLAKE2B_INITIAL_WORKING_STATE[12] ^ (HEADER_SIZE - sizeof(buffer) + sizeof(nonce)), BLAKE2B_INITIAL_WORKING_STATE[13], BLAKE2B_INITIAL_WORKING_STATE[14] ^ UINT64_MAX, BLAKE2B_INITIAL_WORKING_STATE[15]};
-	const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) initialStateSecondPart = a;
-	
+	d = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){BLAKE2B_INITIAL_WORKING_STATE[12] ^ (sizeof(buffer) ^ (HEADER_SIZE + sizeof(nonce))), BLAKE2B_INITIAL_WORKING_STATE[13], BLAKE2B_INITIAL_WORKING_STATE[14] ^ UINT64_MAX, BLAKE2B_INITIAL_WORKING_STATE[15]};
+		
 	for(uint_fast8_t i = 0; i < BLAKE2B_NUMBER_OF_ROUNDS; ++i) {
 	
 		// Set x and y for column step
@@ -206,7 +294,7 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 	}
 	
 	// Get result from working state
-	result = initialStateSecondPart ^ a ^ c;
+	result = initialStateCurrentPartFirstHalf ^ a ^ c;
 }
 
 // BLAKE2b step

@@ -5,8 +5,10 @@ EDGE_BITS = 31
 TRIMMING_ROUNDS = 90
 SLEAN_TRIMMING_PARTS = 2
 LOCAL_RAM_KILOBYTES = 32
+STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS = 1
+STRATUM_SERVER_MINING_ALGORITHM_NAME = Cuckoo
 CC = g++
-CFLAGS = -O3 -ffast-math -Wall -Wextra -Wno-unknown-warning-option -Wno-vla -Wno-vla-cxx-extension -Wno-type-limits -Wno-missing-field-initializers -Wno-nan-infinity-disabled -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME="$(NAME)" -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS) -DSLEAN_TRIMMING_PARTS=$(SLEAN_TRIMMING_PARTS) -DLOCAL_RAM_KILOBYTES=$(LOCAL_RAM_KILOBYTES)
+CFLAGS = -O3 -ffast-math -Wall -Wextra -Wno-unknown-warning-option -Wno-vla -Wno-vla-cxx-extension -Wno-type-limits -Wno-missing-field-initializers -Wno-nan-infinity-disabled -std=c++20 -fno-exceptions -fno-rtti -finput-charset=UTF-8 -fexec-charset=UTF-8 -funsigned-char -DNAME="$(NAME)" -DVERSION=$(VERSION) -DEDGE_BITS=$(EDGE_BITS) -DTRIMMING_ROUNDS=$(TRIMMING_ROUNDS) -DSLEAN_TRIMMING_PARTS=$(SLEAN_TRIMMING_PARTS) -DLOCAL_RAM_KILOBYTES=$(LOCAL_RAM_KILOBYTES) -DSTRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS=$(STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS) -DSTRATUM_SERVER_MINING_ALGORITHM_NAME=$(STRATUM_SERVER_MINING_ALGORITHM_NAME)
 LIBS = -lm
 SRCS = "./main.cpp"
 

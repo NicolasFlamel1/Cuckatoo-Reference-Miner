@@ -72,7 +72,7 @@ template<typename ValueType, const uint32_t size> HashTable<ValueType, size>::Ha
 	entries(new(nothrow) HashTableEntry[bitCeilingConstantExpression(size + 1)])
 {
 
-	// Throw error is size is invalid
+	// Throw error if size is invalid
 	static_assert(size <= bitCeilingConstantExpression(UINT32_MAX >> 1) - 1, "Hash table's size is invalid");
 	
 	// Check if creating entries was successful

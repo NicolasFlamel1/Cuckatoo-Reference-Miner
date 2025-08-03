@@ -62,7 +62,7 @@ template<const uint64_t size> Bitmap<size>::Bitmap() noexcept :
 	buffer(new(nothrow) uint64_t[size / BITMAP_UNIT_WIDTH])
 {
 
-	// Throw error is size is invalid
+	// Throw error if size is invalid
 	static_assert(size && size % BITMAP_UNIT_WIDTH == 0, "Bitmap's size is invalid");
 	
 	// Check if creating buffer was successful

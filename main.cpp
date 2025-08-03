@@ -262,6 +262,9 @@ static uint64_t jobId;
 // Job header
 static uint8_t jobHeader[HEADER_SIZE] = {};
 
+// Job is applicable
+static bool jobIsApplicable = true;
+
 // Job nonce
 static uint64_t jobNonce = 0;
 
@@ -3402,20 +3405,27 @@ void stopMiner() noexcept {
 	
 	// Check if is first graph
 	static bool previouslyDisconnectedFromServer;
+	static bool previouslyWaitedForApplicableJobFromServer;
 	if(isFirstGraph) {
 	
 		// Set previously disconnected from server to false
 		previouslyDisconnectedFromServer = false;
+		
+		// Set previously waited for applicable job from server to false
+		previouslyWaitedForApplicableJobFromServer = false;
 	}
 	
 	// Display message
-	cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (graphsProcessed ? (previouslyDisconnectedFromServer ? ". This is lower for this graph since it includes the time taken to reconnect to the stratum server" : "") : ". This is lower for the first graph since it includes the time taken to prime the pipeline") << endl;
+	cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (graphsProcessed ? (previouslyDisconnectedFromServer ? ". This is lower for this graph since it includes the time taken to reconnect to the stratum server" : (previouslyWaitedForApplicableJobFromServer ? ". This is lower for this graph since it includes the time taken to receive an applicable job from the stratum server" : "")) : ". This is lower for the first graph since it includes the time taken to prime the pipeline") << endl;
 	
 	// Update previous graph processed time
 	previousGraphProcessedTime = endTime;
 	
 	// Set previously disconnected from server to false
 	previouslyDisconnectedFromServer = false;
+	
+	// Set previously waited for applicable job from server to false
+	previouslyWaitedForApplicableJobFromServer = false;
 	
 	// Display message
 	cout << "\tGraphs checked:\t " << ++graphsProcessed << endl;
@@ -3444,9 +3454,22 @@ void stopMiner() noexcept {
 			// Increment solutions found
 			++solutionsFound;
 			
+			// Check if stratum server uses one mining algorithm
+			#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS == 1
+			
+				// Create submit request failed
+				char submitRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"submit\",\"params\":{\"edge_bits\":" TO_STRING(EDGE_BITS) ",\"height\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"job_id\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"nonce\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"pow\":[") - sizeof('\0') + (sizeof("4294967295,") - sizeof('\0')) * SOLUTION_SIZE - sizeof(',') + sizeof("]}}\n")];
+				const int requestSize = snprintf(submitRequest, sizeof(submitRequest), "{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"submit\",\"params\":{\"edge_bits\":" TO_STRING(EDGE_BITS) ",\"height\":%" PRIu64 ",\"job_id\":%" PRIu64 ",\"nonce\":%" PRIu64 ",\"pow\":[%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "]}}\n", height, id, nonce, searchingThreadsSolution[0], searchingThreadsSolution[1], searchingThreadsSolution[2], searchingThreadsSolution[3], searchingThreadsSolution[4], searchingThreadsSolution[5], searchingThreadsSolution[6], searchingThreadsSolution[7], searchingThreadsSolution[8], searchingThreadsSolution[9], searchingThreadsSolution[10], searchingThreadsSolution[11], searchingThreadsSolution[12], searchingThreadsSolution[13], searchingThreadsSolution[14], searchingThreadsSolution[15], searchingThreadsSolution[16], searchingThreadsSolution[17], searchingThreadsSolution[18], searchingThreadsSolution[19], searchingThreadsSolution[20], searchingThreadsSolution[21], searchingThreadsSolution[22], searchingThreadsSolution[23], searchingThreadsSolution[24], searchingThreadsSolution[25], searchingThreadsSolution[26], searchingThreadsSolution[27], searchingThreadsSolution[28], searchingThreadsSolution[29], searchingThreadsSolution[30], searchingThreadsSolution[31], searchingThreadsSolution[32], searchingThreadsSolution[33], searchingThreadsSolution[34], searchingThreadsSolution[35], searchingThreadsSolution[36], searchingThreadsSolution[37], searchingThreadsSolution[38], searchingThreadsSolution[39], searchingThreadsSolution[40], searchingThreadsSolution[41]);
+				
+			// Otherwise
+			#else
+			
+				// Create submit request failed
+				char submitRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"submit\",\"params\":{\"height\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"job_id\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"nonce\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"pow\":{\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\":[" TO_STRING(EDGE_BITS) ",[") - sizeof('\0') + (sizeof("4294967295,") - sizeof('\0')) * SOLUTION_SIZE - sizeof(',') + sizeof("]]}}}\n")];
+				const int requestSize = snprintf(submitRequest, sizeof(submitRequest), "{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"submit\",\"params\":{\"height\":%" PRIu64 ",\"job_id\":%" PRIu64 ",\"nonce\":%" PRIu64 ",\"pow\":{\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\":[" TO_STRING(EDGE_BITS) ",[%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "]]}}}\n", height, id, nonce, searchingThreadsSolution[0], searchingThreadsSolution[1], searchingThreadsSolution[2], searchingThreadsSolution[3], searchingThreadsSolution[4], searchingThreadsSolution[5], searchingThreadsSolution[6], searchingThreadsSolution[7], searchingThreadsSolution[8], searchingThreadsSolution[9], searchingThreadsSolution[10], searchingThreadsSolution[11], searchingThreadsSolution[12], searchingThreadsSolution[13], searchingThreadsSolution[14], searchingThreadsSolution[15], searchingThreadsSolution[16], searchingThreadsSolution[17], searchingThreadsSolution[18], searchingThreadsSolution[19], searchingThreadsSolution[20], searchingThreadsSolution[21], searchingThreadsSolution[22], searchingThreadsSolution[23], searchingThreadsSolution[24], searchingThreadsSolution[25], searchingThreadsSolution[26], searchingThreadsSolution[27], searchingThreadsSolution[28], searchingThreadsSolution[29], searchingThreadsSolution[30], searchingThreadsSolution[31], searchingThreadsSolution[32], searchingThreadsSolution[33], searchingThreadsSolution[34], searchingThreadsSolution[35], searchingThreadsSolution[36], searchingThreadsSolution[37], searchingThreadsSolution[38], searchingThreadsSolution[39], searchingThreadsSolution[40], searchingThreadsSolution[41]);
+			#endif
+			
 			// Check if creating submit request failed
-			char submitRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"submit\",\"params\":{\"edge_bits\":" TO_STRING(EDGE_BITS) ",\"height\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"job_id\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"nonce\":") - sizeof('\0') + sizeof("18446744073709551615") - sizeof('\0') + sizeof(",\"pow\":[") - sizeof('\0') + (sizeof("4294967295,") - sizeof('\0')) * SOLUTION_SIZE - sizeof(',') + sizeof("]}}\n")];
-			const int requestSize = snprintf(submitRequest, sizeof(submitRequest), "{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"submit\",\"params\":{\"edge_bits\":" TO_STRING(EDGE_BITS) ",\"height\":%" PRIu64 ",\"job_id\":%" PRIu64 ",\"nonce\":%" PRIu64 ",\"pow\":[%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "]}}\n", height, id, nonce, searchingThreadsSolution[0], searchingThreadsSolution[1], searchingThreadsSolution[2], searchingThreadsSolution[3], searchingThreadsSolution[4], searchingThreadsSolution[5], searchingThreadsSolution[6], searchingThreadsSolution[7], searchingThreadsSolution[8], searchingThreadsSolution[9], searchingThreadsSolution[10], searchingThreadsSolution[11], searchingThreadsSolution[12], searchingThreadsSolution[13], searchingThreadsSolution[14], searchingThreadsSolution[15], searchingThreadsSolution[16], searchingThreadsSolution[17], searchingThreadsSolution[18], searchingThreadsSolution[19], searchingThreadsSolution[20], searchingThreadsSolution[21], searchingThreadsSolution[22], searchingThreadsSolution[23], searchingThreadsSolution[24], searchingThreadsSolution[25], searchingThreadsSolution[26], searchingThreadsSolution[27], searchingThreadsSolution[28], searchingThreadsSolution[29], searchingThreadsSolution[30], searchingThreadsSolution[31], searchingThreadsSolution[32], searchingThreadsSolution[33], searchingThreadsSolution[34], searchingThreadsSolution[35], searchingThreadsSolution[36], searchingThreadsSolution[37], searchingThreadsSolution[38], searchingThreadsSolution[39], searchingThreadsSolution[40], searchingThreadsSolution[41]);
 			if(requestSize < 0) {
 			
 				// Display message
@@ -3506,8 +3529,15 @@ void stopMiner() noexcept {
 		// Check if not reconnecting to the server
 		if(!reconnectToServer) {
 		
+			// Check if stratum server uses more than one mining algorithm
+			#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS != 1
+			
+				// Loop while not reconnecting to the stratum server, not closing, and job isn't applicable
+				do {
+			#endif
+		
 			// Loop while a response from stratum server is available
-			int responseAvailable;
+			int responseAvailable = 0;
 			do {
 			
 				// Set poll info to check if a response from the stratum server exists
@@ -3524,14 +3554,14 @@ void stopMiner() noexcept {
 				#ifdef _WIN32
 				
 					// Check if getting if a response from the stratum server exists failed
-					responseAvailable = WSAPoll(&pollInfo, 1, 0);
+					responseAvailable = WSAPoll(&pollInfo, 1, (responseAvailable || jobIsApplicable) ? 0 : MILLISECONDS_IN_A_SECOND);
 					if(responseAvailable == SOCKET_ERROR) {
 					
 				// Otherwise
 				#else
 				
 					// Check if getting if a response from the stratum server exists failed
-					responseAvailable = poll(&pollInfo, 1, 0);
+					responseAvailable = poll(&pollInfo, 1, (responseAvailable || jobIsApplicable) ? 0 : MILLISECONDS_IN_A_SECOND);
 					if(responseAvailable == -1) {
 				#endif
 				
@@ -3595,12 +3625,46 @@ void stopMiner() noexcept {
 						// Process server response
 						processServerResponse();
 						
+						// Check if job isn't applicable
+						if(!jobIsApplicable) {
+						
+							// Set previously waited for applicable job from server to true
+							previouslyWaitedForApplicableJobFromServer = true;
+						}
+						
 						// Set total received to zero
 						totalReceived = 0;
 					}
 				}
 				
 			} while(responseAvailable);
+			
+			// Check if stratum server uses more than one mining algorithm
+			#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS != 1
+			
+					// Check if not reconnecting to the server and it's time to send a keep alive request to the stratum server
+					if(!reconnectToServer && chrono::high_resolution_clock::now() - lastKeepAliveTime >= SEND_KEEP_ALIVE_REQUEST_INTERVAL) {
+					
+						// Check if sending keep alive request to the stratum server failed
+						if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
+						
+							// Display message
+							cout << "Sending keep alive request to the stratum server failed." << endl;
+							
+							// Set reconnect to server to true
+							reconnectToServer = true;
+						}
+						
+						// Otherwise
+						else {
+						
+							// Update last keep alive time
+							lastKeepAliveTime = chrono::high_resolution_clock::now();
+						}
+					}
+					
+				} while(!reconnectToServer && !closing && !jobIsApplicable);
+			#endif
 		}
 		
 		// Check if reconnecting to the stratum server
@@ -3957,6 +4021,30 @@ void stopMiner() noexcept {
 			return false;
 		}
 		
+		// Chek if stratum server responded with an invalid request response
+		if(strstr(serverResponse, "\"code\":-32600") || strstr(serverResponse, "\"code\": -32600")) {
+		
+			// Check if sending get job template request with algorithm name to the stratum server failed
+			if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":{\"algorithm\":\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\"}}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":{\"algorithm\":\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\"}}\n") - sizeof('\0'))) {
+			
+				// Display message
+				cout << "Sending get job template request to the stratum server failed." << endl;
+				
+				// Return false
+				return false;
+			}
+			
+			// Check if receiving response from the stratum server failed
+			if(!receiveFull(serverResponse, sizeof(serverResponse))) {
+			
+				// Display message
+				cout << "Receiving response from the stratum server failed." << endl;
+				
+				// Return false
+				return false;
+			}
+		}
+		
 		// Check if getting job from the stratum server failed
 		if(!processServerResponse()) {
 		
@@ -3966,6 +4054,142 @@ void stopMiner() noexcept {
 			// Return false
 			return false;
 		}
+		
+		// Check if stratum server uses more than one mining algorithm
+		#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS != 1
+		
+			// Check if job isn't applicable
+			if(!jobIsApplicable) {
+			
+				// Display message
+				cout << "Got job from the stratum server for a different mining algorithm. Waiting to receive an applicable job from the stratum server." << endl;
+				
+				// Set total received to zero
+				size_t totalReceived = 0;
+				
+				// Set last keep alive time to now
+				chrono::high_resolution_clock::time_point lastKeepAliveTime = chrono::high_resolution_clock::now();
+				
+				// While not closing and job isn't applicable
+				while(!closing && !jobIsApplicable) {
+				
+					// Loop while a response from stratum server is available
+					int responseAvailable;
+					do {
+					
+						// Set poll info to check if a response from the stratum server exists
+						pollfd pollInfo = {
+							
+							// Socket descriptor
+							.fd = socketDescriptor,
+							
+							// Events
+							.events = POLLIN
+						};
+						
+						// Check if using Windows
+						#ifdef _WIN32
+						
+							// Check if getting if a response from the stratum server exists failed
+							responseAvailable = WSAPoll(&pollInfo, 1, MILLISECONDS_IN_A_SECOND);
+							if(responseAvailable == SOCKET_ERROR) {
+							
+						// Otherwise
+						#else
+						
+							// Check if getting if a response from the stratum server exists failed
+							responseAvailable = poll(&pollInfo, 1, MILLISECONDS_IN_A_SECOND);
+							if(responseAvailable == -1) {
+						#endif
+						
+							// Display message
+							cout << "Getting if a response from the stratum server exists failed." << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Check if a response from the stratum server exists
+						if(responseAvailable) {
+						
+							// Check if receiving response from the stratum server failed
+							const decltype(function(recv))::result_type received = recv(socketDescriptor, &serverResponse[totalReceived], sizeof(serverResponse) - totalReceived - sizeof('\0'), 0);
+							if(received <= 0) {
+							
+								// Display message
+								cout << "Receiving response from the stratum server failed." << endl;
+								
+								// Return false
+								return false;
+							}
+							
+							// Check if full response wasn't received
+							if(!memchr(&serverResponse[totalReceived], '\n', received)) {
+							
+								// Check if server response buffer is full
+								if(static_cast<size_t>(received) == sizeof(serverResponse) - totalReceived - sizeof('\0')) {
+								
+									// Display message
+									cout << "Receiving response from the stratum server failed." << endl;
+									
+									// Return false
+									return false;
+								}
+								
+								// Otherwise
+								else {
+								
+									// Update total received
+									totalReceived += received;
+								}
+							}
+							
+							// Otherwise
+							else {
+							
+								// Null terminate server response
+								serverResponse[totalReceived + received] = '\0';
+								
+								// Process server response
+								processServerResponse();
+								
+								// Set total received to zero
+								totalReceived = 0;
+							}
+						}
+						
+					} while(responseAvailable);
+					
+					// Check if it's time to send a keep alive request to the stratum server
+					if(chrono::high_resolution_clock::now() - lastKeepAliveTime >= SEND_KEEP_ALIVE_REQUEST_INTERVAL) {
+					
+						// Check if sending keep alive request to the stratum server failed
+						if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"keepalive\",\"params\":null}\n") - sizeof('\0'))) {
+						
+							// Display message
+							cout << "Sending keep alive request to the stratum server failed." << endl;
+							
+							// Return false
+							return false;
+						}
+						
+						// Otherwise
+						else {
+						
+							// Update last keep alive time
+							lastKeepAliveTime = chrono::high_resolution_clock::now();
+						}
+					}
+				}
+				
+				// Check if closing
+				if(closing) {
+				
+					// Return false
+					return false;
+				}
+			}
+		#endif
 		
 		// Display message
 		cout << "Got job from the stratum server." << endl;
@@ -3985,6 +4209,13 @@ void stopMiner() noexcept {
 		
 		// Initialize new job header
 		uint8_t newJobHeader[HEADER_SIZE];
+		
+		// Check if stratum server uses more than one mining algorithm
+		#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS != 1
+		
+			// New job is applicable
+			bool newJobIsApplicable;
+		#endif
 		
 		// Set new job found to false
 		bool newJobFound = false;
@@ -4030,31 +4261,85 @@ void stopMiner() noexcept {
 									if(end != &id[sizeof("\"job_id\":") - sizeof('\0') + idValueOffset] && isdigit(id[sizeof("\"job_id\":") - sizeof('\0') + idValueOffset]) && (id[sizeof("\"job_id\":") - sizeof('\0') + idValueOffset] != '0' || !isdigit(id[sizeof("\"job_id\":") - sizeof('\0') + idValueOffset + sizeof('0')])) && !errno && newJobId <= UINT64_MAX) {
 									
 										// Check if getting job's pre-proof of work was successful
-										const char *preProofOfWork = strstr(partStart, "\"pre_pow\":\"");
+										const char *preProofOfWork = strstr(partStart, "\"pre_pow\":");
 										if(preProofOfWork) {
 										
 											// Reset new job's header
 											memset(newJobHeader, 0, sizeof(newJobHeader));
 											
 											// Go through all hex characters in the job's pre-proof of work
-											const size_t preProofOfWorkValueOffset = preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0')] == ' ';
-											for(const char *i = &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset]; isxdigit(*i) && !isupper(*i); ++i) {
+											const size_t preProofOfWorkValueOffset = ((preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0')] == ' ') ? sizeof(' ') : 0) + sizeof('"');
+											for(const char *i = &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset]; isxdigit(*i) && !isupper(*i); ++i) {
 											
 												// Check if job's pre-proof of work is too long
-												if((i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset]) / 2 == static_cast<ssize_t>(sizeof(newJobHeader))) {
+												if((i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset]) / 2 == static_cast<ssize_t>(sizeof(newJobHeader))) {
 												
+													// Go through remaining hex characters in job's pre-proof of work
+													for(++i; isxdigit(*i) && !isupper(*i); ++i);
+													
+													// Check if character after job's pre-proof of work terminates the pre-proof of work and the job's pre-proof of work is a valid proof of work hex string
+													if(*i == '"' && (i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset]) % 2 == 0 && ((i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset]) / 2 - sizeof(newJobHeader)) % STRATUM_SERVER_MINING_ALGORITHM_SIZE == 0) {
+													
+														// Check if a valid total number of mining algorithms is needed to accept this job
+														const size_t additionalMiningAlgorithms = ((i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset]) / 2 - sizeof(newJobHeader)) / STRATUM_SERVER_MINING_ALGORITHM_SIZE;
+														if(STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS != 1 || additionalMiningAlgorithms != 1) {
+														
+															// Display message
+															cout << "Build this program with STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS=" << (((STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS == 1) ? 0 : STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS) + additionalMiningAlgorithms) << " to accept jobs from this stratum server." << endl;
+														}
+													}
+													
 													// Break
 													break;
 												}
 												
 												// Set character in new job's header
-												newJobHeader[(i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset]) / 2] |= ((i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset]) % 2) ? ((*i - ((*i > '9') ? '0' + 'a' - '9' - 1 : '0')) & 0xF) : ((*i - ((*i > '9') ? '0' + 'a' - '9' - 1 : '0')) << 4);
+												newJobHeader[(i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset]) / 2] |= ((i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset]) % 2) ? ((*i - ((*i > '9') ? '0' + 'a' - '9' - 1 : '0')) & 0xF) : ((*i - ((*i > '9') ? '0' + 'a' - '9' - 1 : '0')) << 4);
 												
-												// Check if next character terminates the job's pre-proof of work and the job's pre-proof of work is the correct size
-												if(i[1] == '"' && i - &preProofOfWork[sizeof("\"pre_pow\":\"") - sizeof('\0') + preProofOfWorkValueOffset] == sizeof(newJobHeader) * 2 - 1) {
+												// Check if next character terminates the job's pre-proof of work
+												if(i[1] == '"') {
 												
-													// Set new job found to true
-													newJobFound = true;
+													// Check if the job's pre-proof of work is the correct size
+													if(i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset] == sizeof(newJobHeader) * 2 - 1) {
+													
+														// Check if stratum server uses one mining algorithm
+														#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS == 1
+														
+															// Set new job found to true
+															newJobFound = true;
+															
+														// Otherwise
+														#else
+														
+															// Check if getting job's algorithm was successful
+															const char *algorithm = strstr(partStart, "\"algorithm\":");
+															if(algorithm) {
+															
+																// Set new job is applicable to if the algorithm is the correct mining algorithm
+																const size_t algorithmValueOffset = algorithm[sizeof("\"algorithm\":") - sizeof('\0')] == ' ';
+																newJobIsApplicable = !strncasecmp("\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\"", &algorithm[sizeof("\"algorithm\":") - sizeof('\0') + algorithmValueOffset], sizeof("\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\"") - sizeof('\0'));
+																
+																// Set new job found to true
+																newJobFound = true;
+															}
+														#endif
+													}
+													
+													// Check if stratum server uses more than one mining algorithm
+													#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS != 1
+													
+														// Otherwise check if job's pre-proof of work is a valid proof of work hex string
+														else if((i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset] + 1) % 2 == 0 && (sizeof(newJobHeader) - (i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset] + 1) / 2) % STRATUM_SERVER_MINING_ALGORITHM_SIZE == 0) {
+														
+															// Check if a valid total number of mining algorithms is needed to accept this job
+															const size_t additionalMiningAlgorithms = (sizeof(newJobHeader) - (i - &preProofOfWork[sizeof("\"pre_pow\":") - sizeof('\0') + preProofOfWorkValueOffset] + 1) / 2) / STRATUM_SERVER_MINING_ALGORITHM_SIZE;
+															if(STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS - additionalMiningAlgorithms != 1) {
+															
+																// Display message
+																cout << "Build this program with STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS=" << max(STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS - additionalMiningAlgorithms, static_cast<size_t>(1)) << " to accept jobs from this stratum server." << endl;
+															}
+														}
+													#endif
 												}
 											}
 										}
@@ -4078,6 +4363,13 @@ void stopMiner() noexcept {
 			
 			// Set job's header to new job's header
 			memcpy(jobHeader, newJobHeader, sizeof(newJobHeader));
+			
+			// Check if stratum server uses more than one mining algorithm
+			#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS != 1
+			
+				// Set job's is applicable to new job is applicable
+				jobIsApplicable = newJobIsApplicable;
+			#endif
 			
 			// Create random job's nonce
 			jobNonce = randomNumberGenerator();

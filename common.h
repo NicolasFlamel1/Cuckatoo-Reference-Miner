@@ -27,7 +27,7 @@ using namespace std;
 // Throw error if host's byte order isn't little endian
 static_assert(endian::native == endian::little, "Host's byte order isn't little endian");
 
-// Throw error is host isn't at least 64-bit
+// Throw error if host isn't at least 64-bit
 static_assert(sizeof(size_t) >= sizeof(uint64_t), "Host isn't at least 64-bit");
 
 // Throw error if edge bits is invalid
@@ -43,6 +43,9 @@ static_assert(has_single_bit(static_cast<unsigned int>(SLEAN_TRIMMING_PARTS)), "
 // Throw error if local RAM kilobytes is invalid
 static_assert(LOCAL_RAM_KILOBYTES >= MIN_LOCAL_RAM_KILOBYTES && LOCAL_RAM_KILOBYTES <= 256, "Local RAM kilobytes is outside of the accepted range");
 static_assert(has_single_bit(static_cast<unsigned int>(LOCAL_RAM_KILOBYTES)), "Local RAM kilobytes isn't a power of two");
+
+// Throw error if stratum server number of mining algorithms is invalid
+static_assert(STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS >= 1, "Stratum server number of mining algorithms is outside of the accepted range");
 
 // Throw error if the size of a vector of a type isn't the same as the size of an array of that type
 static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_t[1]), "Vector vs array size mismatch");
@@ -96,8 +99,21 @@ static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_
 // Secp256k1 private key size
 #define SECP256K1_PRIVATE_KEY_SIZE 32
 
-// Header size
-#define HEADER_SIZE (sizeof(uint16_t) + sizeof(uint64_t) + sizeof(int64_t) + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + SECP256K1_PRIVATE_KEY_SIZE + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t))
+// Stratum server mining algorithm size
+#define STRATUM_SERVER_MINING_ALGORITHM_SIZE (sizeof(uint8_t) + sizeof(uint64_t))
+
+// Check if stratum server uses one mining algorithm
+#if STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS == 1
+
+	// Header size
+	#define HEADER_SIZE (sizeof(uint16_t) + sizeof(uint64_t) + sizeof(int64_t) + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + SECP256K1_PRIVATE_KEY_SIZE + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t))
+	
+// Otherwise
+#else
+
+	// Header size
+	#define HEADER_SIZE (sizeof(uint16_t) + sizeof(uint64_t) + sizeof(int64_t) + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + BLAKE2B_HASH_SIZE + SECP256K1_PRIVATE_KEY_SIZE + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + STRATUM_SERVER_MINING_ALGORITHM_SIZE * STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS + sizeof(uint32_t))
+#endif
 
 // Check if there's no trimming rounds
 #if TRIMMING_ROUNDS == 0
