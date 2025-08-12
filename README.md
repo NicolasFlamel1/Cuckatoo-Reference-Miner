@@ -84,19 +84,19 @@ A stratum server address, port, username, and password can be provided when runn
 ```
 Here's commands that can be used to mine to some of the MimbleWimble Coin (MWC) mining pools:
 
-* [2Miners](https://2miners.com/mwc-mining-pool) (Replace `YOUR_WALLETS_TOR_OR_MWCMQS_ADDRESS.RIG_ID` with your values, for example `rvscna33zmif2j4fz65wmvjvjevhywrlezzfm2q7jxyg5hejmpfuhcid.device_1`)
+* [2Miners](https://2miners.com/mwc-mining-pool) (Replace `YOUR_WALLETS_TOR_OR_MQS_ADDRESS_WITHOUT_URL_PROTOCOL_AND_WITHOUT_TOP_LEVEL_DOMAIN.RIG_ID` with your values, for example `rvscna33zmif2j4fz65wmvjvjevhywrlezzfm2q7jxyg5hejmpfuhcid.device_1` for the Tor address `rvscna33zmif2j4fz65wmvjvjevhywrlezzfm2q7jxyg5hejmpfuhcid` or `q5ZsxbvYHCUVtUTWEAPfCX5kA9Ku9NdND7oeZaVkUmotk4NNrUio.device_1` for the MQS address `mwcmqs://q5ZsxbvYHCUVtUTWEAPfCX5kA9Ku9NdND7oeZaVkUmotk4NNrUio`)
 ```
-"./Cuckatoo Reference Miner" -a mwc.2miners.com:7575 -u YOUR_WALLETS_TOR_OR_MWCMQS_ADDRESS.RIG_ID
+"./Cuckatoo Reference Miner" -a mwc.2miners.com:7575 -u YOUR_WALLETS_TOR_OR_MQS_ADDRESS_WITHOUT_URL_PROTOCOL_AND_WITHOUT_TOP_LEVEL_DOMAIN.RIG_ID
 ```
-* [WoolyPooly](https://woolypooly.com/en/coin/mwc) (Replace `YOUR_USERNAME_GENERATED_BY_WOOLYPOOLY.RIG_ID` with your values, for example `WPHaHR0cDovL3J2c2NuYTMzem1pZjJqNGZ6NjV3bXZqdmpldmh5d3JsZXp6Zm0ycTdqeHlnNWhlam1wZnVoY2lkLm9uaW9u.device_1`)
+* [WoolyPooly](https://woolypooly.com/en/coin/mwc) (Replace `YOUR_POOL_USERNAME_GENERATED_BY_WOOLYPOOLYS_HOW_TO_CONNECT_GUIDE.RIG_ID` with your values, for example `WPHaHR0cHM6Ly9td2N3YWxsZXQuY29tL3dhbGxldC9yNWJhaA.device_1` for the HTTP address `https://mwcwallet.com/wallet/r5bah` or `WPHbXdjbXFzOi8vcTVac3hidllIQ1VWdFVUV0VBUGZDWDVrQTlLdTlOZE5EN29lWmFWa1Vtb3RrNE5OclVpbw.device_1` for the MQS address `mwcmqs://q5ZsxbvYHCUVtUTWEAPfCX5kA9Ku9NdND7oeZaVkUmotk4NNrUio`)
 ```
-"./Cuckatoo Reference Miner" -a pool.woolypooly.com:11000 -u YOUR_USERNAME_GENERATED_BY_WOOLYPOOLY.RIG_ID
+"./Cuckatoo Reference Miner" -a pool.woolypooly.com:11000 -u YOUR_POOL_USERNAME_GENERATED_BY_WOOLYPOOLYS_HOW_TO_CONNECT_GUIDE.RIG_ID
 ```
-* [MWC Pool](https://mwcpool.com) (Replace `YOUR_MWC_POOL_USERNAME.RIG_ID` with your values, for example `nicolasflamel.device_1`)
+* [MWC Pool](https://mwcpool.com) (Replace `YOUR_MWC_POOL_USERNAME.RIG_ID` with your values, for example `nicolasflamel.device_1` for the username `nicolasflamel`)
 ```
 "./Cuckatoo Reference Miner" -a stratum+tcp://stratum2.mwcpool.com:2222 -u YOUR_MWC_POOL_USERNAME.RIG_ID
 ```
-* [Pacific Pool](https://pacificpool.ws) (Replace `YOUR_PACIFIC_POOL_USERNAME.RIG_ID` with your values, for example `nicolasflamel.device_1`)
+* [Pacific Pool](https://pacificpool.ws) (Replace `YOUR_PACIFIC_POOL_USERNAME.RIG_ID` with your values, for example `nicolasflamel.device_1` for the username `nicolasflamel`)
 ```
 "./Cuckatoo Reference Miner" -a stratum+tcp://stratum2.pacificpool.ws:2222 -u YOUR_PACIFIC_POOL_USERNAME.RIG_ID
 ```
