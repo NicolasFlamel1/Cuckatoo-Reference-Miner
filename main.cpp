@@ -1743,6 +1743,9 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 		// Otherwise
 		else {
 		
+			// Set previous graph processed time to now
+			previousGraphProcessedTime = chrono::high_resolution_clock::now();
+			
 			// Enable all edges in edges bitmap
 			edgesBitmap.setAllBits();
 			
@@ -3419,8 +3422,18 @@ void stopMiner() noexcept {
 		previouslyWaitedForApplicableJobFromServer = false;
 	}
 	
-	// Display message
-	cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (graphsProcessed ? (previouslyDisconnectedFromServer ? ". This is lower for this graph since it includes the time taken to reconnect to the stratum server" : (previouslyWaitedForApplicableJobFromServer ? ". This is lower for this graph since it includes the time taken to receive an applicable job from the stratum server" : "")) : ". This is lower for the first graph since it includes the time taken to prime the pipeline") << endl;
+	// Check if there's no trimming rounds
+	#if TRIMMING_ROUNDS == 0
+	
+		// Display message
+		cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (previouslyDisconnectedFromServer ? ". This is lower for this graph since it includes the time taken to reconnect to the stratum server" : (previouslyWaitedForApplicableJobFromServer ? ". This is lower for this graph since it includes the time taken to receive an applicable job from the stratum server" : "")) << endl;
+		
+	// Otherwise
+	#else
+	
+		// Display message
+		cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (graphsProcessed ? (previouslyDisconnectedFromServer ? ". This is lower for this graph since it includes the time taken to reconnect to the stratum server" : (previouslyWaitedForApplicableJobFromServer ? ". This is lower for this graph since it includes the time taken to receive an applicable job from the stratum server" : "")) : ". This is lower for the first graph since it includes the time taken to prime the pipeline") << endl;
+	#endif
 	
 	// Update previous graph processed time
 	previousGraphProcessedTime = endTime;
