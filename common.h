@@ -34,7 +34,8 @@ static_assert(sizeof(size_t) >= sizeof(uint64_t), "Host isn't at least 64-bit");
 static_assert(EDGE_BITS >= 10 && EDGE_BITS <= 32, "Edge bits is outside of the accepted range");
 
 // Throw error if trimming rounds is invalid (Number of edges after a pair of trimming rounds ≈ NUMBER_OF_EDGES / (pow(roundNumber / 2 + 1, 2) + 2))
-static_assert(TRIMMING_ROUNDS >= 0 && TRIMMING_ROUNDS <= 1000 && static_cast<double>(NUMBER_OF_EDGES) / (((TRIMMING_ROUNDS + 1) / 2 + 1) * ((TRIMMING_ROUNDS + 1) / 2 + 1) + 2) >= SOLUTION_SIZE, "Trimming rounds is outside of the accepted range");
+static_assert(TRIMMING_ROUNDS >= 0 && TRIMMING_ROUNDS <= 1000, "Trimming rounds is outside of the accepted range");
+static_assert(static_cast<double>(NUMBER_OF_EDGES) / (((TRIMMING_ROUNDS + 1) / 2 + 1) * ((TRIMMING_ROUNDS + 1) / 2 + 1) + 2) >= SOLUTION_SIZE, "Trimming rounds is too high for the number of edge bits");
 
 // Throw error if slean trimming parts is invalid
 static_assert(SLEAN_TRIMMING_PARTS >= 2 && SLEAN_TRIMMING_PARTS <= MAX_SLEAN_TRIMMING_PARTS, "Slean trimming parts is outside of the accepted range");
@@ -45,7 +46,7 @@ static_assert(LOCAL_RAM_KILOBYTES >= MIN_LOCAL_RAM_KILOBYTES && LOCAL_RAM_KILOBY
 static_assert(has_single_bit(static_cast<unsigned int>(LOCAL_RAM_KILOBYTES)), "Local RAM kilobytes isn't a power of two");
 
 // Throw error if stratum server number of mining algorithms is invalid
-static_assert(STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS >= 1, "Stratum server number of mining algorithms is outside of the accepted range");
+static_assert(STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS >= 1 && STRATUM_SERVER_NUMBER_OF_MINING_ALGORITHMS <= 10, "Stratum server number of mining algorithms is outside of the accepted range");
 
 // Throw error if the size of a vector of a type isn't the same as the size of an array of that type
 static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_t[1]), "Vector vs array size mismatch");
