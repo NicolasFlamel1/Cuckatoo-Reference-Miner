@@ -58,13 +58,13 @@ This trimming algorithm can be made faster by switching to mean trimming once th
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
+		__kernel void trimEdgesStepOne(__global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint *bucketsSecondPart);
+		__kernel void trimEdgesStepOne(__global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint *restrict bucketsSecondPart);
 	#endif
 
 // Otherwise check if local buckets size is two
@@ -74,13 +74,13 @@ This trimming algorithm can be made faster by switching to mean trimming once th
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
+		__kernel void trimEdgesStepOne(__global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint2 *bucketsSecondPart);
+		__kernel void trimEdgesStepOne(__global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint2 *restrict bucketsSecondPart);
 	#endif
 
 // Otherwise
@@ -90,13 +90,13 @@ This trimming algorithm can be made faster by switching to mean trimming once th
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
+		__kernel void trimEdgesStepOne(__global uint4 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint4 *bucketsSecondPart);
+		__kernel void trimEdgesStepOne(__global uint4 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint4 *restrict bucketsSecondPart);
 	#endif
 #endif
 
@@ -111,13 +111,13 @@ This trimming algorithm can be made faster by switching to mean trimming once th
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step two
-	__kernel void trimEdgesStepTwo(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepTwo(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step two
-	__kernel void trimEdgesStepTwo(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys, __global const uint *bucketsSecondPart);
+	__kernel void trimEdgesStepTwo(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys, __global const uint *restrict bucketsSecondPart);
 #endif
 
 // Check if work items per work group exists
@@ -131,13 +131,13 @@ This trimming algorithm can be made faster by switching to mean trimming once th
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step three
-	__kernel void trimEdgesStepThree(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepThree(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step three
-	__kernel void trimEdgesStepThree(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys, __global const uint *bucketsSecondPart);
+	__kernel void trimEdgesStepThree(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys, __global const uint *restrict bucketsSecondPart);
 #endif
 
 // Check if work items per work group exists
@@ -151,13 +151,13 @@ This trimming algorithm can be made faster by switching to mean trimming once th
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step four
-	__kernel void trimEdgesStepFour(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepFour(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step four
-	__kernel void trimEdgesStepFour(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart);
+	__kernel void trimEdgesStepFour(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *restrict sourceBucketsSecondPart);
 #endif
 
 // Check if work items per work group exists
@@ -168,7 +168,7 @@ This trimming algorithm can be made faster by switching to mean trimming once th
 #endif
 
 // Trim edges step five
-__kernel void trimEdgesStepFive(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part);
+__kernel void trimEdgesStepFive(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_SIX_WORK_ITEMS_PER_WORK_GROUP
@@ -181,13 +181,13 @@ __kernel void trimEdgesStepFive(__global const uint *buckets, __global const uin
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step six
-	__kernel void trimEdgesStepSix(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part);
+	__kernel void trimEdgesStepSix(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part);
 
 // Otherwise
 #else
 
 	// Trim edges step six
-	__kernel void trimEdgesStepSix(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part, __global const uint *sourceBucketsSecondPart);
+	__kernel void trimEdgesStepSix(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part, __global const uint *restrict sourceBucketsSecondPart);
 #endif
 
 // Check if work items per work group exists
@@ -201,19 +201,19 @@ __kernel void trimEdgesStepFive(__global const uint *buckets, __global const uin
 #if LOCAL_BUCKETS_SIZE == 1
 
 	// Trim edges step seven
-	__kernel void trimEdgesStepSeven(__global const ulong *edgesBitmap, __global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
+	__kernel void trimEdgesStepSeven(__global const ulong *restrict edgesBitmap, __global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
 
 // Otherwise check if local buckets size is two
 #elif LOCAL_BUCKETS_SIZE == 2
 
 	// Trim edges step seven
-	__kernel void trimEdgesStepSeven(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
+	__kernel void trimEdgesStepSeven(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
 
 // Otherwise
 #else
 
 	// Trim edges step seven
-	__kernel void trimEdgesStepSeven(__global const ulong *edgesBitmap, __global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
+	__kernel void trimEdgesStepSeven(__global const ulong *restrict edgesBitmap, __global uint4 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -224,7 +224,7 @@ __kernel void trimEdgesStepFive(__global const uint *buckets, __global const uin
 #endif
 
 // Trim edges step eight
-__kernel void trimEdgesStepEight(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys);
+__kernel void trimEdgesStepEight(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_NINE_WORK_ITEMS_PER_WORK_GROUP
@@ -234,7 +234,7 @@ __kernel void trimEdgesStepEight(__global const uint *buckets, __global const ui
 #endif
 
 // Trim edges step nine
-__kernel void trimEdgesStepNine(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys);
+__kernel void trimEdgesStepNine(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_TEN_WORK_ITEMS_PER_WORK_GROUP
@@ -244,7 +244,7 @@ __kernel void trimEdgesStepNine(__global const uint *buckets, __global const uin
 #endif
 
 // Trim edges step ten
-__kernel void trimEdgesStepTen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
+__kernel void trimEdgesStepTen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_ELEVEN_WORK_ITEMS_PER_WORK_GROUP
@@ -254,7 +254,7 @@ __kernel void trimEdgesStepTen(__global const uint *sourceBuckets, __global cons
 #endif
 
 // Trim edges step eleven
-__kernel void trimEdgesStepEleven(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part);
+__kernel void trimEdgesStepEleven(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_TWELVE_WORK_ITEMS_PER_WORK_GROUP
@@ -264,7 +264,7 @@ __kernel void trimEdgesStepEleven(__global const uint *buckets, __global const u
 #endif
 
 // Trim edges step twelve
-__kernel void trimEdgesStepTwelve(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part);
+__kernel void trimEdgesStepTwelve(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_THIRTEEN_WORK_ITEMS_PER_WORK_GROUP
@@ -277,13 +277,13 @@ __kernel void trimEdgesStepTwelve(__global const uint *sourceBuckets, __global c
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step thirteen
-	__kernel void trimEdgesStepThirteen(__global const ulong *edgesBitmap, __global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepThirteen(__global const ulong *restrict edgesBitmap, __global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step thirteen
-	__kernel void trimEdgesStepThirteen(__global const ulong *edgesBitmap, __global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
+	__kernel void trimEdgesStepThirteen(__global const ulong *restrict edgesBitmap, __global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -294,7 +294,7 @@ __kernel void trimEdgesStepTwelve(__global const uint *sourceBuckets, __global c
 #endif
 
 // Trim edges step fourteen
-__kernel void trimEdgesStepFourteen(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys);
+__kernel void trimEdgesStepFourteen(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_FIFTEEN_WORK_ITEMS_PER_WORK_GROUP
@@ -304,7 +304,7 @@ __kernel void trimEdgesStepFourteen(__global const uint *buckets, __global const
 #endif
 
 // Trim edges step fifteen
-__kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys);
+__kernel void trimEdgesStepFifteen(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_SIXTEEN_WORK_ITEMS_PER_WORK_GROUP
@@ -317,13 +317,13 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step sixteen
-	__kernel void trimEdgesStepSixteen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepSixteen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step sixteen
-	__kernel void trimEdgesStepSixteen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global uint *nodesBitmap);
+	__kernel void trimEdgesStepSixteen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global uint *restrict nodesBitmap);
 #endif
 
 // Check if work items per work group exists
@@ -337,13 +337,13 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step seventeen
-	__kernel void trimEdgesStepSeventeen(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap);
+	__kernel void trimEdgesStepSeventeen(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap);
 
 // Otherwise
 #else
 
 	// Trim edges step seventeen
-	__kernel void trimEdgesStepSeventeen(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part);
+	__kernel void trimEdgesStepSeventeen(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -357,13 +357,13 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step eighteen
-	__kernel void trimEdgesStepEighteen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepEighteen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step eighteen
-	__kernel void trimEdgesStepEighteen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part);
+	__kernel void trimEdgesStepEighteen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -377,13 +377,13 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step nineteen
-	__kernel void trimEdgesStepNineteen(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepNineteen(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step nineteen
-	__kernel void trimEdgesStepNineteen(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part);
+	__kernel void trimEdgesStepNineteen(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -394,7 +394,7 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 #endif
 
 // Trim edges step twenty
-__kernel void trimEdgesStepTwenty(__global const uint2 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap);
+__kernel void trimEdgesStepTwenty(__global const uint2 *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_TWENTY_ONE_WORK_ITEMS_PER_WORK_GROUP
@@ -404,7 +404,7 @@ __kernel void trimEdgesStepTwenty(__global const uint2 *buckets, __global const 
 #endif
 
 // Trim edges step twenty-one
-__kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap);
+__kernel void trimEdgesStepTwentyOne(__global const uint2 *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_TWENTY_TWO_WORK_ITEMS_PER_WORK_GROUP
@@ -417,13 +417,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step twenty-two
-	__kernel void trimEdgesStepTwentyTwo(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket);
+	__kernel void trimEdgesStepTwentyTwo(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket);
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-two
-	__kernel void trimEdgesStepTwentyTwo(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, __global uint *nodesBitmap);
+	__kernel void trimEdgesStepTwentyTwo(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, __global uint *restrict nodesBitmap);
 #endif
 
 // Check if work items per work group exists
@@ -437,13 +437,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step twenty-three
-	__kernel void trimEdgesStepTwentyThree(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket);
+	__kernel void trimEdgesStepTwentyThree(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket);
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-three
-	__kernel void trimEdgesStepTwentyThree(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part);
+	__kernel void trimEdgesStepTwentyThree(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -457,13 +457,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 4
 
 	// Trim edges step twenty-four
-	__kernel void trimEdgesStepTwentyFour(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepTwentyFour(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-four
-	__kernel void trimEdgesStepTwentyFour(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part);
+	__kernel void trimEdgesStepTwentyFour(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -477,13 +477,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 4
 
 	// Trim edges step twenty-five
-	__kernel void trimEdgesStepTwentyFive(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket);
+	__kernel void trimEdgesStepTwentyFive(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket);
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-five
-	__kernel void trimEdgesStepTwentyFive(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, __global uint *nodesBitmap);
+	__kernel void trimEdgesStepTwentyFive(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, __global uint *restrict nodesBitmap);
 #endif
 
 // Check if work items per work group exists
@@ -497,13 +497,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 4
 
 	// Trim edges step twenty-six
-	__kernel void trimEdgesStepTwentySix(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap);
+	__kernel void trimEdgesStepTwentySix(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap);
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-six
-	__kernel void trimEdgesStepTwentySix(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part);
+	__kernel void trimEdgesStepTwentySix(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -517,13 +517,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 4
 
 	// Trim edges step twenty-seven
-	__kernel void trimEdgesStepTwentySeven(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket);
+	__kernel void trimEdgesStepTwentySeven(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket);
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-seven
-	__kernel void trimEdgesStepTwentySeven(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part);
+	__kernel void trimEdgesStepTwentySeven(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -537,13 +537,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 8
 
 	// Trim edges step twenty-eight
-	__kernel void trimEdgesStepTwentyEight(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
+	__kernel void trimEdgesStepTwentyEight(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-eight
-	__kernel void trimEdgesStepTwentyEight(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part);
+	__kernel void trimEdgesStepTwentyEight(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -557,13 +557,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 8
 
 	// Trim edges step twenty-nine
-	__kernel void trimEdgesStepTwentyNine(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket);
+	__kernel void trimEdgesStepTwentyNine(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket);
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-nine
-	__kernel void trimEdgesStepTwentyNine(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, __global uint *nodesBitmap);
+	__kernel void trimEdgesStepTwentyNine(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, __global uint *restrict nodesBitmap);
 #endif
 
 // Check if work items per work group exists
@@ -577,13 +577,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 8
 
 	// Trim edges step thirty
-	__kernel void trimEdgesStepThirty(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap);
+	__kernel void trimEdgesStepThirty(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap);
 
 // Otherwise
 #else
 
 	// Trim edges step thirty
-	__kernel void trimEdgesStepThirty(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part);
+	__kernel void trimEdgesStepThirty(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -597,13 +597,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 8
 
 	// Trim edges step thirty-one
-	__kernel void trimEdgesStepThirtyOne(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket);
+	__kernel void trimEdgesStepThirtyOne(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket);
 
 // Otherwise
 #else
 
 	// Trim edges step thirty-one
-	__kernel void trimEdgesStepThirtyOne(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part);
+	__kernel void trimEdgesStepThirtyOne(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const uchar part);
 #endif
 
 // Check if work items per work group exists
@@ -614,7 +614,7 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #endif
 
 // Trim edges step thirty-two
-__kernel void trimEdgesStepThirtyTwo(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
+__kernel void trimEdgesStepThirtyTwo(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_THIRTY_THREE_WORK_ITEMS_PER_WORK_GROUP
@@ -624,7 +624,7 @@ __kernel void trimEdgesStepThirtyTwo(__global const ulong *edgesBitmap, __global
 #endif
 
 // Trim edges step thirty-three
-__kernel void trimEdgesStepThirtyThree(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket);
+__kernel void trimEdgesStepThirtyThree(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_THIRTY_FOUR_WORK_ITEMS_PER_WORK_GROUP
@@ -634,7 +634,7 @@ __kernel void trimEdgesStepThirtyThree(__global const uint2 *sourceBuckets, __gl
 #endif
 
 // Trim edges step thirty-four
-__kernel void trimEdgesStepThirtyFour(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap);
+__kernel void trimEdgesStepThirtyFour(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap);
 
 // SipHash-2-4
 static inline uint sipHash24(ulong4 keys, const ulong nonce);
@@ -661,13 +661,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
+		__kernel void trimEdgesStepOne(__global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint *bucketsSecondPart) {
+		__kernel void trimEdgesStepOne(__global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint *restrict bucketsSecondPart) {
 	#endif
 
 // Otherwise check if local buckets size is two
@@ -677,13 +677,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
+		__kernel void trimEdgesStepOne(__global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint2 *bucketsSecondPart) {
+		__kernel void trimEdgesStepOne(__global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint2 *restrict bucketsSecondPart) {
 	#endif
 
 // Otherwise
@@ -693,13 +693,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
+		__kernel void trimEdgesStepOne(__global uint4 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		__kernel void trimEdgesStepOne(__global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint4 *bucketsSecondPart) {
+		__kernel void trimEdgesStepOne(__global uint4 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part, __global uint4 *restrict bucketsSecondPart) {
 	#endif
 #endif
 
@@ -948,13 +948,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step two
-	__kernel void trimEdgesStepTwo(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepTwo(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step two
-	__kernel void trimEdgesStepTwo(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys, __global const uint *bucketsSecondPart) {
+	__kernel void trimEdgesStepTwo(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys, __global const uint *restrict bucketsSecondPart) {
 #endif
 
 	// Declare bitmap
@@ -1023,13 +1023,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step three
-	__kernel void trimEdgesStepThree(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepThree(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step three
-	__kernel void trimEdgesStepThree(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys, __global const uint *bucketsSecondPart) {
+	__kernel void trimEdgesStepThree(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys, __global const uint *restrict bucketsSecondPart) {
 #endif
 
 	// Declare bitmap
@@ -1098,13 +1098,13 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step four
-	__kernel void trimEdgesStepFour(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepFour(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step four
-	__kernel void trimEdgesStepFour(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *sourceBucketsSecondPart) {
+	__kernel void trimEdgesStepFour(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global const uint *restrict sourceBucketsSecondPart) {
 #endif
 
 	// Declare bitmap
@@ -1202,7 +1202,7 @@ static inline bool isBitSetInBitmap(__local const uint *bitmap, const uint index
 }
 
 // Trim edges step five
-__kernel void trimEdgesStepFive(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part) {
+__kernel void trimEdgesStepFive(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint))];
@@ -1257,13 +1257,13 @@ __kernel void trimEdgesStepFive(__global const uint *buckets, __global const uin
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step six
-	__kernel void trimEdgesStepSix(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part) {
+	__kernel void trimEdgesStepSix(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part) {
 
 // Otherwise
 #else
 
 	// Trim edges step six
-	__kernel void trimEdgesStepSix(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part, __global const uint *sourceBucketsSecondPart) {
+	__kernel void trimEdgesStepSix(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part, __global const uint *restrict sourceBucketsSecondPart) {
 #endif
 
 	// Declare bitmap
@@ -1348,19 +1348,19 @@ __kernel void trimEdgesStepFive(__global const uint *buckets, __global const uin
 #if LOCAL_BUCKETS_SIZE == 1
 
 	// Trim edges step seven
-	__kernel void trimEdgesStepSeven(__global const ulong *edgesBitmap, __global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
+	__kernel void trimEdgesStepSeven(__global const ulong *restrict edgesBitmap, __global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
 
 // Otherwise check if local buckets size is two
 #elif LOCAL_BUCKETS_SIZE == 2
 
 	// Trim edges step seven
-	__kernel void trimEdgesStepSeven(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
+	__kernel void trimEdgesStepSeven(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
 
 // Otherwise
 #else
 
 	// Trim edges step seven
-	__kernel void trimEdgesStepSeven(__global const ulong *edgesBitmap, __global uint4 *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
+	__kernel void trimEdgesStepSeven(__global const ulong *restrict edgesBitmap, __global uint4 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
 #endif
 
 	// Check if local buckets size is one
@@ -1561,7 +1561,7 @@ __kernel void trimEdgesStepFive(__global const uint *buckets, __global const uin
 }
 
 // Trim edges step eight
-__kernel void trimEdgesStepEight(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepEight(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -1616,7 +1616,7 @@ __kernel void trimEdgesStepEight(__global const uint *buckets, __global const ui
 }
 
 // Trim edges step nine
-__kernel void trimEdgesStepNine(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepNine(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -1671,7 +1671,7 @@ __kernel void trimEdgesStepNine(__global const uint *buckets, __global const uin
 }
 
 // Trim edges step ten
-__kernel void trimEdgesStepTen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepTen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -1758,7 +1758,7 @@ __kernel void trimEdgesStepTen(__global const uint *sourceBuckets, __global cons
 }
 
 // Trim edges step eleven
-__kernel void trimEdgesStepEleven(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part) {
+__kernel void trimEdgesStepEleven(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint))];
@@ -1810,7 +1810,7 @@ __kernel void trimEdgesStepEleven(__global const uint *buckets, __global const u
 }
 
 // Trim edges step twelve
-__kernel void trimEdgesStepTwelve(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part) {
+__kernel void trimEdgesStepTwelve(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -1884,13 +1884,13 @@ __kernel void trimEdgesStepTwelve(__global const uint *sourceBuckets, __global c
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step thirteen
-	__kernel void trimEdgesStepThirteen(__global const ulong *edgesBitmap, __global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepThirteen(__global const ulong *restrict edgesBitmap, __global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step thirteen
-	__kernel void trimEdgesStepThirteen(__global const ulong *edgesBitmap, __global uint *buckets, __global uint *numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
+	__kernel void trimEdgesStepThirteen(__global const ulong *restrict edgesBitmap, __global uint *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const ulong4 sipHashKeys, const uchar part) {
 #endif
 
 	// Get global ID
@@ -1936,7 +1936,7 @@ __kernel void trimEdgesStepTwelve(__global const uint *sourceBuckets, __global c
 }
 
 // Trim edges step fourteen
-__kernel void trimEdgesStepFourteen(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepFourteen(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -1991,7 +1991,7 @@ __kernel void trimEdgesStepFourteen(__global const uint *buckets, __global const
 }
 
 // Trim edges step fifteen
-__kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepFifteen(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap, const ulong4 sipHashKeys) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -2049,13 +2049,13 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step sixteen
-	__kernel void trimEdgesStepSixteen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepSixteen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step sixteen
-	__kernel void trimEdgesStepSixteen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global uint *nodesBitmap) {
+	__kernel void trimEdgesStepSixteen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, __global uint *restrict nodesBitmap) {
 #endif
 
 	// Declare bitmap
@@ -2161,13 +2161,13 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step seventeen
-	__kernel void trimEdgesStepSeventeen(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap) {
+	__kernel void trimEdgesStepSeventeen(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap) {
 
 // Otherwise
 #else
 
 	// Trim edges step seventeen
-	__kernel void trimEdgesStepSeventeen(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part) {
+	__kernel void trimEdgesStepSeventeen(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part) {
 #endif
 
 	// Declare bitmap
@@ -2233,13 +2233,13 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step eighteen
-	__kernel void trimEdgesStepEighteen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepEighteen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step eighteen
-	__kernel void trimEdgesStepEighteen(__global const uint *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part) {
+	__kernel void trimEdgesStepEighteen(__global const uint *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const ulong4 sipHashKeys, const uchar part) {
 #endif
 
 	// Declare bitmap
@@ -2311,13 +2311,13 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step nineteen
-	__kernel void trimEdgesStepNineteen(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepNineteen(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step nineteen
-	__kernel void trimEdgesStepNineteen(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part) {
+	__kernel void trimEdgesStepNineteen(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part) {
 #endif
 
 	// Get global ID
@@ -2366,7 +2366,7 @@ __kernel void trimEdgesStepFifteen(__global const uint *buckets, __global const 
 }
 
 // Trim edges step twenty
-__kernel void trimEdgesStepTwenty(__global const uint2 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap) {
+__kernel void trimEdgesStepTwenty(__global const uint2 *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -2418,7 +2418,7 @@ __kernel void trimEdgesStepTwenty(__global const uint2 *buckets, __global const 
 }
 
 // Trim edges step twenty-one
-__kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *nodesBitmap) {
+__kernel void trimEdgesStepTwentyOne(__global const uint2 *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict nodesBitmap) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -2473,13 +2473,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step twenty-two
-	__kernel void trimEdgesStepTwentyTwo(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
+	__kernel void trimEdgesStepTwentyTwo(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket) {
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-two
-	__kernel void trimEdgesStepTwentyTwo(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, __global uint *nodesBitmap) {
+	__kernel void trimEdgesStepTwentyTwo(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, __global uint *restrict nodesBitmap) {
 #endif
 
 	// Declare bitmap
@@ -2582,13 +2582,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 2
 
 	// Trim edges step twenty-three
-	__kernel void trimEdgesStepTwentyThree(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
+	__kernel void trimEdgesStepTwentyThree(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket) {
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-three
-	__kernel void trimEdgesStepTwentyThree(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part) {
+	__kernel void trimEdgesStepTwentyThree(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const uchar part) {
 #endif
 
 	// Declare bitmap
@@ -2660,13 +2660,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 4
 
 	// Trim edges step twenty-four
-	__kernel void trimEdgesStepTwentyFour(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepTwentyFour(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-four
-	__kernel void trimEdgesStepTwentyFour(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part) {
+	__kernel void trimEdgesStepTwentyFour(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part) {
 #endif
 
 	// Get global ID
@@ -2718,13 +2718,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 4
 
 	// Trim edges step twenty-five
-	__kernel void trimEdgesStepTwentyFive(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
+	__kernel void trimEdgesStepTwentyFive(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket) {
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-five
-	__kernel void trimEdgesStepTwentyFive(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, __global uint *nodesBitmap) {
+	__kernel void trimEdgesStepTwentyFive(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, __global uint *restrict nodesBitmap) {
 #endif
 
 	// Declare bitmap
@@ -2827,13 +2827,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 4
 
 	// Trim edges step twenty-six
-	__kernel void trimEdgesStepTwentySix(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap) {
+	__kernel void trimEdgesStepTwentySix(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap) {
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-six
-	__kernel void trimEdgesStepTwentySix(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part) {
+	__kernel void trimEdgesStepTwentySix(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part) {
 #endif
 
 	// Declare bitmap
@@ -2899,13 +2899,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 4
 
 	// Trim edges step twenty-seven
-	__kernel void trimEdgesStepTwentySeven(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
+	__kernel void trimEdgesStepTwentySeven(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket) {
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-seven
-	__kernel void trimEdgesStepTwentySeven(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part) {
+	__kernel void trimEdgesStepTwentySeven(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const uchar part) {
 #endif
 
 	// Declare bitmap
@@ -2977,13 +2977,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 8
 
 	// Trim edges step twenty-eight
-	__kernel void trimEdgesStepTwentyEight(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
+	__kernel void trimEdgesStepTwentyEight(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-eight
-	__kernel void trimEdgesStepTwentyEight(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part) {
+	__kernel void trimEdgesStepTwentyEight(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys, const uchar part) {
 #endif
 
 	// Get global ID
@@ -3035,13 +3035,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 8
 
 	// Trim edges step twenty-nine
-	__kernel void trimEdgesStepTwentyNine(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
+	__kernel void trimEdgesStepTwentyNine(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket) {
 
 // Otherwise
 #else
 
 	// Trim edges step twenty-nine
-	__kernel void trimEdgesStepTwentyNine(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, __global uint *nodesBitmap) {
+	__kernel void trimEdgesStepTwentyNine(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, __global uint *restrict nodesBitmap) {
 #endif
 
 	// Declare bitmap
@@ -3144,13 +3144,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 8
 
 	// Trim edges step thirty
-	__kernel void trimEdgesStepThirty(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap) {
+	__kernel void trimEdgesStepThirty(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap) {
 
 // Otherwise
 #else
 
 	// Trim edges step thirty
-	__kernel void trimEdgesStepThirty(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap, const uchar part) {
+	__kernel void trimEdgesStepThirty(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap, const uchar part) {
 #endif
 
 	// Declare bitmap
@@ -3216,13 +3216,13 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 #if SLEAN_TRIMMING_PARTS == 8
 
 	// Trim edges step thirty-one
-	__kernel void trimEdgesStepThirtyOne(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
+	__kernel void trimEdgesStepThirtyOne(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket) {
 
 // Otherwise
 #else
 
 	// Trim edges step thirty-one
-	__kernel void trimEdgesStepThirtyOne(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global const uint *nodesBitmap, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket, const uchar part) {
+	__kernel void trimEdgesStepThirtyOne(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global const uint *restrict nodesBitmap, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket, const uchar part) {
 #endif
 
 	// Declare bitmap
@@ -3291,7 +3291,7 @@ __kernel void trimEdgesStepTwentyOne(__global const uint2 *buckets, __global con
 }
 
 // Trim edges step thirty-two
-__kernel void trimEdgesStepThirtyTwo(__global const ulong *edgesBitmap, __global uint2 *buckets, __global uint *numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepThirtyTwo(__global const ulong *restrict edgesBitmap, __global uint2 *restrict buckets, __global uint *restrict numberOfEdgesPerBucket, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
 
 	// Get global ID
 	const uint globalId = get_global_id(0);
@@ -3326,7 +3326,7 @@ __kernel void trimEdgesStepThirtyTwo(__global const ulong *edgesBitmap, __global
 }
 
 // Trim edges step thirty-three
-__kernel void trimEdgesStepThirtyThree(__global const uint2 *sourceBuckets, __global const uint *numberOfEdgesPerSourceBucket, __global uint *destinationBuckets, __global uint *numberOfEdgesPerDestinationBucket) {
+__kernel void trimEdgesStepThirtyThree(__global const uint2 *restrict sourceBuckets, __global const uint *restrict numberOfEdgesPerSourceBucket, __global uint *restrict destinationBuckets, __global uint *restrict numberOfEdgesPerDestinationBucket) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -3391,7 +3391,7 @@ __kernel void trimEdgesStepThirtyThree(__global const uint2 *sourceBuckets, __gl
 }
 
 // Trim edges step thirty-four
-__kernel void trimEdgesStepThirtyFour(__global const uint *buckets, __global const uint *numberOfEdgesPerBucket, __global uint *edgesBitmap) {
+__kernel void trimEdgesStepThirtyFour(__global const uint *restrict buckets, __global const uint *restrict numberOfEdgesPerBucket, __global uint *restrict edgesBitmap) {
 
 	// Declare bitmap
 	__local uint bitmap[(short)(NUMBER_OF_REMAINING_EDGES_BITMAP_BYTES / sizeof(uint))];

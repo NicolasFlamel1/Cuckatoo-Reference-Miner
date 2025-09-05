@@ -19,7 +19,7 @@ using namespace std;
 // Function prototypes
 
 // SipHash-2-4
-template<const unsigned int numberOfStates> static inline void sipHash24(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nodes, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &keys, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nonces) noexcept;
+template<const unsigned int numberOfStates> static inline void sipHash24(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *__restrict__ nodes, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &__restrict__ keys, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *__restrict__ nonces) noexcept;
 
 // SipRound
 template<const unsigned int numberOfStates> static inline void sipRound(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) states[SIPHASH_KEYS_SIZE]) noexcept;
@@ -28,7 +28,7 @@ template<const unsigned int numberOfStates> static inline void sipRound(uint64_t
 // Supporting function implementation
 
 // SipHash-2-4
-template<const unsigned int numberOfStates> void sipHash24(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nodes, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &keys, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *nonces) noexcept {
+template<const unsigned int numberOfStates> void sipHash24(uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *__restrict__ nodes, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &__restrict__ keys, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) *__restrict__ nonces) noexcept {
 
 	// Initialize states
 	uint64_t __attribute__((vector_size(sizeof(uint64_t) * numberOfStates))) states[SIPHASH_KEYS_SIZE] = {};

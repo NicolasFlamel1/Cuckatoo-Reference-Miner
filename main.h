@@ -67,13 +67,13 @@ void stopMiner() noexcept;
 #ifdef __ANDROID__
 
 	// Prepare miner
-	extern "C" JNIEXPORT void JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_prepareMiner(const JNIEnv *environment, const jobject object) noexcept;
+	extern "C" JNIEXPORT void JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_prepareMiner(const JNIEnv *__restrict__ environment, const jobject __restrict__ object) noexcept;
 	
 	// Start miner
-	extern "C" JNIEXPORT jboolean JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_startMiner(JNIEnv *environment, const jobject object, const jobjectArray argv) noexcept;
+	extern "C" JNIEXPORT jboolean JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_startMiner(JNIEnv *__restrict__ environment, const jobject __restrict__ object, const jobjectArray __restrict__ argv) noexcept;
 	
 	// Stop miner
-	extern "C" JNIEXPORT void JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_stopMiner(const JNIEnv *environment, const jobject object) noexcept;
+	extern "C" JNIEXPORT void JNICALL Java_com_Cuckatoo_1Reference_1Miner_MainActivity_stopMiner(const JNIEnv *__restrict__ environment, const jobject __restrict__ object) noexcept;
 #endif
 
 

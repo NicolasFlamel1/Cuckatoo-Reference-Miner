@@ -49,13 +49,13 @@ using namespace metal;
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint *buckets, device atomic_uint *numberOfEdgesPerBucket, constant const ulong4 &sipHashKeys, const uint globalId);
+		[[kernel]] void trimEdgesStepOne(device uint *__restrict buckets, device atomic_uint *__restrict numberOfEdgesPerBucket, constant const ulong4 &__restrict sipHashKeys, const uint globalId);
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint *buckets, device atomic_uint *numberOfEdgesPerBucket, constant const ulong4 &sipHashKeys, device uint *bucketsSecondPart, const uint globalId);
+		[[kernel]] void trimEdgesStepOne(device uint *__restrict buckets, device atomic_uint *__restrict numberOfEdgesPerBucket, constant const ulong4 &__restrict sipHashKeys, device uint *__restrict bucketsSecondPart, const uint globalId);
 	#endif
 
 // Otherwise check if local buckets size is two
@@ -65,13 +65,13 @@ using namespace metal;
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint2 *buckets, device atomic_uint *numberOfEdgesPerBucket, constant const ulong4 &sipHashKeys, const uint globalId, const ushort localId, const ushort localSize);
+		[[kernel]] void trimEdgesStepOne(device uint2 *__restrict buckets, device atomic_uint *__restrict numberOfEdgesPerBucket, constant const ulong4 &__restrict sipHashKeys, const uint globalId, const ushort localId, const ushort localSize);
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint2 *buckets, device atomic_uint *numberOfEdgesPerBucket, constant const ulong4 &sipHashKeys, device uint2 *bucketsSecondPart, const uint globalId, const ushort localId, const ushort localSize);
+		[[kernel]] void trimEdgesStepOne(device uint2 *__restrict buckets, device atomic_uint *__restrict numberOfEdgesPerBucket, constant const ulong4 &__restrict sipHashKeys, device uint2 *__restrict bucketsSecondPart, const uint globalId, const ushort localId, const ushort localSize);
 	#endif
 
 // Otherwise
@@ -81,13 +81,13 @@ using namespace metal;
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint4 *buckets, device atomic_uint *numberOfEdgesPerBucket, constant const ulong4 &sipHashKeys, const uint globalId, const ushort localId, const ushort localSize);
+		[[kernel]] void trimEdgesStepOne(device uint4 *__restrict buckets, device atomic_uint *__restrict numberOfEdgesPerBucket, constant const ulong4 &__restrict sipHashKeys, const uint globalId, const ushort localId, const ushort localSize);
 	
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint4 *buckets, device atomic_uint *numberOfEdgesPerBucket, constant const ulong4 &sipHashKeys, device uint4 *bucketsSecondPart, const uint globalId, const ushort localId, const ushort localSize);
+		[[kernel]] void trimEdgesStepOne(device uint4 *__restrict buckets, device atomic_uint *__restrict numberOfEdgesPerBucket, constant const ulong4 &__restrict sipHashKeys, device uint4 *__restrict bucketsSecondPart, const uint globalId, const ushort localId, const ushort localSize);
 	#endif
 #endif
 
@@ -95,41 +95,41 @@ using namespace metal;
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step two
-	[[kernel]] void trimEdgesStepTwo(device const uint *sourceBuckets, device const uint *numberOfEdgesPerSourceBucket, device uint *destinationBuckets, device atomic_uint *numberOfEdgesPerDestinationBucket, constant const ulong4 &sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
+	[[kernel]] void trimEdgesStepTwo(device const uint *__restrict sourceBuckets, device const uint *__restrict numberOfEdgesPerSourceBucket, device uint *__restrict destinationBuckets, device atomic_uint *__restrict numberOfEdgesPerDestinationBucket, constant const ulong4 &__restrict sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
 
 // Otherwise
 #else
 
 	// Trim edges step two
-	[[kernel]] void trimEdgesStepTwo(device const uint *sourceBuckets, device const uint *numberOfEdgesPerSourceBucket, device uint *destinationBuckets, device atomic_uint *numberOfEdgesPerDestinationBucket, constant const ulong4 &sipHashKeys, device const uint *sourceBucketsSecondPart, const ushort localId, const ushort localSize, const uint groupId);
+	[[kernel]] void trimEdgesStepTwo(device const uint *__restrict sourceBuckets, device const uint *__restrict numberOfEdgesPerSourceBucket, device uint *__restrict destinationBuckets, device atomic_uint *__restrict numberOfEdgesPerDestinationBucket, constant const ulong4 &__restrict sipHashKeys, device const uint *__restrict sourceBucketsSecondPart, const ushort localId, const ushort localSize, const uint groupId);
 #endif
 
 // Trim edges step three
-[[kernel]] void trimEdgesStepThree(device const uint *sourceBuckets, device const uint *numberOfEdgesPerSourceBucket, device uint2 *destinationBuckets, device atomic_uint *numberOfEdgesPerDestinationBucket, constant const ulong4 &sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
+[[kernel]] void trimEdgesStepThree(device const uint *__restrict sourceBuckets, device const uint *__restrict numberOfEdgesPerSourceBucket, device uint2 *__restrict destinationBuckets, device atomic_uint *__restrict numberOfEdgesPerDestinationBucket, constant const ulong4 &__restrict sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
 
 // Trim edges step four
-[[kernel]] void trimEdgesStepFour(device const uint2 *sourceBuckets, device const uint *numberOfEdgesPerSourceBucket, device uint4 *destinationBuckets, device atomic_uint *numberOfEdgesPerDestinationBucket, constant const ulong4 &sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
+[[kernel]] void trimEdgesStepFour(device const uint2 *__restrict sourceBuckets, device const uint *__restrict numberOfEdgesPerSourceBucket, device uint4 *__restrict destinationBuckets, device atomic_uint *__restrict numberOfEdgesPerDestinationBucket, constant const ulong4 &__restrict sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
 
 // Trim edges step five
-[[kernel]] void trimEdgesStepFive(device const uint4 *sourceBuckets, device const uint *numberOfEdgesPerSourceBucket, device uint4 *destinationBuckets, device atomic_uint *numberOfEdgesPerDestinationBucket, const ushort localId, const ushort localSize, const uint groupId);
+[[kernel]] void trimEdgesStepFive(device const uint4 *__restrict sourceBuckets, device const uint *__restrict numberOfEdgesPerSourceBucket, device uint4 *__restrict destinationBuckets, device atomic_uint *__restrict numberOfEdgesPerDestinationBucket, const ushort localId, const ushort localSize, const uint groupId);
 
 // Check if trimming rounds is one
 #if TRIMMING_ROUNDS == 1
 
 	// Trim edges step six
-	[[kernel]] void trimEdgesStepSix(device const uint *buckets, device const uint *numberOfEdgesPerBucket, device atomic_uint *remainingEdges, constant const ulong4 &sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
+	[[kernel]] void trimEdgesStepSix(device const uint *__restrict buckets, device const uint *__restrict numberOfEdgesPerBucket, device atomic_uint *__restrict remainingEdges, constant const ulong4 &__restrict sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
 
 // Otherwise check if trimming rounds is two
 #elif TRIMMING_ROUNDS == 2
 
 	// Trim edges step six
-	[[kernel]] void trimEdgesStepSix(device const uint2 *buckets, device const uint *numberOfEdgesPerBucket, device atomic_uint *remainingEdges, constant const ulong4 &sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
+	[[kernel]] void trimEdgesStepSix(device const uint2 *__restrict buckets, device const uint *__restrict numberOfEdgesPerBucket, device atomic_uint *__restrict remainingEdges, constant const ulong4 &__restrict sipHashKeys, const ushort localId, const ushort localSize, const uint groupId);
 
 // Otherwise
 #else
 
 	// Trim edges step six
-	[[kernel]] void trimEdgesStepSix(device const uint4 *buckets, device const uint *numberOfEdgesPerBucket, device atomic_uint *remainingEdges, const ushort localId, const ushort localSize, const uint groupId);
+	[[kernel]] void trimEdgesStepSix(device const uint4 *__restrict buckets, device const uint *__restrict numberOfEdgesPerBucket, device atomic_uint *__restrict remainingEdges, const ushort localId, const ushort localSize, const uint groupId);
 #endif
 
 // Check if number of buckets is one
@@ -167,13 +167,13 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint *buckets [[buffer(0)]], device atomic_uint *numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &sipHashKeys [[buffer(2)]], const uint globalId [[thread_position_in_grid]]) {
+		[[kernel]] void trimEdgesStepOne(device uint *__restrict buckets [[buffer(0)]], device atomic_uint *__restrict numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], const uint globalId [[thread_position_in_grid]]) {
 		
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint *buckets [[buffer(0)]], device atomic_uint *numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &sipHashKeys [[buffer(2)]], device uint *bucketsSecondPart [[buffer(3)]], const uint globalId [[thread_position_in_grid]]) {
+		[[kernel]] void trimEdgesStepOne(device uint *__restrict buckets [[buffer(0)]], device atomic_uint *__restrict numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], device uint *__restrict bucketsSecondPart [[buffer(3)]], const uint globalId [[thread_position_in_grid]]) {
 	#endif
 
 // Otherwise check if local buckets size is two
@@ -183,13 +183,13 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint2 *buckets [[buffer(0)]], device atomic_uint *numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &sipHashKeys [[buffer(2)]], const uint globalId [[thread_position_in_grid]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]]) {
+		[[kernel]] void trimEdgesStepOne(device uint2 *__restrict buckets [[buffer(0)]], device atomic_uint *__restrict numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], const uint globalId [[thread_position_in_grid]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]]) {
 		
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint2 *buckets [[buffer(0)]], device atomic_uint *numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &sipHashKeys [[buffer(2)]], device uint2 *bucketsSecondPart [[buffer(3)]], const uint globalId [[thread_position_in_grid]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]]) {
+		[[kernel]] void trimEdgesStepOne(device uint2 *__restrict buckets [[buffer(0)]], device atomic_uint *__restrict numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], device uint2 *__restrict bucketsSecondPart [[buffer(3)]], const uint globalId [[thread_position_in_grid]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]]) {
 	#endif
 
 // Otherwise
@@ -199,13 +199,13 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 	#if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint4 *buckets [[buffer(0)]], device atomic_uint *numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &sipHashKeys [[buffer(2)]], const uint globalId [[thread_position_in_grid]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]]) {
+		[[kernel]] void trimEdgesStepOne(device uint4 *__restrict buckets [[buffer(0)]], device atomic_uint *__restrict numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], const uint globalId [[thread_position_in_grid]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]]) {
 		
 	// Otherwise
 	#else
 	
 		// Trim edges step one
-		[[kernel]] void trimEdgesStepOne(device uint4 *buckets [[buffer(0)]], device atomic_uint *numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &sipHashKeys [[buffer(2)]], device uint4 *bucketsSecondPart [[buffer(3)]], const uint globalId [[thread_position_in_grid]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]]) {
+		[[kernel]] void trimEdgesStepOne(device uint4 *__restrict buckets [[buffer(0)]], device atomic_uint *__restrict numberOfEdgesPerBucket [[buffer(1)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], device uint4 *__restrict bucketsSecondPart [[buffer(3)]], const uint globalId [[thread_position_in_grid]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]]) {
 	#endif
 #endif
 
@@ -442,13 +442,13 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 #if INITIAL_BUCKETS_NUMBER_OF_BUCKETS == NUMBER_OF_BUCKETS
 
 	// Trim edges step two
-	[[kernel]] void trimEdgesStepTwo(device const uint *sourceBuckets [[buffer(0)]], device const uint *numberOfEdgesPerSourceBucket [[buffer(1)]], device uint *destinationBuckets [[buffer(4)]], device atomic_uint *numberOfEdgesPerDestinationBucket [[buffer(5)]], constant const ulong4 &sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
+	[[kernel]] void trimEdgesStepTwo(device const uint *__restrict sourceBuckets [[buffer(0)]], device const uint *__restrict numberOfEdgesPerSourceBucket [[buffer(1)]], device uint *__restrict destinationBuckets [[buffer(4)]], device atomic_uint *__restrict numberOfEdgesPerDestinationBucket [[buffer(5)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
 
 // Otherwise
 #else
 
 	// Trim edges step two
-	[[kernel]] void trimEdgesStepTwo(device const uint *sourceBuckets [[buffer(0)]], device const uint *numberOfEdgesPerSourceBucket [[buffer(1)]], device uint *destinationBuckets [[buffer(4)]], device atomic_uint *numberOfEdgesPerDestinationBucket [[buffer(5)]], constant const ulong4 &sipHashKeys [[buffer(2)]], device const uint *sourceBucketsSecondPart [[buffer(3)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
+	[[kernel]] void trimEdgesStepTwo(device const uint *__restrict sourceBuckets [[buffer(0)]], device const uint *__restrict numberOfEdgesPerSourceBucket [[buffer(1)]], device uint *__restrict destinationBuckets [[buffer(4)]], device atomic_uint *__restrict numberOfEdgesPerDestinationBucket [[buffer(5)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], device const uint *__restrict sourceBucketsSecondPart [[buffer(3)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
 #endif
 
 	// Declare bitmap
@@ -537,7 +537,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 }
 
 // Trim edges step three
-[[kernel]] void trimEdgesStepThree(device const uint *sourceBuckets [[buffer(4)]], device const uint *numberOfEdgesPerSourceBucket [[buffer(5)]], device uint2 *destinationBuckets [[buffer(0)]], device atomic_uint *numberOfEdgesPerDestinationBucket [[buffer(1)]], constant const ulong4 &sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
+[[kernel]] void trimEdgesStepThree(device const uint *__restrict sourceBuckets [[buffer(4)]], device const uint *__restrict numberOfEdgesPerSourceBucket [[buffer(5)]], device uint2 *__restrict destinationBuckets [[buffer(0)]], device atomic_uint *__restrict numberOfEdgesPerDestinationBucket [[buffer(1)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -602,7 +602,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 }
 
 // Trim edges step four
-[[kernel]] void trimEdgesStepFour(device const uint2 *sourceBuckets [[buffer(0)]], device const uint *numberOfEdgesPerSourceBucket [[buffer(1)]], device uint4 *destinationBuckets [[buffer(4)]], device atomic_uint *numberOfEdgesPerDestinationBucket [[buffer(5)]], constant const ulong4 &sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
+[[kernel]] void trimEdgesStepFour(device const uint2 *__restrict sourceBuckets [[buffer(0)]], device const uint *__restrict numberOfEdgesPerSourceBucket [[buffer(1)]], device uint4 *__restrict destinationBuckets [[buffer(4)]], device atomic_uint *__restrict numberOfEdgesPerDestinationBucket [[buffer(5)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -661,7 +661,7 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 }
 
 // Trim edges step five
-[[kernel]] void trimEdgesStepFive(device const uint4 *sourceBuckets [[buffer(0)]], device const uint *numberOfEdgesPerSourceBucket [[buffer(1)]], device uint4 *destinationBuckets [[buffer(4)]], device atomic_uint *numberOfEdgesPerDestinationBucket [[buffer(5)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
+[[kernel]] void trimEdgesStepFive(device const uint4 *__restrict sourceBuckets [[buffer(0)]], device const uint *__restrict numberOfEdgesPerSourceBucket [[buffer(1)]], device uint4 *__restrict destinationBuckets [[buffer(4)]], device atomic_uint *__restrict numberOfEdgesPerDestinationBucket [[buffer(5)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
 
 	// Declare bitmap
 	threadgroup atomic_uint bitmap[static_cast<short>(NUMBER_OF_BITMAP_BYTES / sizeof(uint))];
@@ -720,19 +720,19 @@ static inline bool isBitSetInBitmap(threadgroup const atomic_uint *bitmap, const
 #if TRIMMING_ROUNDS == 1
 
 	// Trim edges step six
-	[[kernel]] void trimEdgesStepSix(device const uint *buckets [[buffer(4)]], device const uint *numberOfEdgesPerBucket [[buffer(5)]], device atomic_uint *remainingEdges [[buffer(6)]], constant const ulong4 &sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
+	[[kernel]] void trimEdgesStepSix(device const uint *__restrict buckets [[buffer(4)]], device const uint *__restrict numberOfEdgesPerBucket [[buffer(5)]], device atomic_uint *__restrict remainingEdges [[buffer(6)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
 
 // Otherwise check if trimming rounds is two
 #elif TRIMMING_ROUNDS == 2
 
 	// Trim edges step six
-	[[kernel]] void trimEdgesStepSix(device const uint2 *buckets [[buffer(4)]], device const uint *numberOfEdgesPerBucket [[buffer(5)]], device atomic_uint *remainingEdges [[buffer(6)]], constant const ulong4 &sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
+	[[kernel]] void trimEdgesStepSix(device const uint2 *__restrict buckets [[buffer(4)]], device const uint *__restrict numberOfEdgesPerBucket [[buffer(5)]], device atomic_uint *__restrict remainingEdges [[buffer(6)]], constant const ulong4 &__restrict sipHashKeys [[buffer(2)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
 
 // Otherwise
 #else
 
 	// Trim edges step six
-	[[kernel]] void trimEdgesStepSix(device const uint4 *buckets [[buffer(4)]], device const uint *numberOfEdgesPerBucket [[buffer(5)]], device atomic_uint *remainingEdges [[buffer(6)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
+	[[kernel]] void trimEdgesStepSix(device const uint4 *__restrict buckets [[buffer(4)]], device const uint *__restrict numberOfEdgesPerBucket [[buffer(5)]], device atomic_uint *__restrict remainingEdges [[buffer(6)]], const ushort localId [[thread_position_in_threadgroup]], const ushort localSize [[threads_per_threadgroup]], const uint groupId [[threadgroup_position_in_grid]]) {
 #endif
 
 	// Declare index

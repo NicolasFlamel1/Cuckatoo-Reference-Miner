@@ -50,7 +50,7 @@ static const uint8_t BLAKE2B_SIGMA[][16] = {
 static inline void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &result, const uint8_t header[HEADER_SIZE], uint64_t nonce) noexcept;
 
 // BLAKE2b step
-static inline void blake2bStep(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &a, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &b, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &c, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &d, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &x, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &y) noexcept;
+static inline void blake2bStep(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ a, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ b, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ c, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ d, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ x, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ y) noexcept;
 
 
 // Supporting function implementation
@@ -298,7 +298,7 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 }
 
 // BLAKE2b step
-void blake2bStep(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &a, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &b, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &c, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &d, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &x, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &y) noexcept {
+void blake2bStep(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ a, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ b, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ c, uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ d, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ x, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR))) &__restrict__ y) noexcept {
 
 	// Perform step on values
 	a += b + x;

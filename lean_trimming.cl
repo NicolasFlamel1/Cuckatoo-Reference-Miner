@@ -47,7 +47,7 @@ __kernel void trimEdgesStepOne(__global uint *nodesBitmap, const ulong4 sipHashK
 #endif
 
 // Trim edges step two
-__kernel void trimEdgesStepTwo(__global ulong *edgesBitmap, __global const uint *nodesBitmap, const ulong4 sipHashKeys);
+__kernel void trimEdgesStepTwo(__global ulong *restrict edgesBitmap, __global const uint *restrict nodesBitmap, const ulong4 sipHashKeys);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_THREE_WORK_ITEMS_PER_WORK_GROUP
@@ -57,7 +57,7 @@ __kernel void trimEdgesStepTwo(__global ulong *edgesBitmap, __global const uint 
 #endif
 
 // Trim edges step three
-__kernel void trimEdgesStepThree(__global const ulong *edgesBitmap, __global uint *nodesBitmap, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
+__kernel void trimEdgesStepThree(__global const ulong *restrict edgesBitmap, __global uint *restrict nodesBitmap, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
 
 // Check if work items per work group exists
 #ifdef TRIM_EDGES_STEP_FOUR_WORK_ITEMS_PER_WORK_GROUP
@@ -67,7 +67,7 @@ __kernel void trimEdgesStepThree(__global const ulong *edgesBitmap, __global uin
 #endif
 
 // Trim edges step four
-__kernel void trimEdgesStepFour(__global ulong *edgesBitmap, __global const uint *nodesBitmap, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
+__kernel void trimEdgesStepFour(__global ulong *restrict edgesBitmap, __global const uint *restrict nodesBitmap, const uchar nodesInSecondPartition, const ulong4 sipHashKeys);
 
 // SipHash-2-4
 static inline uint sipHash24(ulong4 keys, const ulong nonce);
@@ -108,7 +108,7 @@ __kernel void trimEdgesStepOne(__global uint *nodesBitmap, const ulong4 sipHashK
 }
 
 // Trim edges step two
-__kernel void trimEdgesStepTwo(__global ulong *edgesBitmap, __global const uint *nodesBitmap, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepTwo(__global ulong *restrict edgesBitmap, __global const uint *restrict nodesBitmap, const ulong4 sipHashKeys) {
 
 	// Get global ID
 	const uint globalId = get_global_id(0);
@@ -141,7 +141,7 @@ __kernel void trimEdgesStepTwo(__global ulong *edgesBitmap, __global const uint 
 }
 
 // Trim edges step three
-__kernel void trimEdgesStepThree(__global const ulong *edgesBitmap, __global uint *nodesBitmap, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepThree(__global const ulong *restrict edgesBitmap, __global uint *restrict nodesBitmap, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
 
 	// Get global ID
 	const uint globalId = get_global_id(0);
@@ -167,7 +167,7 @@ __kernel void trimEdgesStepThree(__global const ulong *edgesBitmap, __global uin
 }
 
 // Trim edges step four
-__kernel void trimEdgesStepFour(__global ulong *edgesBitmap, __global const uint *nodesBitmap, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
+__kernel void trimEdgesStepFour(__global ulong *restrict edgesBitmap, __global const uint *restrict nodesBitmap, const uchar nodesInSecondPartition, const ulong4 sipHashKeys) {
 
 	// Get global ID
 	const uint globalId = get_global_id(0);

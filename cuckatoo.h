@@ -43,7 +43,7 @@ thread_local static uint32_t cuckatooRootNode;
 static inline bool initializeCuckatooThreadLocalGlobalVariables() noexcept;
 
 // Get cuckatoo solution
-static inline bool getCuckatooSolution(uint32_t solution[SOLUTION_SIZE], CuckatooNodeConnectionsLink *nodeConnections, const uint32_t *edges, const uint64_t numberOfEdges) noexcept;
+static inline bool getCuckatooSolution(uint32_t solution[SOLUTION_SIZE], CuckatooNodeConnectionsLink *__restrict__ nodeConnections, const uint32_t *__restrict__ edges, const uint64_t numberOfEdges) noexcept;
 
 // Search node connections for cuckatoo solution first partition
 static inline bool searchNodeConnectionsForCuckatooSolutionFirstPartition(const uint_fast8_t cycleSize, const uint32_t node, const uint32_t *index) noexcept;
@@ -76,7 +76,7 @@ bool initializeCuckatooThreadLocalGlobalVariables() noexcept {
 }
 
 // Get cuckatoo solution
-bool getCuckatooSolution(uint32_t solution[SOLUTION_SIZE], CuckatooNodeConnectionsLink *nodeConnections, const uint32_t *edges, const uint64_t numberOfEdges) noexcept {
+bool getCuckatooSolution(uint32_t solution[SOLUTION_SIZE], CuckatooNodeConnectionsLink *__restrict__ nodeConnections, const uint32_t *__restrict__ edges, const uint64_t numberOfEdges) noexcept {
 
 	// Go through all edges
 	for(uint64_t nodeConnectionsIndex = 0, edgesIndex = 0; nodeConnectionsIndex < numberOfEdges * 2; nodeConnectionsIndex += 2, edgesIndex += EDGE_NUMBER_OF_COMPONENTS) {

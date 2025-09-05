@@ -36,16 +36,16 @@ using namespace metal;
 // Function prototypes
 
 // Trim edges step one
-[[kernel]] void trimEdgesStepOne(device atomic_uint *nodesBitmap, constant const ulong4 &sipHashKeys, const uint globalId);
+[[kernel]] void trimEdgesStepOne(device atomic_uint *__restrict nodesBitmap, constant const ulong4 &__restrict sipHashKeys, const uint globalId);
 
 // Trim edges step two
-[[kernel]] void trimEdgesStepTwo(device ulong *edgesBitmap, device const uint *nodesBitmap, constant const ulong4 &sipHashKeys, const uint globalId);
+[[kernel]] void trimEdgesStepTwo(device ulong *__restrict edgesBitmap, device const uint *__restrict nodesBitmap, constant const ulong4 &__restrict sipHashKeys, const uint globalId);
 
 // Trim edges step three
-[[kernel]] void trimEdgesStepThree(device const ulong *edgesBitmap, device atomic_uint *nodesBitmap, constant const uchar &nodesInSecondPartition, constant const ulong4 &sipHashKeys, const uint globalId);
+[[kernel]] void trimEdgesStepThree(device const ulong *__restrict edgesBitmap, device atomic_uint *__restrict nodesBitmap, constant const uchar &__restrict nodesInSecondPartition, constant const ulong4 &__restrict sipHashKeys, const uint globalId);
 
 // Trim edges step four
-[[kernel]] void trimEdgesStepFour(device ulong *edgesBitmap, device const uint *nodesBitmap, constant const uchar &nodesInSecondPartition, constant const ulong4 &sipHashKeys, const uint globalId);
+[[kernel]] void trimEdgesStepFour(device ulong *__restrict edgesBitmap, device const uint *__restrict nodesBitmap, constant const uchar &__restrict nodesInSecondPartition, constant const ulong4 &__restrict sipHashKeys, const uint globalId);
 
 // Clear nodes bitmap
 [[kernel]] void clearNodesBitmap(device ulong *nodesBitmap, const uint globalId);
@@ -66,7 +66,7 @@ static inline bool isBitSetInBitmap(device const uint *bitmap, const uint index)
 // Supporting function implementation
 
 // Trim edges step one
-[[kernel]] void trimEdgesStepOne(device atomic_uint *nodesBitmap [[buffer(0)]], constant const ulong4 &sipHashKeys [[buffer(1)]], const uint globalId [[thread_position_in_grid]]) {
+[[kernel]] void trimEdgesStepOne(device atomic_uint *__restrict nodesBitmap [[buffer(0)]], constant const ulong4 &__restrict sipHashKeys [[buffer(1)]], const uint globalId [[thread_position_in_grid]]) {
 
 	// Get work item's edge indices
 	const uint indices = globalId * NUMBER_OF_EDGES_PER_STEP_ONE_WORK_ITEM;
@@ -86,7 +86,7 @@ static inline bool isBitSetInBitmap(device const uint *bitmap, const uint index)
 }
 
 // Trim edges step two
-[[kernel]] void trimEdgesStepTwo(device ulong *edgesBitmap [[buffer(2)]], device const uint *nodesBitmap [[buffer(0)]], constant const ulong4 &sipHashKeys [[buffer(1)]], const uint globalId [[thread_position_in_grid]]) {
+[[kernel]] void trimEdgesStepTwo(device ulong *__restrict edgesBitmap [[buffer(2)]], device const uint *__restrict nodesBitmap [[buffer(0)]], constant const ulong4 &__restrict sipHashKeys [[buffer(1)]], const uint globalId [[thread_position_in_grid]]) {
 
 	// Get work item's edge indices
 	const uint indices = globalId * static_cast<char>(sizeof(ulong) * BITS_IN_A_BYTE);
@@ -116,7 +116,7 @@ static inline bool isBitSetInBitmap(device const uint *bitmap, const uint index)
 }
 
 // Trim edges step three
-[[kernel]] void trimEdgesStepThree(device const ulong *edgesBitmap [[buffer(2)]], device atomic_uint *nodesBitmap [[buffer(0)]], constant const uchar &nodesInSecondPartition [[buffer(3)]], constant const ulong4 &sipHashKeys [[buffer(1)]], const uint globalId [[thread_position_in_grid]]) {
+[[kernel]] void trimEdgesStepThree(device const ulong *__restrict edgesBitmap [[buffer(2)]], device atomic_uint *__restrict nodesBitmap [[buffer(0)]], constant const uchar &__restrict nodesInSecondPartition [[buffer(3)]], constant const ulong4 &__restrict sipHashKeys [[buffer(1)]], const uint globalId [[thread_position_in_grid]]) {
 
 	// Get work item's edge indices
 	const uint indices = globalId * static_cast<char>(sizeof(ulong) * BITS_IN_A_BYTE);
@@ -139,7 +139,7 @@ static inline bool isBitSetInBitmap(device const uint *bitmap, const uint index)
 }
 
 // Trim edges step four
-[[kernel]] void trimEdgesStepFour(device ulong *edgesBitmap [[buffer(2)]], device const uint *nodesBitmap [[buffer(0)]], constant const uchar &nodesInSecondPartition [[buffer(3)]], constant const ulong4 &sipHashKeys [[buffer(1)]], const uint globalId [[thread_position_in_grid]]) {
+[[kernel]] void trimEdgesStepFour(device ulong *__restrict edgesBitmap [[buffer(2)]], device const uint *__restrict nodesBitmap [[buffer(0)]], constant const uchar &__restrict nodesInSecondPartition [[buffer(3)]], constant const ulong4 &__restrict sipHashKeys [[buffer(1)]], const uint globalId [[thread_position_in_grid]]) {
 
 	// Get work item's edge indices
 	const uint indices = globalId * static_cast<char>(sizeof(ulong) * BITS_IN_A_BYTE);

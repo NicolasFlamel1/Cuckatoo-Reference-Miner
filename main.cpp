@@ -276,7 +276,7 @@ static uint64_t jobNonce = 0;
 // Function prototypes
 
 // Trimming finished
-static inline void trimmingFinished(const void *data, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &sipHashKeys, const uint64_t height, const uint64_t id, const uint64_t nonce) noexcept;
+static inline void trimmingFinished(const void *__restrict__ data, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &__restrict__ sipHashKeys, const uint64_t height, const uint64_t id, const uint64_t nonce) noexcept;
 
 // Check if not tuning
 #ifndef TUNING
@@ -3257,14 +3257,14 @@ void stopMiner() noexcept {
 #ifdef __ANDROID__
 
 	// Prepare miner
-	void Java_com_Cuckatoo_1Reference_1Miner_MainActivity_prepareMiner(__attribute__((unused)) const JNIEnv *environment, __attribute__((unused)) const jobject object) noexcept {
+	void Java_com_Cuckatoo_1Reference_1Miner_MainActivity_prepareMiner(__attribute__((unused)) const JNIEnv *__restrict__ environment, __attribute__((unused)) const jobject __restrict__ object) noexcept {
 	
 		// Prepare miner
 		prepareMiner();
 	}
 	
 	// Start miner
-	jboolean Java_com_Cuckatoo_1Reference_1Miner_MainActivity_startMiner(JNIEnv *environment, const jobject object, const jobjectArray argv) noexcept {
+	jboolean Java_com_Cuckatoo_1Reference_1Miner_MainActivity_startMiner(JNIEnv *__restrict__ environment, const jobject __restrict__ object, const jobjectArray __restrict__ argv) noexcept {
 	
 		// Check if getting class's append to text view method failed
 		const jmethodID appendToTextViewMethod = environment->GetMethodID(environment->GetObjectClass(object), "appendToTextView", "(Ljava/lang/String;)V");
@@ -3361,7 +3361,7 @@ void stopMiner() noexcept {
 	}
 	
 	// Stop miner
-	void Java_com_Cuckatoo_1Reference_1Miner_MainActivity_stopMiner(__attribute__((unused)) const JNIEnv *environment, __attribute__((unused)) const jobject object) noexcept {
+	void Java_com_Cuckatoo_1Reference_1Miner_MainActivity_stopMiner(__attribute__((unused)) const JNIEnv *__restrict__ environment, __attribute__((unused)) const jobject __restrict__ object) noexcept {
 	
 		// Stop miner
 		stopMiner();
@@ -3372,13 +3372,13 @@ void stopMiner() noexcept {
 #ifndef TUNING
 
 	// Trimming finished
-	void trimmingFinished(const void *data, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &sipHashKeys, const uint64_t height, const uint64_t id, const uint64_t nonce) noexcept {
+	void trimmingFinished(const void *__restrict__ data, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &__restrict__ sipHashKeys, const uint64_t height, const uint64_t id, const uint64_t nonce) noexcept {
 	
 // Otherwise
 #else
 
 	// Trimming finished
-	void trimmingFinished(const void *data, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &sipHashKeys, __attribute__((unused)) const uint64_t height, __attribute__((unused)) const uint64_t id, __attribute__((unused)) const uint64_t nonce) noexcept {
+	void trimmingFinished(const void *__restrict__ data, const uint64_t __attribute__((vector_size(sizeof(uint64_t) * SIPHASH_KEYS_SIZE))) &__restrict__ sipHashKeys, __attribute__((unused)) const uint64_t height, __attribute__((unused)) const uint64_t id, __attribute__((unused)) const uint64_t nonce) noexcept {
 #endif
 
 	// Record start time
