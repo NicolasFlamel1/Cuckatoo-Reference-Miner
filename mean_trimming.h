@@ -1041,7 +1041,7 @@ using namespace std;
 		}
 		
 		// Display message
-		cout << "Mining started" << endl << endl << "Mining info:" << endl << "\tMining rate:\t 0 graph(s)/second" << endl << "\tGraphs checked:\t 0" << endl;
+		// Mining started - stats will be displayed by main loop
 		
 		// Check if not tuning
 		#ifndef TUNING
@@ -1050,8 +1050,8 @@ using namespace std;
 			cout << "\tSolutions found: 0" << endl;
 		#endif
 		
-		// Display message
-		cout << "Pipeline stages:" << endl;
+		// Store pipeline stages info for live stats
+		// (no longer displayed separately)
 		
 		// Set previous graph processed time to now
 		previousGraphProcessedTime = chrono::high_resolution_clock::now();
@@ -1231,8 +1231,9 @@ using namespace std;
 			return false;
 		}
 		
-		// Display message
-		cout << "\tTrimming time:\t " << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
+		// Calculate trimming time for live stats
+		extern double trimmingTime;
+		trimmingTime = commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count();
 		
 		// Set start time to now
 		startTime = chrono::high_resolution_clock::now();
@@ -1411,8 +1412,9 @@ using namespace std;
 				return false;
 			}
 			
-			// Display message
-			cout << "\tTrimming time:\t " << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
+			// Calculate trimming time for live stats
+			extern double trimmingTime;
+			trimmingTime = commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count();
 			
 			// Set start time to now
 			startTime = chrono::high_resolution_clock::now();
@@ -1594,8 +1596,9 @@ using namespace std;
 				return false;
 			}
 			
-			// Display message
-			cout << "\tTrimming time:\t " << (commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count()) << " second(s)" << endl;
+			// Calculate trimming time for live stats
+			extern double trimmingTime;
+			trimmingTime = commandBuffer->GPUEndTime() - commandBuffer->kernelStartTime() + static_cast<chrono::duration<double>>(endTime - startTime).count();
 			
 			// Set start time to now
 			startTime = chrono::high_resolution_clock::now();
@@ -2069,7 +2072,7 @@ using namespace std;
 		}
 		
 		// Display message
-		cout << "Mining started" << endl << endl << "Mining info:" << endl << "\tMining rate:\t 0 graph(s)/second" << endl << "\tGraphs checked:\t 0" << endl;
+		// Mining started - stats will be displayed by main loop
 		
 		// Check if not tuning
 		#ifndef TUNING
@@ -2078,8 +2081,8 @@ using namespace std;
 			cout << "\tSolutions found: 0" << endl;
 		#endif
 		
-		// Display message
-		cout << "Pipeline stages:" << endl;
+		// Store pipeline stages info for live stats
+		// (no longer displayed separately)
 		
 		// Set previous graph processed time to now
 		previousGraphProcessedTime = chrono::high_resolution_clock::now();
@@ -2339,8 +2342,9 @@ using namespace std;
 			return false;
 		}
 		
-		// Display message
-		cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
+		// Calculate trimming time for live stats
+		extern double trimmingTime;
+		trimmingTime = static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count();
 		
 		// Check if queuing clearing number of edges per bucket one on the device failed
 		firstCommandEvent.free();
@@ -2610,8 +2614,9 @@ using namespace std;
 				return false;
 			}
 			
-			// Display message
-			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
+			// Calculate trimming time for live stats
+			extern double trimmingTime;
+			trimmingTime = static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count();
 			
 			// Check if queuing clearing number of edges per bucket one on the device failed
 			firstCommandEvent.free();
@@ -2884,8 +2889,9 @@ using namespace std;
 				return false;
 			}
 			
-			// Display message
-			cout << "\tTrimming time:\t " << static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count() << " second(s)" << endl;
+			// Calculate trimming time for live stats
+			extern double trimmingTime;
+			trimmingTime = static_cast<chrono::duration<double>>(static_cast<chrono::nanoseconds>(endTime - startTime)).count();
 			
 			// Check if queuing clearing number of edges per bucket one on the device failed
 			firstCommandEvent.free();

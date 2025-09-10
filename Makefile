@@ -82,7 +82,7 @@ else ifeq ($(OS),Windows_NT)
 	#CFLAGS += -march=native -mtune=native -static-libstdc++ -static-libgcc -I"./opencl_headers"
 	CFLAGS += -march=native -mtune=native -static-libstdc++ -static-libgcc -I./opencl_headers -I/mingw64/include
 	#LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32 -lOpenCL
-	LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32 -L/mingw64/lib -lOpenCL
+	LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32 -L/c/msys64/mingw64/lib -lOpenCL
 
 	
 	# Delete command
@@ -201,6 +201,9 @@ else
 	# Null location
 	NULL_LOCATION = "/dev/null"
 endif
+
+# Default target
+all: make
 
 # Make
 make:
