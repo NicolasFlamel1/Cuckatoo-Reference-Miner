@@ -41,7 +41,14 @@ make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesim
 ```
 
 #### Windows
-After installing [MinGW-w64](https://winlibs.com), this program can be built and ran with Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+After installing [MinGW-w64](https://winlibs.com), install the pre-requisite libraries (opencl, etc.) using the following commands in mingw64:
+
+```
+pacman -Syuu
+pacman -S mingw-w64-x86_64-opencl-icd mingw-w64-x86_64-opencl-headers
+```
+
+This program can be built and ran with Windows with the following commands in mingw65, where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 mingw32-make EDGE_BITS=31
 mingw32-make run
