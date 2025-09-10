@@ -79,8 +79,11 @@ else ifeq ($(OS),Windows_NT)
 	RUN_COMMAND = "./$(PROGRAM_NAME)"
 	
 	# Set flags and link libraries
-	CFLAGS += -march=native -mtune=native -static-libstdc++ -static-libgcc -I"./opencl_headers"
-	LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32 "$(shell echo %SYSTEMROOT%)\System32\OpenCL.dll"
+	#CFLAGS += -march=native -mtune=native -static-libstdc++ -static-libgcc -I"./opencl_headers"
+	CFLAGS += -march=native -mtune=native -static-libstdc++ -static-libgcc -I./opencl_headers -I/mingw64/include
+	#LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32 -lOpenCL
+	LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32 -L/mingw64/lib -lOpenCL
+
 	
 	# Delete command
 	DELETE_COMMAND = del /q
