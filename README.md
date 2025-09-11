@@ -7,7 +7,7 @@ Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean, slean
 If you're building this program for a desktop operating system then it's recommended that you build this program on the same system that you'll be running it on since it uses the `-march=native` and `-mtune=native` compiler flags to optimize itself for the current system's available features. Because of this, I don't recommend using the prebuilt versions of this program for desktop operating systems.
 
 #### Linux
-This program can be built and ran with Linux with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+This program can be built and ran with Linux by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev
 make EDGE_BITS=31
@@ -15,7 +15,7 @@ make run
 ```
 
 #### macOS
-After installing [Xcode](https://developer.apple.com/xcode), this program can be built and ran with macOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+After installing [Xcode](https://developer.apple.com/xcode), this program can be built and ran with macOS by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 make EDGE_BITS=31
 make run
@@ -26,14 +26,14 @@ make EDGE_BITS=31 USE_OPENCL=1
 ```
 
 #### iOS
-After installing [Xcode](https://developer.apple.com/xcode), this program can be built for iOS with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `PROVISIONING_PROFILE` is set to the location of the provisioning profile that you want to use to provision the app which can be obtained from [Apple's developer site](https://developer.apple.com) and is also used to determine the app's identifier, and `SIGNING_IDENTITY` is set to signing identity that you want to use to sign the app which can be obtained by running `security find-identity -v -p codesigning` in a terminal:
+After installing [Xcode](https://developer.apple.com/xcode), this program can be built for iOS by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `PROVISIONING_PROFILE` is set to the location of the provisioning profile that you want to use to provision the app which can be obtained from [Apple's developer site](https://developer.apple.com) and is also used to determine the app's identifier, and `SIGNING_IDENTITY` is set to signing identity that you want to use to sign the app which can be obtained by running `security find-identity -v -p codesigning` in a terminal:
 ```
 sudo xcode-select --switch "/Applications/Xcode.app"
 make CC="$(xcrun --sdk iphoneos --find g++)" SDK="$(xcrun --sdk iphoneos --show-sdk-path)" PROVISIONING_PROFILE="~/Desktop/embedded.mobileprovision" SIGNING_IDENTITY="4FAF7C8AC62BBAEE46ACF3E761B54F557D93974B" EDGE_BITS=31
 ```
 The resulting ipa file can be ran by installing it on an iPhone and running it.
 
-This program can also be built for and ran with Xcode's iOS simulator with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+This program can also be built for and ran with Xcode's iOS simulator by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 sudo xcode-select --switch "/Applications/Xcode.app"
 make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)" EDGE_BITS=31
@@ -41,14 +41,14 @@ make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesim
 ```
 
 #### Windows
-After downloading [MinGW-w64](https://winlibs.com/#download-release), extracting its contents, and adding its `mingw64/bin` folder to your `PATH` environment variable, this program can be built and ran with Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+After downloading [MinGW-w64](https://winlibs.com/#download-release), extracting its contents, and adding its `mingw64/bin` folder to your `PATH` environment variable, this program can be built and ran with Windows by running the following commands in a command prompt from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 mingw32-make EDGE_BITS=31
 mingw32-make run
 ```
 
 #### Android
-After installing [Android Studio](https://developer.android.com/studio) and [Android NDK](https://developer.android.com/ndk), this program can be built for and ran with Android with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `CC` is set to the location of the Android NDK compiler that you want to use which is also used to determine the Android ABI and minimum API level to use, `BUILD_TOOLS` is set to the location of the Android SDK build tools that you want to use, `ANDROID_JAR` is set to the location of the Android Java library that you want to use, `JBR_BIN` is set to the location of an Android JetBrains Runtime, and `ADB` is set to the location of an Android ADB platform tool:
+After installing [Android Studio](https://developer.android.com/studio) and [Android NDK](https://developer.android.com/ndk), this program can be built for and ran with Android by running the following commands in a terminal or command prompt from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `CC` is set to the location of the Android NDK compiler that you want to use which is also used to determine the Android ABI and minimum API level to use, `BUILD_TOOLS` is set to the location of the Android SDK build tools that you want to use, `ANDROID_JAR` is set to the location of the Android Java library that you want to use, `JBR_BIN` is set to the location of an Android JetBrains Runtime, and `ADB` is set to the location of an Android ADB platform tool:
 
 If using Linux:
 ```
@@ -70,7 +70,7 @@ If using Windows:
 ```
 
 #### Cross-compiling for Windows
-This program can be built with Linux for Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+This program can be built with Linux for Windows by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 sudo apt install make g++-mingw-w64 coreutils
 make CC=x86_64-w64-mingw32-g++-posix EDGE_BITS=31
