@@ -3,6 +3,8 @@
 ### Description
 Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean, slean, and lean edge trimming on the GPU using OpenCL and Metal. It can be used to mine MimbleWimble Coin (MWC) and MimbleWimble Coin-like cryptocurrencies, and it can run on Linux, macOS, iOS, Windows, and Android.
 
+Since this program uses OpenCL v1.2 and Metal v3.0, it should be compatible with nearly every GPU released since 2015.
+
 ### Building
 If you're building this program for a desktop operating system then it's recommended that you build this program on the same system that you'll be running it on since it uses the `-march=native` and `-mtune=native` compiler flags to optimize itself for the current system's available features. Because of this, I don't recommend using the prebuilt versions of this program for desktop operating systems.
 
