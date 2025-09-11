@@ -9,7 +9,7 @@ If you're building this program for a desktop operating system then it's recomme
 #### Linux
 This program can be built and ran with Linux with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev coreutils
+sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev
 make EDGE_BITS=31
 make run
 ```
@@ -41,7 +41,7 @@ make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesim
 ```
 
 #### Windows
-After installing [MinGW-w64](https://winlibs.com), this program can be built and ran with Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+After downloading [MinGW-w64](https://winlibs.com/#download-release), extracting its contents, and adding its `mingw64/bin` folder to your `PATH` environment variable, this program can be built and ran with Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 mingw32-make EDGE_BITS=31
 mingw32-make run
@@ -72,8 +72,7 @@ If using Windows:
 #### Cross-compiling for Windows
 This program can be built with Linux for Windows with the following commands where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-sudo apt install make g++-mingw-w64 cmake coreutils wget tar
-make CC=x86_64-w64-mingw32-g++-posix crossCompilingDependencies
+sudo apt install make g++-mingw-w64 coreutils
 make CC=x86_64-w64-mingw32-g++-posix EDGE_BITS=31
 ```
 
