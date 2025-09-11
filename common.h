@@ -88,6 +88,9 @@ static_assert(sizeof(uint64_t __attribute__((vector_size(8)))) == sizeof(uint64_
 // Decimal number base
 #define DECIMAL_NUMBER_BASE 10
 
+// Bitmap unit width
+#define BITMAP_UNIT_WIDTH (sizeof(uint64_t) * BITS_IN_A_BYTE)
+
 // Edges bitmap size
 #define EDGES_BITMAP_SIZE (NUMBER_OF_EDGES / BITMAP_UNIT_WIDTH)
 

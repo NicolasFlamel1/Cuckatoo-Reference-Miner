@@ -95,7 +95,6 @@
 #include <thread>
 #include "./main.h"
 #include "./common.h"
-#include "./bitmap.h"
 #include "./blake2b.h"
 #include "./hash_table.h"
 #include "./siphash.h"
@@ -1484,7 +1483,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 		
 		// Go through all searching threads
 		thread searchingThreads[numberOfSearchingThreads];
-		uint64_t numberOfEdges[numberOfSearchingThreads];
 		barrier searchingThreadsBarrier(numberOfSearchingThreads);
 		const unique_ptr<uint32_t[]> edges(new(nothrow) uint32_t[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS]);
 		unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreadsSearchingEdges];
@@ -1502,7 +1500,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 			}
 			
 			// Create searching thread
-			searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &numberOfEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
+			searchingThreads[i] = thread([numberOfApplicableCpuCores, firstThreadIndex, numberOfSearchingThreads, numberOfSearchingThreadsSearchingEdges, &searchingThreadsBarrier, edges = edges.get(), nodeConnections = nodeConnections[min(i, numberOfSearchingThreadsSearchingEdges - 1)].get(), &numberOfSearchingThreadsFinished, &closeSearchingThreads, &searchingThreadsInitializedSuccessfully, searchingThreadIndex = i]() noexcept {
 			
 				// Check if using an Apple device and not using macOS or using Android
 				unique_lock lock(searchingThreadsMutex);
@@ -1581,38 +1579,14 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 					}
 					
 					// Go through all of the searching thread's units in the edges bitmap
-					numberOfEdges[searchingThreadIndex] = 0;
+					uint64_t edgeIndex = bitmapStart * BITMAP_UNIT_WIDTH * EDGE_NUMBER_OF_COMPONENTS;
 					for(uint_fast32_t bitmapIndex = bitmapStart; bitmapIndex < bitmapEnd; ++bitmapIndex) {
 					
-						// Add number of set bits in the unit to the searching thread's number of edges
-						numberOfEdges[searchingThreadIndex] += __builtin_popcountll(reinterpret_cast<const uint64_t *>(searchingThreadsData)[bitmapIndex]);
-					}
-					
-					// Wait for all searching threads to finish counting the number of edges in their units
-					searchingThreadsBarrier.arrive_and_wait();
-					
-					// Check if not the first searching thread
-					uint64_t firstEdge = 0;
-					if(searchingThreadIndex) {
-					
-						// Go through all previous searching threads
-						for(unsigned int previousSearchingThreadIndex = searchingThreadIndex; previousSearchingThreadIndex; --previousSearchingThreadIndex) {
-						
-							// Add previous searching thread's number of edges to first edge
-							firstEdge += numberOfEdges[previousSearchingThreadIndex - 1];
-						}
-					}
-					
-					// Go through all of the searching thread's units in the edges bitmap
-					uint64_t edgeIndex = firstEdge * EDGE_NUMBER_OF_COMPONENTS;
-					for(uint_fast32_t bitmapIndex = bitmapStart; bitmapIndex < bitmapEnd; ++bitmapIndex) {
-					
-						// Go through all set bits in the unit
-						uint64_t unit = reinterpret_cast<const uint64_t *>(searchingThreadsData)[bitmapIndex];
-						for(uint_fast8_t unitCurrentBitIndex = __builtin_ffsll(unit), unitPreviousBitIndex = 0; unitCurrentBitIndex; unit >>= unitCurrentBitIndex, unitPreviousBitIndex += unitCurrentBitIndex, unitCurrentBitIndex = __builtin_ffsll(unit)) {
+						// Go through all bits in the unit
+						for(uint_fast8_t i = 0; i < BITMAP_UNIT_WIDTH; ++i) {
 						
 							// Set edge's index
-							edges[edgeIndex] = bitmapIndex * BITMAP_UNIT_WIDTH + (unitCurrentBitIndex - 1) + unitPreviousBitIndex;
+							edges[edgeIndex] = bitmapIndex * BITMAP_UNIT_WIDTH + i;
 							
 							// Set edge's nodes
 							const uint64_t __attribute__((vector_size(sizeof(uint64_t) * 2))) nonces = {static_cast<uint64_t>(edges[edgeIndex]) * 2, (static_cast<uint64_t>(edges[edgeIndex]) * 2) | 1};
@@ -1623,22 +1597,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 							
 							// Go to next edge
 							edgeIndex += EDGE_NUMBER_OF_COMPONENTS;
-							
-							// Check if shifting by the entire unit
-							if(unitCurrentBitIndex == BITMAP_UNIT_WIDTH) {
-							
-								// Break
-								break;
-							}
 						}
-					}
-					
-					// Go through all next searching threads
-					uint64_t totalNumberOfEdges = firstEdge + numberOfEdges[searchingThreadIndex];
-					for(unsigned int nextSearchingThreadIndex = searchingThreadIndex + 1; nextSearchingThreadIndex < numberOfSearchingThreads; ++nextSearchingThreadIndex) {
-					
-						// Add next searching thread's number of edges to total number of edges
-						totalNumberOfEdges += numberOfEdges[nextSearchingThreadIndex];
 					}
 					
 					// Wait for all searching threads to finish getting the edges in their units
@@ -1651,7 +1610,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 						if(searchingThreadIndex) {
 						
 							// Set first searching edges
-							const uint64_t firstSearchingEdge = (1 - 1 / pow(2, searchingThreadIndex - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT));
+							const uint64_t firstSearchingEdge = (1 - 1 / pow(2, searchingThreadIndex - 1)) * NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(NUMBER_OF_EDGES * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT));
 							
 							// Go through all previous edges
 							for(uint64_t nodeConnectionsIndex = 0, edgesIndex = 0; nodeConnectionsIndex < firstSearchingEdge * 2; nodeConnectionsIndex += 2, edgesIndex += EDGE_NUMBER_OF_COMPONENTS) {
@@ -1665,7 +1624,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 							
 							// Check if getting solution was successful
 							uint32_t solution[SOLUTION_SIZE];
-							if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
+							if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(NUMBER_OF_EDGES * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
 							
 								// Lock
 								lock.lock();
@@ -1683,7 +1642,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 						
 							// Check if getting solution was successful
 							uint32_t solution[SOLUTION_SIZE];
-							if(getCuckatooSolution(solution, nodeConnections, edges, ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)))) {
+							if(getCuckatooSolution(solution, nodeConnections, edges, ceil(NUMBER_OF_EDGES * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)))) {
 							
 								// Lock
 								lock.lock();
@@ -1732,9 +1691,8 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 			return searchingThreadsFinished;
 		});
 		
-		// Check if searching threads didn't initialized successfully or creating edges bitmap failed
-		Bitmap<NUMBER_OF_EDGES> edgesBitmap;
-		if(!searchingThreadsInitializedSuccessfully || !edgesBitmap) {
+		// Check if searching threads didn't initialized successfully
+		if(!searchingThreadsInitializedSuccessfully) {
 		
 			// Display message
 			cout << "Allocating memory failed." << endl;
@@ -1743,14 +1701,11 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 		// Otherwise
 		else {
 		
-			// Set previous graph processed time to now
-			previousGraphProcessedTime = chrono::high_resolution_clock::now();
-			
-			// Enable all edges in edges bitmap
-			edgesBitmap.setAllBits();
-			
 			// Display message
 			cout << "Mining started." << endl;
+			
+			// Set previous graph processed time to now
+			previousGraphProcessedTime = chrono::high_resolution_clock::now();
 			
 			// While not closing
 			while(!closing) {
@@ -1760,7 +1715,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 				blake2b(sipHashKeys, jobHeader, jobNonce);
 				
 				// Trimming finished
-				trimmingFinished(edgesBitmap.getBuffer(), sipHashKeys, jobHeight, jobId, jobNonce++);
+				trimmingFinished(nullptr, sipHashKeys, jobHeight, jobId, jobNonce++);
 			}
 		}
 		
@@ -1780,8 +1735,8 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 		// Lock searching threads lock
 		searchingThreadsLock.lock();
 		
-		// Return if searching threads initialized successfully and creating edges bitmap was successful
-		return searchingThreadsInitializedSuccessfully && edgesBitmap;
+		// Return if searching threads initialized successfully
+		return searchingThreadsInitializedSuccessfully;
 		
 	// Otherwise
 	#else

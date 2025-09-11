@@ -57,22 +57,9 @@ static inline bool searchNodeConnectionsForCuckatooSolutionSecondPartition(const
 // Initialize cuckatoo thread local global variables
 bool initializeCuckatooThreadLocalGlobalVariables() noexcept {
 
-	// Check if creating thread local global variables failed
-	if(!cuckatooUNewestNodeConnections || !cuckatooVNewestNodeConnections || !cuckatooUVisitedNodePairs || !cuckatooVVisitedNodePairs) {
-	
-		// Return false
-		return false;
-	}
-	
-	// Reset thread local global variables
-	cuckatooUNewestNodeConnections.clear();
-	cuckatooVNewestNodeConnections.clear();
-	cuckatooUVisitedNodePairs.clear();
-	cuckatooVVisitedNodePairs.clear();
+	// Return if creating thread local global variables was successful
 	cuckatooRootNode = 0;
-	
-	// Retrn true
-	return true;
+	return cuckatooUNewestNodeConnections && cuckatooVNewestNodeConnections && cuckatooUVisitedNodePairs && cuckatooVVisitedNodePairs;
 }
 
 // Get cuckatoo solution

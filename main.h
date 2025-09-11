@@ -33,7 +33,7 @@ class RedirectCout final : public streambuf {
 	public:
 	
 		// Constructor
-		explicit RedirectCout(const function<void(const char)> &callback) noexcept;
+		explicit RedirectCout(const function<void(const char)> &__restrict__ callback) noexcept;
 		
 		// Destructor
 		~RedirectCout() noexcept;
