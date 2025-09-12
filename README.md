@@ -1,7 +1,7 @@
 # Cuckatoo Reference Miner
 
 ### Description
-Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean, slean, and lean edge trimming on the GPU using OpenCL and Metal. It can be used to mine MimbleWimble Coin (MWC) and MimbleWimble Coin-like cryptocurrencies, and it can run on Linux, macOS, iOS, Windows, and Android.
+Cuckatoo miner that supports cuckatoo10 to cuckatoo32 and implements mean, slean, and lean edge trimming on the GPU using OpenCL and Metal. It can be used to mine MimbleWimble Coin (MWC) and MimbleWimble Coin-like cryptocurrencies, and it can run on Linux, macOS, iOS, Windows, Android, and FreeBSD.
 
 Since this program uses OpenCL v1.2 and Metal v3.0, it should be compatible with nearly every GPU released since 2015.
 
@@ -11,7 +11,7 @@ If you're building this program for a desktop operating system then it's recomme
 #### Linux
 This program can be built and ran with Linux by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev coreutils
+sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev coreutils pkg-config
 make EDGE_BITS=31
 make run
 ```
@@ -75,6 +75,14 @@ If using Windows with an MSYS shell:
 ```
 "$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android29-clang++" BUILD_TOOLS="$LOCALAPPDATA\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="$LOCALAPPDATA\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="$PROGRAMFILES\Android\Android Studio\jbr\bin" ADB="$LOCALAPPDATA\Android\Sdk\platform-tools\adb" EDGE_BITS=31
 "$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android29-clang++" BUILD_TOOLS="$LOCALAPPDATA\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="$LOCALAPPDATA\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="$PROGRAMFILES\Android\Android Studio\jbr\bin" ADB="$LOCALAPPDATA\Android\Sdk\platform-tools\adb" run
+```
+
+### FreeBSD
+This program can be built and ran with FreeBSD by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+```
+pkg install gmake c++ OpenCL ocl-icd libdbus coreutils pkgconf
+gmake CC=c++ EDGE_BITS=31
+gmake CC=c++ run
 ```
 
 #### Cross-compiling for Windows

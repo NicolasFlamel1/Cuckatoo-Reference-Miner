@@ -248,20 +248,31 @@ else
 	
 	# Link libstdc++, OpenCL, and D-Bus
 	CFLAGS += -march=native -mtune=native `pkg-config --cflags dbus-1`
-	LIBS += -lstdc++ `pkg-config --libs dbus-1`
+	LIBS += -lstdc++ -lpthread `pkg-config --libs dbus-1`
 	
-	# Check if static OpenCL library exists
-	ifneq (,$(wildcard ./opencl_loader/dist/linux/$(shell arch)/lib/libOpenCL.a))
+	# Check if compiling for FreeBSD
+	ifeq ($(shell uname),FreeBSD)
 	
-		# Statically link to OpenCL library
-		CFLAGS += -I"./opencl_headers"
-		LIBS += -Wl,-Bstatic -L"./opencl_loader/dist/linux/$(shell arch)/lib" -lOpenCL -Wl,-Bdynamic
+		# Set flags and link libraries
+		CFLAGS += -I"/usr/local/include"
+		LIBS += -lOpenCL
 		
 	# Otherwise
 	else
 	
-		# Dynamically link to OpenCL library
-		LIBS += -lOpenCL
+		# Check if static OpenCL library exists
+		ifneq (,$(wildcard ./opencl_loader/dist/linux/$(shell arch)/lib/libOpenCL.a))
+		
+			# Statically link to OpenCL library
+			CFLAGS += -I"./opencl_headers"
+			LIBS += -Wl,-Bstatic -L"./opencl_loader/dist/linux/$(shell arch)/lib" -lOpenCL -Wl,-Bdynamic
+			
+		# Otherwise
+		else
+		
+			# Dynamically link to OpenCL library
+			LIBS += -lOpenCL
+		endif
 	endif
 	
 	# Delete command

@@ -71,8 +71,17 @@
 	#include <arpa/inet.h>
 	#include <CL/cl.h>
 	#include <netdb.h>
+	#include <netinet/in.h>
 	#include <poll.h>
+	#include <sys/socket.h>
 	#include <unistd.h>
+	
+	// Check if using FreeBSD
+	#ifdef __FreeBSD__
+	
+		// Header files
+		#include <pthread_np.h>
+	#endif
 	
 	// Check if not using Android
 	#ifndef __ANDROID__
