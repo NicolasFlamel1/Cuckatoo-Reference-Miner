@@ -82,7 +82,7 @@ else ifeq ($(OS),Windows_NT)
 	CFLAGS += -march=native -mtune=native -static-libstdc++ -static-libgcc -I"./opencl_headers"
 	LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32
 	
-	# Check if Windows provided OpenCL library
+	# Check if Windows provides OpenCL library
 	ifneq (,$(wildcard $(shell echo %SYSTEMROOT%)\System32\OpenCL.dll))
 	
 		# Dynamically link to OpenCL library provided by Windows
