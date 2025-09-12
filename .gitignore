@@ -5,11 +5,10 @@ Cuckatoo Reference Miner.app
 libCuckatoo_Reference_Miner.so
 Cuckatoo Reference Miner.apk
 Cuckatoo Reference Miner.apk.idsig
-v2024.10.24.tar.gz
-OpenCL-Headers-2024.10.24
-OpenCL-ICD-Loader-2024.10.24
-opencl_loader_cross_compiling
-metal-cpp_macOS15.2_iOS18.2.zip
+v2025.07.22.tar.gz
+OpenCL-Headers-2025.07.22
+OpenCL-ICD-Loader-2025.07.22
+metal-cpp_macOS26_iOS26-beta2.zip
 metal-cpp
 Payload
 build

@@ -80,22 +80,10 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 		// Perform column step
 		blake2bStep(a, b, c, d, x, y);
 		
-		// Check if using Clang
-		#ifdef __clang__
-		
-			// Update b, c, and d for diagonal step
-			b = __builtin_shufflevector(b, b, 1, 2, 3, 0);
-			c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
-			d = __builtin_shufflevector(d, d, 3, 0, 1, 2);
-		
-		// Otherwise
-		#else
-		
-			// Update b, c, and d for diagonal step
-			b = __builtin_shuffle(b, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){1, 2, 3, 0});
-			c = __builtin_shuffle(c, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){2, 3, 0, 1});
-			d = __builtin_shuffle(d, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){3, 0, 1, 2});
-		#endif
+		// Update b, c, and d for diagonal step
+		b = __builtin_shufflevector(b, b, 1, 2, 3, 0);
+		c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
+		d = __builtin_shufflevector(d, d, 3, 0, 1, 2);
 		
 		// Set x, and y for diagonal step
 		x = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){buffer[BLAKE2B_SIGMA[i][8]], buffer[BLAKE2B_SIGMA[i][10]], buffer[BLAKE2B_SIGMA[i][12]], buffer[BLAKE2B_SIGMA[i][14]]};
@@ -104,22 +92,10 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 		// Perform diagonal step
 		blake2bStep(a, b, c, d, x, y);
 		
-		// Check if using Clang
-		#ifdef __clang__
-		
-			// Update b, c, and d for column step
-			b = __builtin_shufflevector(b, b, 3, 0, 1, 2);
-			c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
-			d = __builtin_shufflevector(d, d, 1, 2, 3, 0);
-		
-		// Otherwise
-		#else
-		
-			// Update b, c, and d for column step
-			b = __builtin_shuffle(b, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){3, 0, 1, 2});
-			c = __builtin_shuffle(c, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){2, 3, 0, 1});
-			d = __builtin_shuffle(d, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){1, 2, 3, 0});
-		#endif
+		// Update b, c, and d for column step
+		b = __builtin_shufflevector(b, b, 3, 0, 1, 2);
+		c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
+		d = __builtin_shufflevector(d, d, 1, 2, 3, 0);
 	}
 	
 	// Check if using Windows
@@ -181,22 +157,10 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 			// Perform column step
 			blake2bStep(a, b, c, d, x, y);
 			
-			// Check if using Clang
-			#ifdef __clang__
-			
-				// Update b, c, and d for diagonal step
-				b = __builtin_shufflevector(b, b, 1, 2, 3, 0);
-				c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
-				d = __builtin_shufflevector(d, d, 3, 0, 1, 2);
-			
-			// Otherwise
-			#else
-			
-				// Update b, c, and d for diagonal step
-				b = __builtin_shuffle(b, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){1, 2, 3, 0});
-				c = __builtin_shuffle(c, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){2, 3, 0, 1});
-				d = __builtin_shuffle(d, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){3, 0, 1, 2});
-			#endif
+			// Update b, c, and d for diagonal step
+			b = __builtin_shufflevector(b, b, 1, 2, 3, 0);
+			c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
+			d = __builtin_shufflevector(d, d, 3, 0, 1, 2);
 			
 			// Set x, and y for diagonal step
 			x = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){buffer[BLAKE2B_SIGMA[i][8]], buffer[BLAKE2B_SIGMA[i][10]], buffer[BLAKE2B_SIGMA[i][12]], buffer[BLAKE2B_SIGMA[i][14]]};
@@ -205,22 +169,10 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 			// Perform diagonal step
 			blake2bStep(a, b, c, d, x, y);
 			
-			// Check if using Clang
-			#ifdef __clang__
-			
-				// Update b, c, and d for column step
-				b = __builtin_shufflevector(b, b, 3, 0, 1, 2);
-				c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
-				d = __builtin_shufflevector(d, d, 1, 2, 3, 0);
-			
-			// Otherwise
-			#else
-			
-				// Update b, c, and d for column step
-				b = __builtin_shuffle(b, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){3, 0, 1, 2});
-				c = __builtin_shuffle(c, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){2, 3, 0, 1});
-				d = __builtin_shuffle(d, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){1, 2, 3, 0});
-			#endif
+			// Update b, c, and d for column step
+			b = __builtin_shufflevector(b, b, 3, 0, 1, 2);
+			c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
+			d = __builtin_shufflevector(d, d, 1, 2, 3, 0);
 		}
 		
 		// Set buffer to end of header
@@ -251,22 +203,10 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 		// Perform column step
 		blake2bStep(a, b, c, d, x, y);
 		
-		// Check if using Clang
-		#ifdef __clang__
-		
-			// Update b, c, and d for diagonal step
-			b = __builtin_shufflevector(b, b, 1, 2, 3, 0);
-			c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
-			d = __builtin_shufflevector(d, d, 3, 0, 1, 2);
-		
-		// Otherwise
-		#else
-		
-			// Update b, c, and d for diagonal step
-			b = __builtin_shuffle(b, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){1, 2, 3, 0});
-			c = __builtin_shuffle(c, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){2, 3, 0, 1});
-			d = __builtin_shuffle(d, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){3, 0, 1, 2});
-		#endif
+		// Update b, c, and d for diagonal step
+		b = __builtin_shufflevector(b, b, 1, 2, 3, 0);
+		c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
+		d = __builtin_shufflevector(d, d, 3, 0, 1, 2);
 		
 		// Set x, and y for diagonal step
 		x = (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){buffer[BLAKE2B_SIGMA[i][8]], buffer[BLAKE2B_SIGMA[i][10]], buffer[BLAKE2B_SIGMA[i][12]], buffer[BLAKE2B_SIGMA[i][14]]};
@@ -275,22 +215,10 @@ void blake2b(uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMP
 		// Perform diagonal step
 		blake2bStep(a, b, c, d, x, y);
 		
-		// Check if using Clang
-		#ifdef __clang__
-		
-			// Update b, c, and d for column step
-			b = __builtin_shufflevector(b, b, 3, 0, 1, 2);
-			c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
-			d = __builtin_shufflevector(d, d, 1, 2, 3, 0);
-		
-		// Otherwise
-		#else
-		
-			// Update b, c, and d for column step
-			b = __builtin_shuffle(b, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){3, 0, 1, 2});
-			c = __builtin_shuffle(c, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){2, 3, 0, 1});
-			d = __builtin_shuffle(d, (const uint64_t __attribute__((vector_size(sizeof(uint64_t) * BLAKE2B_COMPONENTS_PER_VECTOR)))){1, 2, 3, 0});
-		#endif
+		// Update b, c, and d for column step
+		b = __builtin_shufflevector(b, b, 3, 0, 1, 2);
+		c = __builtin_shufflevector(c, c, 2, 3, 0, 1);
+		d = __builtin_shufflevector(d, d, 1, 2, 3, 0);
 	}
 	
 	// Get result from working state

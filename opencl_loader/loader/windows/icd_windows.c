@@ -111,8 +111,8 @@ static WinLayer* pWinLayerCapacity;
 
 static int __cdecl compareLayer(const void *a, const void *b)
 {
-    return ((WinLayer *)a)->priority < ((WinLayer *)b)->priority ? -1 :
-           ((WinLayer *)a)->priority > ((WinLayer *)b)->priority ? 1 : 0;
+    return ((const WinLayer *)a)->priority < ((const WinLayer *)b)->priority ? -1 :
+           ((const WinLayer *)a)->priority > ((const WinLayer *)b)->priority ? 1 : 0;
 }
 
 static BOOL layerAdd(const char* szName, DWORD priority)
@@ -281,7 +281,7 @@ BOOL CALLBACK khrIcdOsVendorsEnumerate(PINIT_ONCE InitOnce, PVOID Parameter, PVO
     if (hDXGI)
     {
         IDXGIFactory* pFactory = NULL;
-        PFN_CREATE_DXGI_FACTORY pCreateDXGIFactory = (PFN_CREATE_DXGI_FACTORY)GetProcAddress(hDXGI, "CreateDXGIFactory");
+        PFN_CREATE_DXGI_FACTORY pCreateDXGIFactory = (PFN_CREATE_DXGI_FACTORY)(void*)GetProcAddress(hDXGI, "CreateDXGIFactory");
         if (pCreateDXGIFactory)
         {
             HRESULT hr = pCreateDXGIFactory(&IID_IDXGIFactory, (void **)&pFactory);
