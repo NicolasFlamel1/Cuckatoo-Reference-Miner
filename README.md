@@ -11,7 +11,7 @@ If you're building this program for a desktop operating system then it's recomme
 #### Linux
 This program can be built and ran with Linux by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev coreutils pkg-config
+sudo apt install make g++ coreutils pkg-config opencl-headers ocl-icd-opencl-dev libdbus-1-dev
 make EDGE_BITS=31
 make run
 ```
@@ -77,10 +77,10 @@ If using Windows with an MSYS shell:
 "$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android29-clang++" BUILD_TOOLS="$LOCALAPPDATA\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="$LOCALAPPDATA\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="$PROGRAMFILES\Android\Android Studio\jbr\bin" ADB="$LOCALAPPDATA\Android\Sdk\platform-tools\adb" run
 ```
 
-### FreeBSD
+#### FreeBSD
 This program can be built and ran with FreeBSD by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-pkg install gmake c++ OpenCL ocl-icd libdbus coreutils pkgconf
+pkg install gmake pkgconf OpenCL ocl-icd dbus
 gmake CC=c++ EDGE_BITS=31
 gmake CC=c++ run
 ```
