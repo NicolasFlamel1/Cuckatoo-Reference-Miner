@@ -11,7 +11,7 @@ If you're building this program for a desktop operating system then it's recomme
 #### Linux
 This program can be built and ran with Linux by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
-sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev
+sudo apt install make g++ opencl-headers ocl-icd-opencl-dev libdbus-1-dev coreutils
 make EDGE_BITS=31
 make run
 ```
@@ -43,14 +43,14 @@ make CC="$(xcrun --sdk iphonesimulator --find g++)" SDK="$(xcrun --sdk iphonesim
 ```
 
 #### Windows
-After downloading [MinGW-w64](https://winlibs.com/#download-release), extracting its contents, and adding its `mingw64/bin` folder to your `PATH` environment variable, this program can be built and ran with Windows by running the following commands in a command prompt from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
+After downloading [MinGW-w64](https://winlibs.com/#download-release), extracting its contents, and adding its `mingw64/bin` folder to your `PATH` environment variable, this program can be built and ran with Windows by running the following commands in a command prompt or MSYS shell from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 mingw32-make EDGE_BITS=31
 mingw32-make run
 ```
 
 #### Android
-After installing [Android Studio](https://developer.android.com/studio) and [Android NDK](https://developer.android.com/ndk), this program can be built for and ran with Android by running the following commands in a terminal or command prompt from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `CC` is set to the location of the Android NDK compiler that you want to use which is also used to determine the Android ABI and minimum API level to use, `BUILD_TOOLS` is set to the location of the Android SDK build tools that you want to use, `ANDROID_JAR` is set to the location of the Android Java library that you want to use, `JBR_BIN` is set to the location of an Android JetBrains Runtime, and `ADB` is set to the location of an Android ADB platform tool:
+After installing [Android Studio](https://developer.android.com/studio) and [Android NDK](https://developer.android.com/ndk), this program can be built for and ran with Android by running the following commands in a terminal, command prompt, or MSYS shell from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31), `CC` is set to the location of the Android NDK compiler that you want to use which is also used to determine the Android ABI and minimum API level to use, `BUILD_TOOLS` is set to the location of the Android SDK build tools that you want to use, `ANDROID_JAR` is set to the location of the Android Java library that you want to use, `JBR_BIN` is set to the location of an Android JetBrains Runtime, and `ADB` is set to the location of an Android ADB platform tool:
 
 If using Linux:
 ```
@@ -65,10 +65,16 @@ If using macOS:
 ~/Library/Android/sdk/ndk/29.0.13113456/prebuilt/darwin-x86_64/bin/make CC="~/Library/Android/sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android29-clang++" BUILD_TOOLS="~/Library/Android/Sdk/build-tools/36.0.0" ANDROID_JAR="~/Library/Android/Sdk/platforms/android-35/android.jar" JBR_BIN="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin" ADB="~/Library/Android/Sdk/platform-tools/adb" run
 ```
 
-If using Windows:
+If using Windows with a command prompt:
 ```
 "%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android29-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" EDGE_BITS=31
 "%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="%LOCALAPPDATA%\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android29-clang++" BUILD_TOOLS="%LOCALAPPDATA%\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="%LOCALAPPDATA%\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="%PROGRAMFILES%\Android\Android Studio\jbr\bin" ADB="%LOCALAPPDATA%\Android\Sdk\platform-tools\adb" run
+```
+
+If using Windows with an MSYS shell:
+```
+"$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android29-clang++" BUILD_TOOLS="$LOCALAPPDATA\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="$LOCALAPPDATA\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="$PROGRAMFILES\Android\Android Studio\jbr\bin" ADB="$LOCALAPPDATA\Android\Sdk\platform-tools\adb" EDGE_BITS=31
+"$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\prebuilt\windows-x86_64\bin\make" CC="$LOCALAPPDATA\Android\Sdk\ndk\29.0.13113456\toolchains\llvm\prebuilt\windows-x86_64\bin\aarch64-linux-android29-clang++" BUILD_TOOLS="$LOCALAPPDATA\Android\Sdk\build-tools\36.0.0" ANDROID_JAR="$LOCALAPPDATA\Android\Sdk\platforms\android-35\android.jar" JBR_BIN="$PROGRAMFILES\Android\Android Studio\jbr\bin" ADB="$LOCALAPPDATA\Android\Sdk\platform-tools\adb" run
 ```
 
 #### Cross-compiling for Windows
