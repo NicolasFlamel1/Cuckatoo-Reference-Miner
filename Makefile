@@ -246,7 +246,7 @@ else
 	# Run command
 	RUN_COMMAND = "./$(PROGRAM_NAME)"
 	
-	# Link libstdc++, OpenCL, and D-Bus
+	# Set flags and link libraries
 	CFLAGS += -march=native -mtune=native `pkg-config --cflags dbus-1`
 	LIBS += -lstdc++ -lpthread `pkg-config --libs dbus-1`
 	

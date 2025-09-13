@@ -1920,9 +1920,6 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 		
 			// Display message
 			cout << (trimmingTypeDisplay ? "," : "") << " lean";
-			
-			// Set trimming type displayed to true
-			trimmingTypeDisplay = true;
 		}
 		
 		// Display new line
@@ -3573,6 +3570,19 @@ void stopMiner() noexcept {
 						break;
 					}
 					
+					// Check if invalid response was received
+					if(memchr(&serverResponse[totalReceived], '\0', received)) {
+					
+						// Display message
+						cout << "Received invalid response from the stratum server." << endl;
+						
+						// Set reconnect to server to true
+						reconnectToServer = true;
+						
+						// Break
+						break;
+					}
+					
 					// Check if full response wasn't received
 					if(!memchr(&serverResponse[totalReceived], '\n', received)) {
 					
@@ -4104,6 +4114,16 @@ void stopMiner() noexcept {
 								return false;
 							}
 							
+							// Check if invalid response was received
+							if(memchr(&serverResponse[totalReceived], '\0', received)) {
+							
+								// Display message
+								cout << "Received invalid response from the stratum server." << endl;
+								
+								// Return false
+								return false;
+							}
+							
 							// Check if full response wasn't received
 							if(!memchr(&serverResponse[totalReceived], '\n', received)) {
 							
@@ -4202,7 +4222,7 @@ void stopMiner() noexcept {
 		bool newJobFound = false;
 		
 		// Go through all complete parts of the server response
-		for(char *partStart = serverResponse, *partEnd = strchr(partStart, '\n'); partStart && partEnd; partStart = &partEnd[sizeof('\n')], partEnd = strchr(partStart, '\n')) {
+		for(char *partStart = serverResponse, *partEnd = strchr(partStart, '\n'); partEnd; partStart = &partEnd[sizeof('\n')], partEnd = strchr(partStart, '\n')) {
 		
 			// Null terminate the part
 			*partEnd = '\0';
@@ -4413,7 +4433,7 @@ void stopMiner() noexcept {
 		
 			// Check if receiving data from the stratum server failed
 			const decltype(function(recv))::result_type received = recv(socketDescriptor, &data[totalReceived], size - totalReceived - sizeof('\0'), 0);
-			if(received <= 0 || (static_cast<size_t>(received) == size - totalReceived - sizeof('\0') && !memchr(&data[totalReceived], '\n', received))) {
+			if(received <= 0 || memchr(&data[totalReceived], '\0', received) || (static_cast<size_t>(received) == size - totalReceived - sizeof('\0') && !memchr(&data[totalReceived], '\n', received))) {
 			
 				// Return false
 				return false;
