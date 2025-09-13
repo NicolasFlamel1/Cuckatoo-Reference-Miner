@@ -81,8 +81,8 @@ If using Windows with an MSYS shell:
 This program can be built and ran with FreeBSD by running the following commands in a terminal from the root of this project where `EDGE_BITS` is set to the cuckatoo variation that you want to use (e.g. `EDGE_BITS=31` for cuckatoo31):
 ```
 pkg install gmake pkgconf OpenCL ocl-icd dbus
-gmake CC=c++ EDGE_BITS=31
-gmake CC=c++ run
+gmake CC=clang++ EDGE_BITS=31
+gmake CC=clang++ run
 ```
 
 #### Cross-compiling for Windows
