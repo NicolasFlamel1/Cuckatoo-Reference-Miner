@@ -1,6 +1,6 @@
 # Parameters
 NAME = Cuckatoo Reference Miner
-VERSION = 0.3.0
+VERSION = 0.3.1
 EDGE_BITS = 31
 TRIMMING_ROUNDS = 90
 SLEAN_TRIMMING_PARTS = 2
@@ -253,19 +253,30 @@ else
 	# Check if compiling for FreeBSD
 	ifeq ($(shell uname),FreeBSD)
 	
-		# Set flags and link libraries
-		CFLAGS += -I"/usr/local/include"
-		LIBS += -lOpenCL
+		# Check if static OpenCL library exists
+		ifneq (,$(wildcard ./opencl_loader/dist/freebsd/$(shell uname -p)/lib/libOpenCL.a))
+		
+			# Statically link to OpenCL library
+			CFLAGS += -I"./opencl_headers"
+			LIBS += -Wl,-Bstatic -L"./opencl_loader/dist/freebsd/$(shell uname -p)/lib" -lOpenCL -Wl,-Bdynamic
+			
+		# Otherwise
+		else
+		
+			# Dynamically link to OpenCL library
+			CFLAGS += -I"/usr/local/include"
+			LIBS += -lOpenCL
+		endif
 		
 	# Otherwise
 	else
 	
 		# Check if static OpenCL library exists
-		ifneq (,$(wildcard ./opencl_loader/dist/linux/$(shell arch)/lib/libOpenCL.a))
+		ifneq (,$(wildcard ./opencl_loader/dist/linux/$(shell uname -p)/lib/libOpenCL.a))
 		
 			# Statically link to OpenCL library
 			CFLAGS += -I"./opencl_headers"
-			LIBS += -Wl,-Bstatic -L"./opencl_loader/dist/linux/$(shell arch)/lib" -lOpenCL -Wl,-Bdynamic
+			LIBS += -Wl,-Bstatic -L"./opencl_loader/dist/linux/$(shell uname -p)/lib" -lOpenCL -Wl,-Bdynamic
 			
 		# Otherwise
 		else
@@ -359,9 +370,33 @@ linuxDependencies:
 	wget "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/refs/tags/v2025.07.22.tar.gz"
 	tar -xf "./v2025.07.22.tar.gz"
 	mv "./OpenCL-ICD-Loader-2025.07.22" "./opencl_loader"
-	cd "./opencl_loader" && rm -f "./CMakeCache.txt" && cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/opencl_loader/dist/linux/i686" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DOPENCL_ICD_LOADER_HEADERS_DIR="$(CURDIR)/opencl_headers" -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_C_COMPILER="$(shell echo $(subst g++,gcc,$(CC)))" -DCMAKE_CXX_COMPILER="$(shell echo $(CC))" -DCMAKE_CXX_FLAGS="-m32" -DCMAKE_C_FLAGS="-m32" "./CMakeLists.txt" && make && make install && make clean
-	cd "./opencl_loader" && rm -f "./CMakeCache.txt" && cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/opencl_loader/dist/linux/x86_64" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DOPENCL_ICD_LOADER_HEADERS_DIR="$(CURDIR)/opencl_headers" -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_C_COMPILER="$(shell echo $(subst g++,gcc,$(CC)))" -DCMAKE_CXX_COMPILER="$(shell echo $(CC))" "./CMakeLists.txt" && make && make install && make clean
+	cd "./opencl_loader" && rm -f "./CMakeCache.txt" && cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/opencl_loader/dist/linux/i686" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DOPENCL_ICD_LOADER_HEADERS_DIR="$(CURDIR)/opencl_headers" -DCMAKE_C_COMPILER="$(shell echo $(subst g++,gcc,$(CC)))" -DCMAKE_CXX_COMPILER="$(shell echo $(CC))" -DCMAKE_CXX_FLAGS="-m32" -DCMAKE_C_FLAGS="-m32" "./CMakeLists.txt" && make && make install && make clean
+	cd "./opencl_loader" && rm -f "./CMakeCache.txt" && cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/opencl_loader/dist/linux/x86_64" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DOPENCL_ICD_LOADER_HEADERS_DIR="$(CURDIR)/opencl_headers" -DCMAKE_C_COMPILER="$(shell echo $(subst g++,gcc,$(CC)))" -DCMAKE_CXX_COMPILER="$(shell echo $(CC))" "./CMakeLists.txt" && make && make install && make clean
 	find "./opencl_loader/dist/linux" ! -name "libOpenCL.a" -type f -delete && find "./opencl_loader/dist/linux" -empty -type d -delete
+	tar -xf "./v2025.07.22.tar.gz"
+	rm "./v2025.07.22.tar.gz"
+	mv "./opencl_loader/dist" "./OpenCL-ICD-Loader-2025.07.22"
+	rm -r "./opencl_loader"
+	mv "./OpenCL-ICD-Loader-2025.07.22" "./opencl_loader"
+
+# Make FreeBSD dependencies (This command works when using FreeBSD: gmake CC=clang++ freeBsdDependencies)
+freeBsdDependencies:
+	
+	# OpenCL headers
+	rm -rf "./v2025.07.22.tar.gz" "./OpenCL-Headers-2025.07.22" "./opencl_headers"
+	wget "https://github.com/KhronosGroup/OpenCL-Headers/archive/refs/tags/v2025.07.22.tar.gz"
+	tar -xf "./v2025.07.22.tar.gz"
+	rm "./v2025.07.22.tar.gz"
+	mv "./OpenCL-Headers-2025.07.22" "./opencl_headers"
+	
+	# OpenCL loader
+	rm -rf "./OpenCL-ICD-Loader-2025.07.22" "./opencl_loader"
+	wget "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/refs/tags/v2025.07.22.tar.gz"
+	tar -xf "./v2025.07.22.tar.gz"
+	mv "./OpenCL-ICD-Loader-2025.07.22" "./opencl_loader"
+	cd "./opencl_loader" && rm -f "./CMakeCache.txt" && cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/opencl_loader/dist/freebsd/i386" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DOPENCL_ICD_LOADER_HEADERS_DIR="$(CURDIR)/opencl_headers" -DCMAKE_C_COMPILER="$(shell echo $(subst g++,g,$(CC)))" -DCMAKE_CXX_COMPILER="$(shell echo $(CC))" -DCMAKE_CXX_FLAGS="-m32" -DCMAKE_C_FLAGS="-m32" "./CMakeLists.txt" && make && make install && make clean
+	cd "./opencl_loader" && rm -f "./CMakeCache.txt" && cmake -DCMAKE_INSTALL_PREFIX="$(CURDIR)/opencl_loader/dist/freebsd/amd64" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DOPENCL_ICD_LOADER_HEADERS_DIR="$(CURDIR)/opencl_headers" -DCMAKE_C_COMPILER="$(shell echo $(subst g++,g,$(CC)))" -DCMAKE_CXX_COMPILER="$(shell echo $(CC))" "./CMakeLists.txt" && make && make install && make clean
+	find "./opencl_loader/dist/freebsd" ! -name "libOpenCL.a" -type f -delete && find "./opencl_loader/dist/freebsd" -empty -type d -delete
 	tar -xf "./v2025.07.22.tar.gz"
 	rm "./v2025.07.22.tar.gz"
 	mv "./opencl_loader/dist" "./OpenCL-ICD-Loader-2025.07.22"
