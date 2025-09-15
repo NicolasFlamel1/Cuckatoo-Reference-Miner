@@ -195,7 +195,7 @@ else ifneq (,$(findstring iPhoneSimulator,$(SDK)))
 	PROGRAM_NAME = $(NAME)
 	
 	# Run command
-	RUN_COMMAND = xcrun simctl install booted "./$(NAME).app" && xcrun simctl launch --console booted "com.$(subst $\ ,_,$(NAME))"
+	RUN_COMMAND = xcrun simctl install booted "./$(NAME).app" && xcrun simctl launch --console booted "com.$(subst $\ ,-,$(NAME))"
 	
 	# Set flags and link libraries
 	CFLAGS += -DUSE_OTHER_MAIN_FUNCTION -isysroot "$(shell echo $(SDK))" -mios-version-min=14 -fobjc-arc
@@ -209,7 +209,7 @@ else ifneq (,$(findstring iPhoneSimulator,$(SDK)))
 	NULL_LOCATION = "/dev/null"
 	
 	# Package command
-	PACKAGE_COMMAND = && rm -rf "./$(NAME).app" && mkdir "./$(NAME).app" && mv "./$(PROGRAM_NAME)" "./$(NAME).app" && echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n<key>CFBundleExecutable</key>\n<string>$(NAME)</string>\n<key>CFBundleName</key>\n<string>$(NAME)</string>\n<key>CFBundleIdentifier</key>\n<string>com.$(subst $\ ,_,$(NAME))</string>\n<key>CFBundleVersion</key>\n<string>$(VERSION)</string>\n<key>CFBundleShortVersionString</key>\n<string>$(VERSION)</string>\n<key>MinimumOSVersion</key>\n<string>14.0</string>\n<key>UILaunchScreen</key>\n<dict/>\n</dict>\n</plist>" > "./$(NAME).app/Info.plist"
+	PACKAGE_COMMAND = && rm -rf "./$(NAME).app" && mkdir "./$(NAME).app" && mv "./$(PROGRAM_NAME)" "./$(NAME).app" && echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n<key>CFBundleExecutable</key>\n<string>$(NAME)</string>\n<key>CFBundleName</key>\n<string>$(NAME)</string>\n<key>CFBundleIdentifier</key>\n<string>com.$(subst $\ ,-,$(NAME))</string>\n<key>CFBundleVersion</key>\n<string>$(VERSION)</string>\n<key>CFBundleShortVersionString</key>\n<string>$(VERSION)</string>\n<key>MinimumOSVersion</key>\n<string>14.0</string>\n<key>UILaunchScreen</key>\n<dict/>\n</dict>\n</plist>" > "./$(NAME).app/Info.plist"
 	
 # Otherwise check if compiling for macOS
 else ifeq ($(shell uname),Darwin)
