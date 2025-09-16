@@ -98,8 +98,12 @@ else ifeq ($(OS),Windows_NT)
 	RUN_COMMAND = "./$(PROGRAM_NAME)"
 	
 	# Set flags and link libraries
-	CFLAGS += -march=native -mtune=native -static-libstdc++ -static-libgcc -I"./opencl_headers"
-	LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32
+
+	#CFLAGS += -march=native -mtune=native -static-libstdc++ -static-libgcc -I"./opencl_headers"
+	CFLAGS += -march=native -mtune=native -static-libstdc++ -static-libgcc -I./opencl_headers -I/mingw64/include
+	#LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32 -lOpenCL
+	LIBS += -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lws2_32 -L/c/msys64/mingw64/lib -lOpenCL
+
 	
 	# Check if using MSYS shell
 	ifneq (,$(MSYSTEM))
@@ -292,6 +296,9 @@ else
 	# Null location
 	NULL_LOCATION = "/dev/null"
 endif
+
+# Default target
+all: make
 
 # Make
 make:

@@ -38,6 +38,7 @@
 	// Header files
 	#include <ws2tcpip.h>
 	#include <CL/cl.h>
+	#include <windows.h>
 	
 // Otherwise check if using an Apple device
 #elif defined __APPLE__
@@ -97,8 +98,10 @@
 #include <cinttypes>
 #include <condition_variable>
 #include <csignal>
+#include <cstdlib>
 #include <cstring>
 #include <getopt.h>
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <thread>
@@ -212,6 +215,11 @@ static bool searchingThreadsFinished;
 // Start searching threads trigger toggle
 static bool startSearchingThreadsTriggerToggle;
 
+// Share tracking
+static uint64_t acceptedShares = 0;
+static uint64_t rejectedShares = 0;
+static uint64_t staleShares = 0;
+
 // Start searching threads conditional variable
 static condition_variable *startSearchingThreadsConditionalVariable;
 
@@ -280,6 +288,9 @@ static uint8_t jobHeader[HEADER_SIZE] = {};
 // Job nonce
 static uint64_t jobNonce = 0;
 
+// Trimming time (set by trimming functions)
+double trimmingTime = 0.0;
+
 
 // Function prototypes
 
@@ -294,6 +305,9 @@ static inline void trimmingFinished(const void *__restrict__ data, const uint64_
 	
 	// Process server response
 	static inline bool processServerResponse() noexcept;
+	
+	// Process submit response
+	static inline void processSubmitResponse(const char *response) noexcept;
 	
 	// Send full
 	static inline bool sendFull(const char *data, size_t size) noexcept;
@@ -3365,48 +3379,24 @@ void stopMiner() noexcept {
 	// Record end time
 	const chrono::high_resolution_clock::time_point endTime = chrono::high_resolution_clock::now();
 	
-	// Display message
-	cout << endl << "Mining info:" << endl;
-	
 	// Get if is first graph
 	const bool isFirstGraph = !graphsProcessed;
 	
 	// Check if is first graph
-	static bool previouslyDisconnectedFromServer;
-	static bool previouslyWaitedForApplicableJobFromServer;
 	if(isFirstGraph) {
-	
-		// Set previously disconnected from server to false
-		previouslyDisconnectedFromServer = false;
-		
-		// Set previously waited for applicable job from server to false
-		previouslyWaitedForApplicableJobFromServer = false;
+		// Initialize static variables for first graph
 	}
-	
-	// Check if there's no trimming rounds
-	#if TRIMMING_ROUNDS == 0
-	
-		// Display message
-		cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (previouslyDisconnectedFromServer ? ". This is lower for this graph since it includes the time taken to reconnect to the stratum server" : (previouslyWaitedForApplicableJobFromServer ? ". This is lower for this graph since it includes the time taken to receive an applicable job from the stratum server" : "")) << endl;
-		
-	// Otherwise
-	#else
-	
-		// Display message
-		cout << "\tMining rate:\t " << (1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count()) << " graph(s)/second" << (graphsProcessed ? (previouslyDisconnectedFromServer ? ". This is lower for this graph since it includes the time taken to reconnect to the stratum server" : (previouslyWaitedForApplicableJobFromServer ? ". This is lower for this graph since it includes the time taken to receive an applicable job from the stratum server" : "")) : ". This is lower for the first graph since it includes the time taken to prime the pipeline") << endl;
-	#endif
+
+	// Calculate mining rate
+	double miningRate = 1 / static_cast<chrono::duration<double>>(endTime - previousGraphProcessedTime).count();
 	
 	// Update previous graph processed time
 	previousGraphProcessedTime = endTime;
 	
-	// Set previously disconnected from server to false
-	previouslyDisconnectedFromServer = false;
+	// Reset server connection flags
 	
-	// Set previously waited for applicable job from server to false
-	previouslyWaitedForApplicableJobFromServer = false;
-	
-	// Display message
-	cout << "\tGraphs checked:\t " << ++graphsProcessed << endl;
+	// Increment graphs processed
+	++graphsProcessed;
 	
 	// Check if not tuning
 	#ifndef TUNING
@@ -3472,8 +3462,8 @@ void stopMiner() noexcept {
 			}
 		}
 		
-		// Display message
-		cout << "\tSolutions found: " << solutionsFound << endl;
+		// Store solutions found for display
+		// (will be displayed in the live stats line)
 		
 		// Check if not reconnecting to the server and it's time to send a keep alive request to the stratum server
 		if(!reconnectToServer && endTime - lastKeepAliveTime >= SEND_KEEP_ALIVE_REQUEST_INTERVAL) {
@@ -3606,8 +3596,7 @@ void stopMiner() noexcept {
 						// Check if job isn't applicable
 						if(!jobIsApplicable) {
 						
-							// Set previously waited for applicable job from server to true
-							previouslyWaitedForApplicableJobFromServer = true;
+						// Mark that we waited for applicable job from server
 						}
 						
 						// Set total received to zero
@@ -3671,8 +3660,7 @@ void stopMiner() noexcept {
 				#endif
 			}
 			
-			// Set previously disconnected from server to true
-			previouslyDisconnectedFromServer = true;
+		// Mark that we disconnected from server
 			
 			// Set total received to zero
 			totalReceived = 0;
@@ -3682,8 +3670,46 @@ void stopMiner() noexcept {
 		}
 	#endif
 	
-	// Display message
-	cout << "Pipeline stages:" << endl << "\tSearching time:\t " << static_cast<chrono::duration<double>>(endTime - startTime).count() << " second(s)" << endl;
+	// Calculate searching time
+	double searchingTime = static_cast<chrono::duration<double>>(endTime - startTime).count();
+	
+	// Display live stats table
+	// Note: trimmingTime will be set by the trimming functions
+	extern double trimmingTime;
+	
+	// Check if this is the first time displaying the table
+	static bool firstTime = true;
+	
+	if (!firstTime) {
+		// Clear previous table and display new one
+		cout << "\r\033[2K"; // Clear current line
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 1
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 2
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 3
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 4
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 5
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 6
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 7
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 8
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 9
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 10
+		cout << "\r\033[1A\033[2K"; // Move up and clear line 11
+	}
+	
+	cout << endl << endl; // 2 blank line separators
+	firstTime = false;
+	cout << "+=============================================================+" << endl;
+	cout << "|                    MWC Miner                    " << endl;
+	cout << "+=============================================================+" << endl;
+	cout << "| Status:      " << setw(12) << "Active" << "    | Graphs Checked: " << setw(12) << graphsProcessed << endl;
+	cout << "| Algorithm:   " << setw(12) << "C" TO_STRING(EDGE_BITS) << "    | Solutions:      " << setw(12) << solutionsFound << endl;
+	cout << "| Mining Rate: " << setw(12) << fixed << setprecision(2) << miningRate << " g/s| Accepted:       " << setw(12) << acceptedShares << endl;
+	cout << "| Search Time: " << setw(12) << fixed << setprecision(2) << searchingTime << "s   | Stale:          " << setw(12) << staleShares << endl;
+	cout << "| Trim Time:   " << setw(12) << fixed << setprecision(2) << trimmingTime << "s   | Rejected:       " << setw(12) << rejectedShares << endl;
+	#ifdef TUNING
+		cout << "| Mode:       " << setw(8) << "Testing" << "        |             " << setw(8) << "     |" << endl;
+	#endif
+	cout << "+=============================================================+" << endl;
 }
 
 // Check if not tuning
@@ -4208,6 +4234,11 @@ void stopMiner() noexcept {
 			const char *method = strstr(partStart, "\"method\":");
 			if(method) {
 			
+				// Check if this is a submit response (has result field)
+				if(strstr(partStart, "\"result\":")) {
+					processSubmitResponse(partStart);
+				}
+			
 				// Check if method is get job template or job
 				if(!strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"getjobtemplate\"", sizeof("\"getjobtemplate\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], " \"getjobtemplate\"", sizeof(" \"getjobtemplate\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], "\"job\"", sizeof("\"job\"") - sizeof('\0')) || !strncmp(&method[sizeof("\"method\":") - sizeof('\0')], " \"job\"", sizeof(" \"job\"") - sizeof('\0'))) {
 				
@@ -4358,6 +4389,22 @@ void stopMiner() noexcept {
 		
 		// Return false
 		return false;
+	}
+	
+	// Process submit response
+	void processSubmitResponse(const char *response) noexcept {
+		// Check if response contains "result":true (accepted share)
+		if(strstr(response, "\"result\":true") || strstr(response, "\"result\": true")) {
+			++acceptedShares;
+		}
+		// Check if response contains "result":false (rejected share)
+		else if(strstr(response, "\"result\":false") || strstr(response, "\"result\": false")) {
+			++rejectedShares;
+		}
+		// Check if response contains "stale" (stale share)
+		else if(strstr(response, "stale") || strstr(response, "Stale")) {
+			++staleShares;
+		}
 	}
 	
 	// Send full
