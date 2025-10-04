@@ -1588,7 +1588,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 					}
 					
 					// Go through all of the searching thread's units in the edges bitmap
-					uint64_t edgeIndex = bitmapStart * BITMAP_UNIT_WIDTH * EDGE_NUMBER_OF_COMPONENTS;
+					uint64_t edgeIndex = static_cast<uint64_t>(bitmapStart) * BITMAP_UNIT_WIDTH * EDGE_NUMBER_OF_COMPONENTS;
 					for(uint_fast32_t bitmapIndex = bitmapStart; bitmapIndex < bitmapEnd; ++bitmapIndex) {
 					
 						// Go through all bits in the unit
@@ -1633,7 +1633,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 							
 							// Check if getting solution was successful
 							uint32_t solution[SOLUTION_SIZE];
-							if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(NUMBER_OF_EDGES * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
+							if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], static_cast<uint64_t>((1 - 1 / pow(2, searchingThreadIndex)) * NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(NUMBER_OF_EDGES * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * NUMBER_OF_EDGES * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT))) - firstSearchingEdge)) {
 							
 								// Lock
 								lock.lock();
@@ -2109,7 +2109,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 								
 								// Check if getting solution was successful
 								uint32_t solution[SOLUTION_SIZE];
-								if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
+								if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], static_cast<uint64_t>((1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreads - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT))) - firstSearchingEdge)) {
 								
 									// Lock
 									lock.lock();
@@ -2334,7 +2334,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 				
 				// Go through all searching threads
 				thread searchingThreads[numberOfSearchingThreads];
-				uint64_t numberOfEdges[numberOfSearchingThreads];
+				uint32_t numberOfEdges[numberOfSearchingThreads];
 				barrier searchingThreadsBarrier(numberOfSearchingThreads);
 				const unique_ptr<uint32_t[]> edges(new(nothrow) uint32_t[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS]);
 				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreadsSearchingEdges];
@@ -2442,7 +2442,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 							searchingThreadsBarrier.arrive_and_wait();
 							
 							// Check if not the first searching thread
-							uint64_t firstEdge = 0;
+							uint32_t firstEdge = 0;
 							if(searchingThreadIndex) {
 							
 								// Go through all previous searching threads
@@ -2454,11 +2454,11 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 							}
 							
 							// Check if not too many edges exist for the searching thread
-							uint64_t totalNumberOfEdges;
+							uint32_t totalNumberOfEdges;
 							if(firstEdge + numberOfEdges[searchingThreadIndex] <= MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
 							
 								// Go through all of the searching thread's units in the edges bitmap
-								uint64_t edgeIndex = firstEdge * EDGE_NUMBER_OF_COMPONENTS;
+								uint64_t edgeIndex = static_cast<uint64_t>(firstEdge) * EDGE_NUMBER_OF_COMPONENTS;
 								for(uint_fast32_t bitmapIndex = bitmapStart; bitmapIndex < bitmapEnd; ++bitmapIndex) {
 								
 									// Go through all set bits in the unit
@@ -2590,7 +2590,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 									
 									// Check if getting solution was successful
 									uint32_t solution[SOLUTION_SIZE];
-									if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
+									if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], static_cast<uint64_t>((1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT))) - firstSearchingEdge)) {
 									
 										// Lock
 										lock.lock();
@@ -2805,7 +2805,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 				
 				// Go through all searching threads
 				thread searchingThreads[numberOfSearchingThreads];
-				uint64_t numberOfEdges[numberOfSearchingThreads];
+				uint32_t numberOfEdges[numberOfSearchingThreads];
 				barrier searchingThreadsBarrier(numberOfSearchingThreads);
 				const unique_ptr<uint32_t[]> edges(new(nothrow) uint32_t[MAX_NUMBER_OF_EDGES_AFTER_TRIMMING * EDGE_NUMBER_OF_COMPONENTS]);
 				unique_ptr<CuckatooNodeConnectionsLink[]> nodeConnections[numberOfSearchingThreadsSearchingEdges];
@@ -2913,7 +2913,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 							searchingThreadsBarrier.arrive_and_wait();
 							
 							// Check if not the first searching thread
-							uint64_t firstEdge = 0;
+							uint32_t firstEdge = 0;
 							if(searchingThreadIndex) {
 							
 								// Go through all previous searching threads
@@ -2925,11 +2925,11 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 							}
 							
 							// Check if not too many edges exist for the searching thread
-							uint64_t totalNumberOfEdges;
+							uint32_t totalNumberOfEdges;
 							if(firstEdge + numberOfEdges[searchingThreadIndex] <= MAX_NUMBER_OF_EDGES_AFTER_TRIMMING) {
 							
 								// Go through all of the searching thread's units in the edges bitmap
-								uint64_t edgeIndex = firstEdge * EDGE_NUMBER_OF_COMPONENTS;
+								uint64_t edgeIndex = static_cast<uint64_t>(firstEdge) * EDGE_NUMBER_OF_COMPONENTS;
 								for(uint_fast32_t bitmapIndex = bitmapStart; bitmapIndex < bitmapEnd; ++bitmapIndex) {
 								
 									// Go through all set bits in the unit
@@ -3061,7 +3061,7 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 									
 									// Check if getting solution was successful
 									uint32_t solution[SOLUTION_SIZE];
-									if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], (1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT)) - firstSearchingEdge)) {
+									if(getCuckatooSolution(solution, &nodeConnections[firstSearchingEdge * 2], &edges[firstSearchingEdge * EDGE_NUMBER_OF_COMPONENTS], static_cast<uint64_t>((1 - 1 / pow(2, searchingThreadIndex)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) + ceil(totalNumberOfEdges * FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT + totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT) - (1 - 1 / pow(2, numberOfSearchingThreadsSearchingEdges - 1)) * totalNumberOfEdges * (1 - FIRST_SEARCHING_THREAD_SEARCH_EDGES_PERCENT))) - firstSearchingEdge)) {
 									
 										// Lock
 										lock.lock();
