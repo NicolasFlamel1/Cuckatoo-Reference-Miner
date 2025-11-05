@@ -1378,31 +1378,69 @@ bool startMiner(const int argc, char *argv[]) noexcept {
 	// Check if not using other main function
 	#ifndef USE_OTHER_MAIN_FUNCTION
 	
-		// Check if setting interrupt signal handler failed
-		if(signal(SIGINT, [](const int signal) noexcept {
+		// Check if using Windows
+		#ifdef _WIN32
 		
-			// Check if interrupt signal occurred
-			if(signal == SIGINT) {
+			// Check if setting interrupt signal handler failed
+			if(signal(SIGINT, [](const int signal) noexcept {
 			
-				// Stop miner
-				stopMiner();
+				// Check if interrupt signal occurred
+				if(signal == SIGINT) {
+				
+					// Stop miner
+					stopMiner();
+				}
+				
+			}) == SIG_ERR) {
+			
+				// Display message
+				cout << "Setting interrupt signal handler failed." << endl;
+				
+				// Return false
+				return false;
 			}
 			
-		}) == SIG_ERR) {
-		
-			// Display message
-			cout << "Setting interrupt signal handler failed." << endl;
+			// Automatically restore default interrupt signal handler when done
+			const unique_ptr<volatile sig_atomic_t, void(*)(volatile sig_atomic_t *)> signalHandlerUniquePointer(&closing, [](__attribute__((unused)) volatile sig_atomic_t *closingPointer) noexcept {
 			
-			// Return false
-			return false;
-		}
+				// Restore default interrupt signal handler
+				signal(SIGINT, SIG_DFL);
+			});
+			
+		// Otherwise
+		#else
 		
-		// Automatically restore default interrupt signal handler when done
-		const unique_ptr<volatile sig_atomic_t, void(*)(volatile sig_atomic_t *)> signalHandlerUniquePointer(&closing, [](__attribute__((unused)) volatile sig_atomic_t *closingPointer) noexcept {
-		
-			// Restore default interrupt signal handler
-			signal(SIGINT, SIG_DFL);
-		});
+			// Initialize signal action to restart syscalls when interrupted
+			struct sigaction signalAction = {};
+			signalAction.sa_flags = SA_RESTART;
+			signalAction.sa_handler = [](const int signal) {
+			
+				// Check if interrupt or terminate signal occurred
+				if(signal == SIGINT || signal == SIGTERM) {
+				
+					// Stop miner
+					stopMiner();
+				}
+			};
+			
+			// Check if setting interrupt signal handler failed
+			if(sigaction(SIGINT, &signalAction, nullptr) || sigaction(SIGTERM, &signalAction, nullptr)) {
+			
+				// Display message
+				cout << "Setting interrupt signal handler failed." << endl;
+				
+				// Return false
+				return false;
+			}
+			
+			// Automatically restore default interrupt signal handler when done
+			const unique_ptr<volatile sig_atomic_t, void(*)(volatile sig_atomic_t *)> signalHandlerUniquePointer(&closing, [](__attribute__((unused)) volatile sig_atomic_t *closingPointer) noexcept {
+			
+				// Restore default interrupt signal handler
+				signal(SIGINT, SIG_DFL);
+				signal(SIGTERM, SIG_DFL);
+			});
+		#endif
 	#endif
 	
 	// Display message
