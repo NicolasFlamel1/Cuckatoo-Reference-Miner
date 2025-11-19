@@ -1,6 +1,6 @@
 # Parameters
 NAME = Cuckatoo Reference Miner
-VERSION = 0.3.1
+VERSION = 0.3.2
 EDGE_BITS = 31
 TRIMMING_ROUNDS = 90
 SLEAN_TRIMMING_PARTS = 2
@@ -316,7 +316,7 @@ run:
 
 # Make clean
 clean:
-	$(DELETE_COMMAND) "./$(NAME)" "./$(NAME).exe" "./$(NAME).ipa" "./$(NAME).app" "./lib$(subst $\ ,_,$(NAME)).so" "./$(NAME).apk" "./$(NAME).apk.idsig" "./v2025.07.22.tar.gz" "./OpenCL-Headers-2025.07.22" "./OpenCL-ICD-Loader-2025.07.22" "./metal-cpp_macOS26_iOS26-beta2.zip" "./metal-cpp" "./Payload" "./build" > $(NULL_LOCATION) 2>&1
+	$(DELETE_COMMAND) "./$(NAME)" "./$(NAME).exe" "./$(NAME).ipa" "./$(NAME).app" "./lib$(subst $\ ,_,$(NAME)).so" "./$(NAME).apk" "./$(NAME).apk.idsig" "./v2025.07.22.tar.gz" "./OpenCL-Headers-2025.07.22" "./OpenCL-ICD-Loader-2025.07.22" "./metal-cpp_26.zip" "./metal-cpp" "./Payload" "./build" > $(NULL_LOCATION) 2>&1
 
 # Make Android dependencies (This command works when using Linux: ~/Android/Sdk/ndk/29.0.13113456/prebuilt/linux-x86_64/bin/make CC="~/Android/Sdk/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++" androidDependencies)
 androidDependencies:
@@ -420,10 +420,10 @@ freeBsdDependencies:
 appleDependencies:
 	
 	# Metal-cpp
-	rm -rf "./metal-cpp_macOS26_iOS26-beta2.zip" "./metal-cpp" "./metal.h"
-	curl -LO "https://developer.apple.com/metal/cpp/files/metal-cpp_macOS26_iOS26-beta2.zip"
-	unzip "./metal-cpp_macOS26_iOS26-beta2.zip"
-	rm "./metal-cpp_macOS26_iOS26-beta2.zip"
+	rm -rf "./metal-cpp_26.zip" "./metal-cpp" "./metal.h"
+	curl -LO "https://developer.apple.com/metal/cpp/files/metal-cpp_26.zip"
+	unzip "./metal-cpp_26.zip"
+	rm "./metal-cpp_26.zip"
 	cd "./metal-cpp" && "./SingleHeader/MakeSingleHeader.py" -o "../metal.h" "./Metal/Metal.hpp"
 	rm -r "./metal-cpp"
 
