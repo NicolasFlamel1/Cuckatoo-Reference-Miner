@@ -3947,8 +3947,34 @@ void stopMiner() noexcept {
 			cout << "Logging into the stratum server without a password." << endl;
 		}
 		
+		// Create login request
+		char loginRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0') + (stratumServerUsername ? strlen(stratumServerUsername) : 0) + sizeof("\",\"pass\":\"") - sizeof('\0') + (stratumServerPassword ? strlen(stratumServerPassword) : 0) + sizeof("\",\"agent\":\"" TO_STRING(STRATUM_SERVER_AGENT_PREFIX) TO_STRING(NAME) "/v" TO_STRING(VERSION) "\"}}\n") - sizeof('\0')];
+		
+		// Append start of username parameter to login request
+		memcpy(loginRequest, "{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0'));
+		
+		// Check if stratum server username exists
+		if(stratumServerUsername) {
+		
+			// Append stratum server username to login request
+			memcpy(&loginRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0')], stratumServerUsername, strlen(stratumServerUsername));
+		}
+		
+		// Append start of password parameter to login request
+		memcpy(&loginRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0') + (stratumServerUsername ? strlen(stratumServerUsername) : 0)], "\",\"pass\":\"", sizeof("\",\"pass\":\"") - sizeof('\0'));
+		
+		// Check if stratum server password exists
+		if(stratumServerPassword) {
+		
+			// Append stratum server password to login request
+			memcpy(&loginRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0') + (stratumServerUsername ? strlen(stratumServerUsername) : 0) + sizeof("\",\"pass\":\"") - sizeof('\0')], stratumServerPassword, strlen(stratumServerPassword));
+		}
+		
+		// Append agent to login request
+		memcpy(&loginRequest[sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0') + (stratumServerUsername ? strlen(stratumServerUsername) : 0) + sizeof("\",\"pass\":\"") - sizeof('\0') + (stratumServerPassword ? strlen(stratumServerPassword) : 0)], "\",\"agent\":\"" TO_STRING(STRATUM_SERVER_AGENT_PREFIX) TO_STRING(NAME) "/v" TO_STRING(VERSION) "\"}}\n", sizeof("\",\"agent\":\"" TO_STRING(STRATUM_SERVER_AGENT_PREFIX) TO_STRING(NAME) "/v" TO_STRING(VERSION) "\"}}\n") - sizeof('\0'));
+		
 		// Check if sending login request to the stratum server failed
-		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"login\",\"params\":{\"login\":\"") - sizeof('\0')) || (stratumServerUsername && !sendFull(stratumServerUsername, strlen(stratumServerUsername))) || !sendFull("\",\"pass\":\"", sizeof("\",\"pass\":\"") - sizeof('\0')) || (stratumServerPassword && !sendFull(stratumServerPassword, strlen(stratumServerPassword))) || !sendFull("\",\"agent\":\"" TO_STRING(NAME) "\"}}\n", sizeof("\",\"agent\":\"" TO_STRING(NAME) "\"}}\n") - sizeof('\0'))) {
+		if(!sendFull(loginRequest, sizeof(loginRequest))) {
 		
 			// Display message
 			cout << "Sending login request to the stratum server failed." << endl;
@@ -4017,8 +4043,8 @@ void stopMiner() noexcept {
 		// Display message
 		cout << "Getting job from the stratum server." << endl;
 		
-		// Check if sending get job template request to the stratum server failed
-		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n") - sizeof('\0'))) {
+		// Check if sending get job template request with algorithm name to the stratum server failed
+		if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":{\"algorithm\":\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\"}}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":{\"algorithm\":\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\"}}\n") - sizeof('\0'))) {
 		
 			// Display message
 			cout << "Sending get job template request to the stratum server failed." << endl;
@@ -4037,11 +4063,11 @@ void stopMiner() noexcept {
 			return false;
 		}
 		
-		// Chek if stratum server responded with an invalid request response
+		// Check if stratum server responded with an invalid request response (-32600)
 		if(strstr(serverResponse, "\"code\":-32600") || strstr(serverResponse, "\"code\": -32600")) {
 		
-			// Check if sending get job template request with algorithm name to the stratum server failed
-			if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":{\"algorithm\":\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\"}}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":{\"algorithm\":\"" TO_STRING(STRATUM_SERVER_MINING_ALGORITHM_NAME) "\"}}\n") - sizeof('\0'))) {
+			// Check if sending get job template request to the stratum server failed
+			if(!sendFull("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n", sizeof("{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"getjobtemplate\",\"params\":null}\n") - sizeof('\0'))) {
 			
 				// Display message
 				cout << "Sending get job template request to the stratum server failed." << endl;
@@ -4059,6 +4085,50 @@ void stopMiner() noexcept {
 				// Return false
 				return false;
 			}
+		}
+		
+		// Check if stratum server responded with a server error response (-32000 to -32099)
+		if(strstr(serverResponse, "\"code\":-320") || strstr(serverResponse, "\"code\": -320")) {
+		
+			// Display message
+			cout << "Getting job from the stratum server failed." << endl;
+				
+			// Check if response contains a message
+			const char *message = strstr(serverResponse, "\"message\":");
+			if(message) {
+			
+				// Check if message contains a value
+				message = strchr(&message[sizeof("\"message\":") - sizeof('\0')], '"');
+				if(message) {
+				
+					// Display message
+					cout << "Failure reason from the stratum server: ";
+					
+					// Go through all characters in the message
+					for(++message; *message && *message != '"'; ++message) {
+					
+						// Check if character is an escaped double quote or backslash
+						if(*message == '\\' && (message[sizeof('\\')] == '"' || message[sizeof('\\')] == '\\')) {
+						
+							// Go to next character
+							++message;
+						}
+						
+						// Check if character is printable
+						if(isprint(*message)) {
+						
+							// Display character
+							cout << *message;
+						}
+					}
+					
+					// Display new line
+					cout << endl;
+				}
+			}
+			
+			// Return false
+			return false;
 		}
 		
 		// Check if getting job from the stratum server failed
