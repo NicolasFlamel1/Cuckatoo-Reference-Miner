@@ -4092,7 +4092,7 @@ void stopMiner() noexcept {
 		
 			// Display message
 			cout << "Getting job from the stratum server failed." << endl;
-				
+			
 			// Check if response contains a message
 			const char *message = strstr(serverResponse, "\"message\":");
 			if(message) {
