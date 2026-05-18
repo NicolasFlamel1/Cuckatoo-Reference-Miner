@@ -265,11 +265,11 @@ else
 	ifeq ($(shell uname),FreeBSD)
 	
 		# Check if static OpenCL library exists
-		ifneq (,$(wildcard ./opencl_loader/dist/freebsd/$(shell uname -p)/lib/libOpenCL.a))
+		ifneq (,$(wildcard ./opencl_loader/dist/freebsd/$(shell uname -m)/lib/libOpenCL.a))
 		
 			# Statically link to OpenCL library
 			CFLAGS += -I"./opencl_headers"
-			LIBS += -Wl,-Bstatic -L"./opencl_loader/dist/freebsd/$(shell uname -p)/lib" -lOpenCL -Wl,-Bdynamic
+			LIBS += -Wl,-Bstatic -L"./opencl_loader/dist/freebsd/$(shell uname -m)/lib" -lOpenCL -Wl,-Bdynamic
 			
 		# Otherwise
 		else
@@ -283,11 +283,11 @@ else
 	else
 	
 		# Check if static OpenCL library exists
-		ifneq (,$(wildcard ./opencl_loader/dist/linux/$(shell uname -p)/lib/libOpenCL.a))
+		ifneq (,$(wildcard ./opencl_loader/dist/linux/$(shell uname -m)/lib/libOpenCL.a))
 		
 			# Statically link to OpenCL library
 			CFLAGS += -I"./opencl_headers"
-			LIBS += -Wl,-Bstatic -L"./opencl_loader/dist/linux/$(shell uname -p)/lib" -lOpenCL -Wl,-Bdynamic
+			LIBS += -Wl,-Bstatic -L"./opencl_loader/dist/linux/$(shell uname -m)/lib" -lOpenCL -Wl,-Bdynamic
 			
 		# Otherwise
 		else
