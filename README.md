@@ -111,6 +111,10 @@ Here's commands that can be used to mine to some of the MimbleWimble Coin (MWC) 
 ```
 "./Cuckatoo Reference Miner" -a stratum+tcp://stratum2.pacificpool.ws:2222 -u YOUR_PACIFIC_POOL_USERNAME.RIG_ID
 ```
+* [Grand Pool](https://grandpool.io/pools/mimblewimble) (Replace `YOUR_WALLETS_TOR_OR_MQS_ADDRESS_WITHOUT_URL_PROTOCOL_AND_WITHOUT_TOP_LEVEL_DOMAIN.RIG_ID` with your values, for example `rvscna33zmif2j4fz65wmvjvjevhywrlezzfm2q7jxyg5hejmpfuhcid.device_1` for the Tor address `rvscna33zmif2j4fz65wmvjvjevhywrlezzfm2q7jxyg5hejmpfuhcid` or `q5ZsxbvYHCUVtUTWEAPfCX5kA9Ku9NdND7oeZaVkUmotk4NNrUio.device_1` for the MQS address `mwcmqs://q5ZsxbvYHCUVtUTWEAPfCX5kA9Ku9NdND7oeZaVkUmotk4NNrUio`)
+```
+"./Cuckatoo Reference Miner" -a stratum+tcp://fr.grandpool.io:6070 -u YOUR_WALLETS_TOR_OR_MQS_ADDRESS_WITHOUT_URL_PROTOCOL_AND_WITHOUT_TOP_LEVEL_DOMAIN.RIG_ID
+```
 You can display all your available GPUs and their indices that this program can use by running it with the `--display_gpus` command line argument.
 ```
 "./Cuckatoo Reference Miner" --display_gpus
